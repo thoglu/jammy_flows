@@ -18,8 +18,8 @@ import pylab
 class gf_block(euclidean_base.euclidean_base):
     def __init__(self, dimension, num_kde=5, num_householder_iter=-1, use_permanent_parameters=False, fit_normalization=0, inverse_function_type="inormal_partly_precise", model_offset=0):
         """
-        Modified version of official implementation in https:/github .. fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
-        to use reparametrization trick for VAEs due to Newton iterations
+        Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
+        to use reparametrization trick for VAEs due to Newton iterations.
         Parameters:
         dimension (int): dimension of the PDF
         num_kde (int): number of KDE s in the one-dimensional PDF

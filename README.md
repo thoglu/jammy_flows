@@ -101,7 +101,7 @@ Hopefully following soon. In the meantime check out the [example script](example
 
 ### Euclidean flows:
 
-- [x] Gaussianization flow (**"g"**)
+- [x] Gaussianization flow (described in [arXiv:2003.01941](https://arxiv.org/abs/2003.01941)) (**"g"**)
 - [x] Hybrid of Nonlinear Scalings and HouseHolder Rotations ("Polynomial Stretch flow") (**"p"**)
 
 ### Spherical flows:
