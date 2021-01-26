@@ -11,9 +11,8 @@ class moebius(sphere_base.sphere_base):
         super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters)
         
         if(dimension!=1):
-            print("The moebius flow is defined for dimension 1, but dimension %d is handed over" % (dimension))
-            sys.exit(-1)
-
+            raise Exception("The moebius flow is defined for dimension 1, but dimension %d is handed over" % (dimension))
+           
     
         self.use_moebius_xyz_parametrization=use_moebius_xyz_parametrization
         self.num_moebius=num_moebius

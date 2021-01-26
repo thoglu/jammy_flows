@@ -10,7 +10,7 @@ import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 
 
-def calculate_contours(pdf_vals, bin_volumes, probs=[0.68, 0.9]):
+def calculate_contours(pdf_vals, bin_volumes, probs=[0.68, 0.95]):
     totsum = 0.0
     flattend_pdf = pdf_vals.flatten()
     #flattend_volumes = bin_volumes.flatten()
@@ -185,7 +185,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
       r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:1], conditional_input=cinput)
       print(r)
-      sys.exit(-1)
+      raise Exception()
 
     #######################
 

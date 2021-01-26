@@ -121,7 +121,7 @@ class AmortizableMLP(nn.Module):
             self.b_s.append(self.outputs[ind])
 
             if(self.svd_mode=="naive"):
-                print("naive")
+                
                 self.u_s.append(self.used_ranks[ind]*self.outputs[ind])
                 self.v_s.append(self.used_ranks[ind]*self.inputs[ind])
                 num_amortization_params+=(self.used_ranks[ind]*inputs[ind]+self.used_ranks[ind]*outputs[ind]+outputs[ind])
@@ -148,11 +148,7 @@ class AmortizableMLP(nn.Module):
             
                 num_amortization_params+=(self.used_ranks[ind]*inputs[ind]+self.used_ranks[ind]*outputs[ind]+outputs[ind]+self.used_ranks[ind])
             else:
-                print("unknown svd mode", self.svd_mode)
-                sys.exit(-1)
-            
-
-            
+                raise Exception("unknown svd mode", self.svd_mode)
 
             add_activation=True
             
@@ -304,15 +300,6 @@ class AmortizableMLP(nn.Module):
             this_v, amortization_params=amortization_params[:, :self.v_s[ind]], amortization_params[:, self.v_s[ind]:]
             this_b, amortization_params=amortization_params[:, :self.b_s[ind]], amortization_params[:, self.b_s[ind]:]
 
-            """
-            if(self.svd_mode=="naive"):
-                sys.exit(-1)
-                this_u=this_u.view(i.shape[0], int(this_u.shape[1]/this_rank), this_rank) # U
-                this_v=this_v.view(i.shape[0], this_rank,int(this_v.shape[1]/this_rank)) # V^T
-                    
-                A=torch.bmm(this_u, this_v)
-            """ 
-                
             if(self.svd_mode=="smart"):
                 
                 ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product

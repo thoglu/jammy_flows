@@ -168,8 +168,7 @@ class psf_block(euclidean_base.euclidean_base):
                 if(rotation_matrix.shape[0]<x.shape[0]):
                     rotation_matrix=rotation_matrix.repeat(x.shape[0], 1,1)
                 else:
-                    print("rotation matrix first dim is larger than data first dim (batch dim) .. taht should never happen!")
-                    sys.exit(-1)
+                    raise Exception("rotation matrix first dim is larger than data first dim (batch dim) .. taht should never happen!")
 
 
         log_widths1=self.log_widths1.to(x)
@@ -271,10 +270,8 @@ class psf_block(euclidean_base.euclidean_base):
                 if(rotation_matrix.shape[0]<x.shape[0]):
                     rotation_matrix=rotation_matrix.repeat(x.shape[0], 1,1)
                 else:
-                    print("rotation matrix first dim is larger than data first dim (batch dim) .. taht should never happen!")
-                    sys.exit(-1)
-           
-
+                    raise Exception("rotation matrix first dim is larger than data first dim (batch dim) .. taht should never happen!")
+                
             x = torch.bmm(rotation_matrix.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)  # uncomment
 
         

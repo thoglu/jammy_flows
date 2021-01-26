@@ -830,7 +830,7 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
             print("CUR PARAMS", param_list)
             ##########
-            sys.exit(-1)
+
             """
             
             param_list.append(torch.flatten(bw))

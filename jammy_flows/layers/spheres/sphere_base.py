@@ -168,8 +168,7 @@ class sphere_base(layer_base.layer_base):
                     mask_smaller=(x[:,ind:ind+1]<0).double()
                     new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
                 else:
-                    print("should not happen for d<3")
-                    sys.exit(-1)
+                    raise NotImplementedError("D>2 not implemented for D-spheres currently")
                     log_det+=torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
 
                 transformed_coords.append(new_angle)

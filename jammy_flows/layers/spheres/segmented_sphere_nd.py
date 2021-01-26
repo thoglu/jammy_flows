@@ -24,8 +24,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
         
         if(dimension==1):
-            print("The moebius flow should be used for dimension 1!")
-            sys.exit(-1)
+            raise Exception("The moebius flow should be used for dimension 1!")
+        
 
         ## a moebius layer
         self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)

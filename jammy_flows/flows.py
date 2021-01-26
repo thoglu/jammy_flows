@@ -214,12 +214,12 @@ class pdf(nn.Module):
 
                 self.flow_dict[k] = dict()
                 if "module" not in flow_defs_detail[k].keys():
-                    print(
+                    raise Exception(
                         "Flow defs of ",
                         k,
                         " do not contain the module object .. this is a requirement!",
                     )
-                    sys.exit(-1)
+                    
                 self.flow_dict[k]["module"] = flow_defs_detail[k]["module"]
                 self.flow_dict[k]["kwargs"] = dict()
 
@@ -366,23 +366,19 @@ class pdf(nn.Module):
         required_hidden_mlp_dims_len=len(self.pdf_defs_list)
         if(required_hidden_mlp_dims_len>0):
             if(len(self.hidden_mlp_dims_sub_pdfs)!=required_hidden_mlp_dims_len):
-                print("hidden mlp dimension definitions for sub pdfs is wrong length (%d) .. requires length (%d)" %(len(self.hidden_mlp_dims_sub_pdfs), required_hidden_mlp_dims_len))
-                sys.exit(-1)
-
-
+                raise Exception("hidden mlp dimension definitions for sub pdfs is wrong length (%d) .. requires length (%d)" %(len(self.hidden_mlp_dims_sub_pdfs), required_hidden_mlp_dims_len))
+              
         ## define internal meta mlp mapping dims as list
         self.hidden_mlp_dims_meta=hidden_mlp_dims_meta
         if(type(self.hidden_mlp_dims_meta)==str):
             self.hidden_mlp_dims_meta=[self.hidden_mlp_dims_meta]
         elif(type(self.hidden_mlp_dims_meta)!=list):
-            print("hidden_mlp_dims_meta has to defined as a string or list of strings!")
-            sys.exit(-1)
-
+            raise Exception("hidden_mlp_dims_meta has to defined as a string or list of strings!")
+           
         if(self.input_encoder is not None):
             if(len(self.hidden_mlp_dims_meta)!=len(self.input_encoder)):
-                print("Every input encoder requires mlp meta dimension definition .. num encoders: %d - num meta mlp dimension definitions: %d" % (len(self.input_encoder), len(self.hidden_mlp_dims_meta)))
-                sys.exit(-1)
-
+                raise Exception("Every input encoder requires mlp meta dimension definition .. num encoders: %d - num meta mlp dimension definitions: %d" % (len(self.input_encoder), len(self.hidden_mlp_dims_meta)))
+               
         
         ## check if we have more than 1 input encoder, meaning we have meta encoders .. otherwise mlp dims meta is ignored anyway
         if(self.input_encoder is not None):
@@ -439,8 +435,8 @@ class pdf(nn.Module):
             ## loop thorugh the layers of this particular sub-flow
             for layer_ind, layer_type in enumerate(self.flow_defs_list[subflow_index]):
                 if(self.flow_dict[layer_type]["type"]!=subflow_description[0]):
-                    print("layer type ", layer_type, " is not compatible with flow type ", subflow_description)
-                    sys.exit(-1)
+                    raise Exception("layer type ", layer_type, " is not compatible with flow type ", subflow_description)
+                  
                 this_kwargs = copy.deepcopy(self.flow_dict[layer_type]["kwargs"])
 
                 ## overwrite permanent parameters if desired or necessary
@@ -870,20 +866,17 @@ class pdf(nn.Module):
         if conditional_input is not None:
 
             if self.input_encoder is None:
-                print("encoder is none but conditionl input is given ...")
-                sys.exit(-1)
-
+                raise Exception("encoder is none but conditionl input is given ...")
+               
             if self.mlp_predictors is None:
-                print("mlp predictor is none but conditional input is given ...")
-                sys.exit(-1)
-
+                raise Exception("mlp predictor is none but conditional input is given ...")
+              
             if(type(conditional_input)!=list):
                 conditional_input=[conditional_input]
 
             if(len(conditional_input)!=len(self.input_encoder)):
-                print("conditional input given has len ", len(conditional_input), " but requires len ", len(self.input_encoder))
-                sys.exit(-1)
-
+                raise Exception("conditional input given has len ", len(conditional_input), " but requires len ", len(self.input_encoder))
+             
           
             num_meta_encoder=len(self.input_encoder)-1
 
@@ -963,8 +956,7 @@ class pdf(nn.Module):
                         extra_params=self.mlp_predictors[pdf_index](this_data_summary)
                         
                     else:
-                        print("FORWARD: extra conditional input is empty but required for encoding!")
-                        sys.exit(-1)
+                        raise Exception("FORWARD: extra conditional input is empty but required for encoding!")
 
             if(self.predict_log_normalization):
                 if(pdf_index==0 and self.join_poisson_and_pdf_description):
@@ -1072,8 +1064,8 @@ class pdf(nn.Module):
                         
                         extra_params=self.mlp_predictors[pdf_index](this_data_summary)
                     else:
-                        print("SAMPLE: extra conditional input is empty but required for encoding!")
-                        sys.exit(-1)
+                        raise Exception("SAMPLE: extra conditional input is empty but required for encoding!")
+     
             if(self.predict_log_normalization):
 
                 if(pdf_index==0 and self.join_poisson_and_pdf_description):

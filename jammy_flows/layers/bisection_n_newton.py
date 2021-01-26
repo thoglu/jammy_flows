@@ -111,7 +111,7 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
             print("feval ", f_eval[torch.isfinite(prev)==False])
             print("f grad eval ", f_prime_eval[torch.isfinite(prev)==False])
 
-            sys.exit(-1)
+            raise Exception()
 
         if(i==(num_newton_iter-1)):
             num_non_converged=(torch.abs(f_eval)>1e-7).sum()
