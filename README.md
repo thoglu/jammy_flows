@@ -1,7 +1,6 @@
 # jammy_flows
 
-<img src="https://github.com/thoglu/jammy_flows/workflows/build_process/badge.svg">
-<img src="https://github.com/thoglu/jammy_flows/workflows/tests/badge.svg">
+<img src="https://github.com/thoglu/jammy_flows/workflows/build/badge.svg"> <img src="https://github.com/thoglu/jammy_flows/workflows/tests/badge.svg">
 
 This package implements (conditional) PDFs with **J**oint **A**utoregressive **M**anifold (**MY**) normalizing-flows. It grew out of work for the paper [Unifying supervised learning and VAEs - automating statistical inference in high-energy physics [arXiv:2008.05825]](https://arxiv.org/abs/2008.05825) and includes the paper's described methodology for coverage calculation on joint manifolds. For Euclidean manifolds, it includes an updated implementation of the [offical implementation](https://github.com/chenlin9/Gaussianization_Flows) of [Gaussianization flows [arXiv:2003.01941]](https://arxiv.org/abs/2003.01941), where now the inverse is differentiable (adding Newton iterations to the bisection) and made more stable using better approximations of the inverse Gaussian CDF.
 
