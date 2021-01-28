@@ -22,7 +22,7 @@ VERSION = '0.91'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-     'numpy', 'torch'
+     "torch>=1.7" , "numpy>=1.18.5" , "scipy>=1.5.4"
 ]
 
 # What packages are optional?
