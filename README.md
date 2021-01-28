@@ -46,6 +46,16 @@ for ind in range(num_batches_per_epoch):
     neg_log_loss.backward()
 
     optimizer.step()
+
+### after training ###
+
+## evaluation
+# target_point = point "x" to evaluate the PDF at
+# log_pdf, base_pdf, base_point = pdf(target_point)
+
+## sampling
+# target_sample, base_sample, target_log_pdf, base_log_pdf = pdf.sample(samplesize=1000)
+
 ```
 ### Conditional PDF
 
@@ -79,6 +89,16 @@ for ind in range(num_batches_per_epoch):
     neg_log_loss.backward()
 
     optimizer.step()
+
+### after training ###
+
+## evaluation
+# target_point = point "x" to evaluate the PDF at
+# log_pdf, base_pdf, base_point = pdf(target_point, conditional_input=some_input)
+
+## sampling
+# target_sample, base_sample, target_log_pdf, base_log_pdf = pdf.sample(conditional_input=some_input) # shape of 'some_input' defines number of samples in conditional pdf
+
 ```
 ### Documentation
 
