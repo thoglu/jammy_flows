@@ -106,7 +106,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
           bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
 
         elif(pdf=="s2"):
-          raise Exeption("s2_norm ", s2_norm, " unknown .")
+          raise Exception("s2_norm ", s2_norm, " unknown .")
         else:
          
             for ind, mm in enumerate(mins_maxs[glob_ind:glob_ind +
