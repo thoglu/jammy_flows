@@ -94,7 +94,7 @@ for ind in range(num_batches_per_epoch):
 
 ## evaluation
 # target_point = point "x" to evaluate the PDF at
-# log_pdf, base_log_pdf, base_sample = pdf(target_point, conditional_input=some_input)
+# log_pdf, base_log_pdf, base_point = pdf(target_point, conditional_input=some_input)
 
 ## sampling, shape of 'some_input' defines number of samples in conditional pdf
 # target_sample, base_sample, target_log_pdf, base_log_pdf = pdf.sample(conditional_input=some_input) 
