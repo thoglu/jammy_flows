@@ -6,6 +6,7 @@ import numpy
 import pylab
 import torch.autograd.functional
 import torch.autograd
+import random
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -13,6 +14,12 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 import jammy_flows.flows as f
 #from pytorch_lightning import seed_everything
 import jammy_flows.helper_fns as helper_fns
+
+def seed_everything(seed):
+
+    random.seed(seed)
+    numpy.random.seed(seed)
+    torch.manual_seed(seed)
 
 def compare_two_arrays(arr1, arr2, name1, name2):
 
@@ -47,6 +54,11 @@ def compare_two_arrays(arr1, arr2, name1, name2):
 
     print("largest diff between ", name1, " and ", name2, " (%d items): " % len(arr1),numpy.fabs(arr1-arr2).max() )
 
+
+"""
+This test checks the inversion by bisection and newton iterations by comparing it to the exact inverse.
+"""
+
 class Test(unittest.TestCase):
     def setUp(self):
 
@@ -71,7 +83,7 @@ class Test(unittest.TestCase):
         samplesize=10000
         
         
-        #seed_everything(0)
+        seed_everything(0)
         flow_exact=f.pdf(*self.init_exact[0], **self.init_exact[1])
         flow_exact.double()
 
@@ -124,7 +136,7 @@ class Test(unittest.TestCase):
         eval_derivs_again_detached_1=torch.cat(eval_derivs_again_detached_1)
         sample_derivs_1=torch.cat(sample_derivs_1)
 
-        #seed_everything(0)
+        seed_everything(0)
 
         flow_numerical=f.pdf(*self.init_numerical[0], **self.init_numerical[1])
         flow_numerical.double()
@@ -175,7 +187,7 @@ class Test(unittest.TestCase):
         sample_derivs_2=torch.cat(sample_derivs_2)
 
         ######
-
+       
         compare_two_arrays(samples.detach().numpy(), samples_num.detach().numpy(), "samples", "samples_numerical")
         compare_two_arrays(evals.detach().numpy(), evals_num.detach().numpy(), "evals", "evals_numerical")
 
