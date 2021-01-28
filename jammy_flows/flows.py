@@ -157,7 +157,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["num_householder_iter"] = -1
         self.flow_dict["g"]["kwargs"]["num_kde"] = 10
         self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
-        self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=0
+        self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block
