@@ -141,8 +141,12 @@ Hopefully following soon. In the meantime check out the [example script](example
 
 ## Requirements
 
-- pytorch (>=1.6)
-- numpy (>=1.15)
+- pytorch (>=1.7)
+- numpy (>=1.18.5)
+- scipy (>=1.5.4)
+- matplotlib (>=3.3.3)
+
+The package has been built and tested with these versions, but might work just fine with older ones.
 
 ## Installation
 ```

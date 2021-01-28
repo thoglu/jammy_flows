@@ -187,7 +187,7 @@ class Test(unittest.TestCase):
         sample_derivs_2=torch.cat(sample_derivs_2)
 
         ######
-        raise Exception()
+       
         compare_two_arrays(samples.detach().numpy(), samples_num.detach().numpy(), "samples", "samples_numerical")
         compare_two_arrays(evals.detach().numpy(), evals_num.detach().numpy(), "evals", "evals_numerical")
 
