@@ -730,7 +730,7 @@ class pdf(nn.Module):
          
                 if(type(enc)==nn.Module):
                     n_enc_this=0
-                    n_en_nograd_this=0
+                    n_enc_nograd_this=0
 
                     for p in self.encoder.parameters():
                         if p.requires_grad:
@@ -880,21 +880,23 @@ class pdf(nn.Module):
           
             num_meta_encoder=len(self.input_encoder)-1
 
-            ## loop over meta encoders first
-            for ind, enc in enumerate(self.input_encoder[:-1]):
-              
-                if(ind==0):
-                    data_summary = self.input_encoder[ind](conditional_input[ind])
-                else:
-                    data_summary = self.input_encoder[ind](conditional_input[ind], encoder_params=extra_params)
-
-                extra_params=self.encoder_mlp_predictors[ind](data_summary)
-
-            ## intermediate to flow params
-
             if(num_meta_encoder==0):
+
                 data_summary = self.input_encoder[-1](conditional_input[-1])
             else:
+
+                raise NotImplementedError()
+
+                extra_params=None
+                ## loop over meta encoders first
+                for ind, enc in enumerate(self.input_encoder[:-1]):
+              
+                    if(ind==0):
+                        data_summary = self.input_encoder[ind](conditional_input[ind])
+                    else:
+                        data_summary = self.input_encoder[ind](conditional_input[ind], encoder_params=extra_params)
+
+                    extra_params=self.encoder_mlp_predictors[ind](data_summary)
 
                 data_summary = self.input_encoder[-1](conditional_input[-1], encoder_params=extra_params)
 
