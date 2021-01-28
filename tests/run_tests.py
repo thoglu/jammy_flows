@@ -10,7 +10,7 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 
 import jammy_flows.flows as f
-from pytorch_lightning import seed_everything
+#from pytorch_lightning import seed_everything
 import jammy_flows.helper_fns as helper_fns
 
 def check_gf_trafo(flow, crude_trafo, new_trafo, new_deriv, new_log_deriv,  plot=False, name="test.png"):
@@ -168,7 +168,7 @@ class Test(unittest.TestCase):
         for ind, init in enumerate(self.flow_inits):
             
             print("checking ...", init)
-            seed_everything(0)
+            #seed_everything(0)
             this_flow=f.pdf(*init[0], **init[1])
             this_flow.double()
 
@@ -257,7 +257,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["n"]["kwargs"]=dict()
         extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
         extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
-        seed_everything(1)
+        #seed_everything(1)
         this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
 
         theta=torch.linspace(0.0001, numpy.pi-0.0001,700)
@@ -286,7 +286,7 @@ class Test(unittest.TestCase):
     def test_derivative(self):
         print("Testing derivatives of Gaussianization flows")
         icdf_approximations=["inormal_full_pade", "inormal_partly_crude", "inormal_partly_precise", "isigmoid"]
-        seed_everything(0)
+        #seed_everything(0)
 
         extra_flow_defs=dict()
         extra_flow_defs["g"]=dict()
@@ -301,7 +301,7 @@ class Test(unittest.TestCase):
             return b.sigmoid_inv_error_pass(x, b.datapoints, b.log_hs, b.log_kde_weights)
 
         for icdf_approx in icdf_approximations:
-            seed_everything(0)
+            #seed_everything(0)
 
             extra_flow_defs=dict()
             extra_flow_defs["g"]=dict()

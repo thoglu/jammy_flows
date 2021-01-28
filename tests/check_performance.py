@@ -11,14 +11,13 @@ sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')
 
 
 import jammy_flows.flows as f
-from pytorch_lightning import seed_everything
+
 
 def test_gf_modes():
 
     icdf_approximations=["inormal_full_pade", "inormal_partly_crude", "inormal_partly_precise", "isigmoid"]
 
     for icdf_approx in icdf_approximations:
-        seed_everything(0)
 
         extra_flow_defs=dict()
         extra_flow_defs["g"]=dict()
