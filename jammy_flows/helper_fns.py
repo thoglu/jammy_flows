@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
+import copy
+
+from scipy.spatial.transform import Rotation as R
 
 
 def calculate_contours(pdf_vals, bin_volumes, probs=[0.68, 0.95]):
@@ -71,7 +74,7 @@ def get_minmax_values(samples):
     return mins_maxs
 
 
-def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="standard"):
+def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="standard", s2_rotate_to_true_value=False, true_values=None):
 
     side_vals = []
 
@@ -129,9 +132,14 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     mask_inner = torch.ones(len(torch_positions)) == 1
 
-    for ind, pdf in enumerate(model.pdf_defs_list):
+    for ind, pdf_def in enumerate(model.pdf_defs_list):
        
-        if (pdf == "s2" and s2_norm=="lambert"):
+        if (pdf_def == "s2" and s2_norm=="lambert"):
+
+            fix_point=None
+
+            if(s2_rotate_to_true_value):
+              fix_point=true_values[model.target_dim_indices[ind][0]:model.target_dim_indices[ind][1]]
            
             mask_inner = mask_inner & (torch.sqrt(
                 (eval_positions[:, model.target_dim_indices[ind][0]:model.
@@ -144,7 +152,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
                            [1]] = cartesian_lambert_to_spherical(
                                eval_positions[:, model.
                                               target_dim_indices[ind][0]:model.
-                                              target_dim_indices[ind][1]])
+                                              target_dim_indices[ind][1]], fix_point=fix_point)
 
     if (conditional_input is not None):
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
@@ -209,7 +217,104 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     return resized_torch_positions, res, bin_volumes, sin_zen_mask, flagged_coords
 
-def cartesian_lambert_to_spherical(xl):
+def rotate_coords_to(theta, phi, target, reverse=False):
+
+  target_theta=target[0]
+  target_phi=target[1]
+
+
+  x=numpy.cos(target_phi)*numpy.sin(target_theta)
+  y=numpy.sin(target_phi)*numpy.sin(target_theta)
+  z=numpy.cos(target_theta)
+
+  ###########
+
+  axis=-numpy.cross(numpy.array([x,y,z]), numpy.array([0,0,1]))
+  axis_len=numpy.sqrt((axis**2).sum())
+  axis/=axis_len
+
+  rot_angle=numpy.pi-target_theta
+  if(reverse):
+    rot_angle=-rot_angle
+
+
+  axis*=rot_angle.item()
+
+  rot_matrix = R.from_rotvec(axis)
+  ###########
+  
+  x=numpy.cos(phi)*numpy.sin(theta)
+  y=numpy.sin(phi)*numpy.sin(theta)
+  z=numpy.cos(theta)
+  vals=torch.cat([x[:,None], y[:,None],z[:,None]], dim=1)
+
+  res=torch.from_numpy(rot_matrix.apply(vals))
+
+
+
+  """
+  print("X BEF ROT ", x.min(),x.max())
+  print("Y BEF ROT ", y.min(),y.max())
+  print("z BEF ROT ", z.min(),z.max())
+
+  
+
+  #rot_angle=rot_angle-rot_angle+numpy.pi
+  print("ROT ANGLE", rot_angle)
+  #vals=torch.Tensor([[0,1,0]])
+  #axis=torch.Tensor([1,0,0])
+  print("LENS MINMAX BEF", ((vals**2).sum(axis=1)).min(), ((vals**2).sum(axis=1)).max())
+  
+  print("AXIS", axis,  (axis**2).sum())
+  u_cross_x=numpy.cross(axis[None,:], vals)
+  u_cross_x_cross_u=numpy.cross(u_cross_x, axis[None,:])
+
+  print("u x u crosscheck")
+  print(u_cross_x_cross_u[:2])
+
+  u_cross_x2=numpy.cross(axis[None,:], vals[:1,:])
+  u_cross_x_cross_u2=numpy.cross(u_cross_x2, axis[None,:])
+
+  print("2... ", u_cross_x_cross_u2)
+
+  res=numpy.cos(rot_angle)*u_cross_x_cross_u
+
+  res+=numpy.sin(rot_angle)*u_cross_x
+  print("vals ", vals)
+  print("axis ", axis)
+  fac_b=(vals*axis[None,:]).sum(axis=1)
+  print("FAC B", fac_b)
+  fac_b=fac_b[:,None]*vals
+
+  print("FGAC B ", fac_b)
+  res+=fac_b
+
+  print("X AF ROT ", res[:,0].min(),res[:,0].max())
+  print("Y AF ROT ", res[:,1].min(),res[:,1].max())
+  print("z AF ROT ", res[:,2].min(),res[:,2].max())
+  """
+
+  
+  ##########
+
+  theta=numpy.arccos(res[:,2])
+  non_finite_mask=numpy.isfinite(theta)==False
+  larger=non_finite_mask & (res[:,2] > 0)
+  smaller=non_finite_mask & (res[:,2] < 0)
+
+  theta[smaller]=numpy.pi
+  theta[larger]=0.0
+
+
+  phi=numpy.arctan2(res[:,1],res[:,0])
+  print("PHI")
+  print(phi)
+  #phi_smaller_mask=phi<0
+  #phi[phi_smaller_mask]=phi[phi_smaller_mask]+2*numpy.pi
+  print("phi new", phi)
+  return theta, phi
+
+def cartesian_lambert_to_spherical(xl, fix_point=None):
 
     ## first go to spherical lambert
 
@@ -220,16 +325,27 @@ def cartesian_lambert_to_spherical(xl):
     phi = larger_mask * phi + (larger_mask == 0) * (2 * numpy.pi - phi)
     theta = 2 * torch.acos(r / 2.0)
 
+    if(fix_point is not None):
+
+      theta, phi = rotate_coords_to(theta, phi, fix_point, reverse=True)
+
     ## now go to spherical real coordinates
 
     return torch.cat([theta[:, None], phi[:, None]], dim=1)
 
 
-def spherical_to_cartesian_lambert(spherical):
+def spherical_to_cartesian_lambert(spherical, fix_point=None):
+
+    #####################
 
     theta = spherical[:, 0]
     phi_lambert = spherical[:, 1]
 
+    ######################
+    if(fix_point is not None):
+      theta, phi_lambert = rotate_coords_to(theta, phi_lambert, fix_point)
+
+    #print(theta, phi_lambert)
     ## first go to spherical lambert
     r_lambert = 2 * torch.cos(theta / 2.0)
 
@@ -394,6 +510,26 @@ def plot_density_with_contours(ax,
 
     pylab.colorbar(pcol_result, ax=ax)
 
+def get_basic_gridlines():
+
+  n_theta=5
+  n_phi=10
+
+  gridlines=[]
+
+  for g in numpy.linspace(0.1,numpy.pi-0.1, n_theta):
+    azis=torch.linspace(0,2*numpy.pi, 100)
+    zens=torch.ones_like(azis)*g
+    gl=torch.cat( [zens[:,None], azis[:,None]], dim=1)
+    gridlines.append(gl)
+
+  for a in numpy.linspace(0,2*numpy.pi-2*numpy.pi/n_phi, n_phi):
+    zens=torch.linspace(0,numpy.pi,100)
+    azis=torch.ones_like(zens)*a
+    gl=torch.cat( [zens[:,None], azis[:,None]], dim=1)
+    gridlines.append(gl)
+
+  return gridlines
 
 def plot_joint_pdf(pdf,
                    fig,
@@ -412,7 +548,9 @@ def plot_joint_pdf(pdf,
                    skip_plotting_density=False,
                    hide_labels=False,
                    s2_norm="standard",
-                   colormap=cm.rainbow):
+                   colormap=cm.rainbow,
+                   s2_rotate_to_true_value=True,
+                   s2_show_gridlines=True):
 
     plot_density = False
     dim = len(samples[0])
@@ -433,6 +571,11 @@ def plot_joint_pdf(pdf,
     if (bounds is not None):
         mms = bounds
 
+    ## true positions are typically labels
+    plotted_true_values=None
+    if(true_values is not None):
+      plotted_true_values=copy.deepcopy(true_values)
+
     ## if bounds contain torch .. change to float
 
     pure_float_mms = []
@@ -452,15 +595,55 @@ def plot_joint_pdf(pdf,
 
     samples = samples.detach().clone()
 
+    gridline_dict=None
+    if(s2_show_gridlines):
+      gridline_dict=dict()
+      for ind, pdf_type in enumerate(pdf.pdf_defs_list):
+        if(pdf_type=="s2"):
+          gridline_dict[(pdf.target_dim_indices[ind][0], pdf.target_dim_indices[ind][1])]=get_basic_gridlines()
+
+
     ## transform samples to lambert space if necessary
     for ind, pdf_type in enumerate(pdf.pdf_defs_list):
         if (pdf_type == "s2" and s2_norm=="lambert"):
             ## transform to labmert space
+
+            ## calculate fix point if rotation for visualtizion is desired
+            fix_point=None
+
+            if(s2_rotate_to_true_value):
+              fix_point=true_values[pdf.target_dim_indices[ind][0]:pdf.
+                                target_dim_indices[ind][1]]
+
+            ## transform samples to lambert space
             samples[:,
                     pdf.target_dim_indices[ind][0]:pdf.target_dim_indices[ind]
                     [1]] = spherical_to_cartesian_lambert(
                         samples[:, pdf.target_dim_indices[ind][0]:pdf.
-                                target_dim_indices[ind][1]])
+                                target_dim_indices[ind][1]], fix_point=fix_point)
+
+            ## transform true value to lambert space
+            if(plotted_true_values is not None):
+              
+                res=spherical_to_cartesian_lambert(true_values[pdf.target_dim_indices[ind][0]:pdf.
+                target_dim_indices[ind][1]].unsqueeze(0), fix_point=fix_point)
+
+                plotted_true_values[pdf.target_dim_indices[ind][0]:pdf.
+                target_dim_indices[ind][1]]=res.squeeze(0)
+
+          
+            ## transform gridlines to lambert space
+            if(s2_show_gridlines):
+              tup=(pdf.target_dim_indices[ind][0],pdf.target_dim_indices[ind][1])
+
+              new_list=[]
+
+              for l in gridline_dict[tup]:
+                new_list.append(spherical_to_cartesian_lambert(l, fix_point=fix_point))
+
+              gridline_dict[tup]=new_list
+
+
 
     samples = samples.numpy()
 
@@ -474,7 +657,9 @@ def plot_joint_pdf(pdf,
         pts_per_dim,
         pdf,
         conditional_input=pdf_conditional_input,
-        s2_norm=s2_norm)
+        s2_norm=s2_norm,
+        s2_rotate_to_true_value=s2_rotate_to_true_value,
+        true_values=true_values)
 
     if (dim == 1):
         ax = fig.add_subplot(gridspec)
@@ -502,12 +687,12 @@ def plot_joint_pdf(pdf,
         #if(bounds is not None):
         #    hist_bounds=[numpy.linspace(bounds[0][0], bounds[0][1], 50),numpy.linspace(bounds[1][0], bounds[1][1], 50) ]
 
-
+        ## plot the density and contours from density
         if (plot_density):
             plot_density_with_contours(ax, log_evals, evalpositions,
                                        bin_volumes, pts_per_dim)
-        #ax.scatter(samples[:,0], samples[:,1])
-
+        
+        ## plot a histogram density from samples
         if (plot_only_contours == False and plot_density == False):
 
             ax.hist2d(samples[:, 0],
@@ -515,6 +700,8 @@ def plot_joint_pdf(pdf,
                       bins=hist_bounds,
                       density=True)
 
+
+        ## plot contours from samples
         new_bounds = None
         if (contour_probs != []):
             new_bounds = show_sample_contours(ax,
@@ -527,15 +714,26 @@ def plot_joint_pdf(pdf,
         if (bounds is not None):
             new_bounds = bounds
 
+        ## mark poles
         if(len(unreliable_spherical_regions)>0):
           ax.plot(unreliable_spherical_regions[:,0], unreliable_spherical_regions[:,1], color="orange", marker="x", lw=0.0)
 
-        if (true_values is not None):
-            ax.plot([true_values[0]], [true_values[1]],
+        ## plot true values
+        if (plotted_true_values is not None):
+            ax.plot([plotted_true_values[0]], [plotted_true_values[1]],
                     color="red",
                     marker="o",
                     ms=3.0)
 
+        ## plot gridlines if desired
+        if(s2_show_gridlines):
+          print(gridline_dict.keys())
+          for gl in gridline_dict[(0,2)]:
+            np_gl=gl.numpy()
+
+            ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
+
+        ## adjust axis bounds
         if (new_bounds is not None):
             ax.set_xlim(new_bounds[0][0], new_bounds[0][1])
             ax.set_ylim(new_bounds[1][0], new_bounds[1][1])
@@ -642,7 +840,9 @@ def visualize_pdf(pdf,
                   skip_plotting_density=False,
                   hide_labels=False,
                   s2_norm="standard",
-                  colormap=cm.rainbow):
+                  colormap=cm.rainbow,
+                  s2_rotate_to_true_value=True,
+                  s2_show_gridlines=True):
 
     with torch.no_grad():
         sample_conditional_input = conditional_input
@@ -683,6 +883,8 @@ def visualize_pdf(pdf,
             skip_plotting_density=skip_plotting_density,
             hide_labels=hide_labels,
             s2_norm=s2_norm,
-            colormap=colormap)
+            colormap=colormap,
+            s2_rotate_to_true_value=s2_rotate_to_true_value,
+            s2_show_gridlines=s2_show_gridlines)
 
     return samples, new_subgridspec
