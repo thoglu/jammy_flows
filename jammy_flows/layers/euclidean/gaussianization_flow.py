@@ -32,9 +32,7 @@ class gf_block(euclidean_base.euclidean_base):
         self.init = False
         self.hs_min=0.1
 
-        """ 
         
-        """
         self.inverse_function_type=inverse_function_type
       
         assert(self.inverse_function_type=="inormal_partly_crude" or self.inverse_function_type=="inormal_partly_precise" or  self.inverse_function_type=="inormal_full_pade" or  self.inverse_function_type=="isigmoid")
@@ -46,11 +44,14 @@ class gf_block(euclidean_base.euclidean_base):
             self.householder_iter = dimension #min(dimension, 10)
         else:
             self.householder_iter = num_householder_iter
+       
 
         self.use_householder=True
         if(self.householder_iter==0):
-            self.use_householder==False
+           
+            self.use_householder=False
 
+      
         #elf.layer = layer
         self.dimension = dimension
         self.num_kde = num_kde
@@ -189,7 +190,7 @@ class gf_block(euclidean_base.euclidean_base):
    
     def sigmoid_inv_error_pass(self, x, datapoints, log_widths, log_norms):
 
-        
+    
         log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms)  # log(CDF)
         log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms)  # log(1-CDF)
 
@@ -539,14 +540,16 @@ class gf_block(euclidean_base.euclidean_base):
             if(self.fit_normalization):
                 this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.log_kde_weights.shape[1], self.log_kde_weights.shape[2]])
 
-
-
+    
         res=bn.inverse_bisection_n_newton(self.sigmoid_inv_error_pass, self.sigmoid_inv_error_pass_derivative, z, this_datapoints, this_hs, this_log_norms, min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
+        
+     
         log_deriv=self.sigmoid_inv_error_pass_log_derivative(res, this_datapoints, this_hs,this_log_norms)
 
         log_det+=-log_deriv.sum(axis=-1)
 
         if self.use_householder:
+         
             res = torch.bmm(rotation_matrix, res.unsqueeze(-1)).squeeze(-1)
        
         return res, log_det
