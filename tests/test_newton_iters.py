@@ -90,7 +90,7 @@ class Test(unittest.TestCase):
     
         flow_exact.train()
 
-        samples, base_samples, evals, base_evals=flow_exact.sample(samplesize=samplesize)
+        samples, base_samples, evals, base_evals=flow_exact.sample(samplesize=samplesize, allow_gradients=True)
         evals_again_exact,_,_=flow_exact(samples)
         evals_again_exact_detached,_,_=flow_exact(samples.detach())
 
@@ -142,7 +142,7 @@ class Test(unittest.TestCase):
         flow_numerical.double()
 
 
-        samples_num, base_samples_num, evals_num, base_evals_num=flow_numerical.sample(samplesize=samplesize)
+        samples_num, base_samples_num, evals_num, base_evals_num=flow_numerical.sample(samplesize=samplesize, allow_gradients=True)
         
         ## re-evaluate samples with the function .. should be equivalent (also in deriavative structure) to evals_num   
         evals_again_num,_,_=flow_numerical(samples_num)
