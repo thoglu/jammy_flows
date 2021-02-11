@@ -138,7 +138,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
             fix_point=None
 
-            if(s2_rotate_to_true_value):
+            if(s2_rotate_to_true_value and true_values is not None):
               fix_point=true_values[model.target_dim_indices[ind][0]:model.target_dim_indices[ind][1]]
            
             mask_inner = mask_inner & (torch.sqrt(
@@ -249,51 +249,6 @@ def rotate_coords_to(theta, phi, target, reverse=False):
   vals=torch.cat([x[:,None], y[:,None],z[:,None]], dim=1)
 
   res=torch.from_numpy(rot_matrix.apply(vals))
-
-
-
-  """
-  print("X BEF ROT ", x.min(),x.max())
-  print("Y BEF ROT ", y.min(),y.max())
-  print("z BEF ROT ", z.min(),z.max())
-
-  
-
-  #rot_angle=rot_angle-rot_angle+numpy.pi
-  print("ROT ANGLE", rot_angle)
-  #vals=torch.Tensor([[0,1,0]])
-  #axis=torch.Tensor([1,0,0])
-  print("LENS MINMAX BEF", ((vals**2).sum(axis=1)).min(), ((vals**2).sum(axis=1)).max())
-  
-  print("AXIS", axis,  (axis**2).sum())
-  u_cross_x=numpy.cross(axis[None,:], vals)
-  u_cross_x_cross_u=numpy.cross(u_cross_x, axis[None,:])
-
-  print("u x u crosscheck")
-  print(u_cross_x_cross_u[:2])
-
-  u_cross_x2=numpy.cross(axis[None,:], vals[:1,:])
-  u_cross_x_cross_u2=numpy.cross(u_cross_x2, axis[None,:])
-
-  print("2... ", u_cross_x_cross_u2)
-
-  res=numpy.cos(rot_angle)*u_cross_x_cross_u
-
-  res+=numpy.sin(rot_angle)*u_cross_x
-  print("vals ", vals)
-  print("axis ", axis)
-  fac_b=(vals*axis[None,:]).sum(axis=1)
-  print("FAC B", fac_b)
-  fac_b=fac_b[:,None]*vals
-
-  print("FGAC B ", fac_b)
-  res+=fac_b
-
-  print("X AF ROT ", res[:,0].min(),res[:,0].max())
-  print("Y AF ROT ", res[:,1].min(),res[:,1].max())
-  print("z AF ROT ", res[:,2].min(),res[:,2].max())
-  """
-
   
   ##########
 
@@ -307,11 +262,10 @@ def rotate_coords_to(theta, phi, target, reverse=False):
 
 
   phi=numpy.arctan2(res[:,1],res[:,0])
-  print("PHI")
-  print(phi)
+
   #phi_smaller_mask=phi<0
   #phi[phi_smaller_mask]=phi[phi_smaller_mask]+2*numpy.pi
-  print("phi new", phi)
+ 
   return theta, phi
 
 def cartesian_lambert_to_spherical(xl, fix_point=None):
@@ -610,10 +564,11 @@ def plot_joint_pdf(pdf,
 
             ## calculate fix point if rotation for visualtizion is desired
             fix_point=None
+            
 
-            if(s2_rotate_to_true_value):
-              fix_point=true_values[pdf.target_dim_indices[ind][0]:pdf.
-                                target_dim_indices[ind][1]]
+            if(s2_rotate_to_true_value and true_values is not None):
+             
+              fix_point=true_values[pdf.target_dim_indices[ind][0]:pdf.target_dim_indices[ind][1]]
 
             ## transform samples to lambert space
             samples[:,

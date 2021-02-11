@@ -1006,15 +1006,33 @@ class pdf(nn.Module):
 
         return log_pdf + log_det, log_pdf, base_pos
 
-    def sample(self, conditional_input=None, samplesize=1,  seed=None, device=torch.device("cpu")):
+    def sample(self, conditional_input=None, samplesize=1,  seed=None, device=torch.device("cpu"), allow_gradients=False):
+        """ 
+        Samples from the (conditional) PDF. 
+        conditional_input: None or Tensor of shape N x D wherer N is the batch size and D the input space dimension.
+        """
+        ###############
+
+        if(allow_gradients):
+
+            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, device=device, seed=seed, samplesize=samplesize)
+
+            return sample, normal_base_sample, log_pdf_target, log_pdf_base
+
+        else:   
+            with torch.no_grad():
+                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, device=device, seed=seed, samplesize=samplesize)
+
+            return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
 
-        data_type = torch.float64
+    def _obtain_sample(self, conditional_input=None, predefined_target_input=None, samplesize=1, seed=None, device=torch.device("cpu")):
         
+        data_type = torch.float64
         data_summary = None
         used_sample_size = samplesize
-
         used_device=device
+
         if conditional_input is not None:
 
             data_summary=self._conditional_input_to_summary(conditional_input=conditional_input)
@@ -1023,23 +1041,43 @@ class pdf(nn.Module):
             data_type = data_summary.dtype
             used_device = data_summary.device
 
-        if(seed is not None):
-            numpy.random.seed(seed)
-        unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_target_dim))
+        x=None
 
-        unit_gauss_samples = (
-            torch.from_numpy(unit_gauss).type(data_type).to(device)
-        )
-        log_gauss_evals = torch.distributions.MultivariateNormal(
-            torch.zeros(self.total_target_dim).type(data_type).to(device),
-            covariance_matrix=torch.eye(self.total_target_dim)
-            .type(data_type)
-            .to(device),
-        ).log_prob(unit_gauss_samples)
+        if(predefined_target_input is not None):
 
-        x = unit_gauss_samples
-        log_det = torch.zeros(used_sample_size).type(data_type).to(device)
+            x=predefined_target_input
 
+            if(conditional_input is not None):
+
+                ## make sure inputs agree
+                assert(x.shape[0]==conditional_input.shape[0])
+                assert(x.dtype==data_summary.dtype)
+                assert(x.device==data_summary.device)
+
+            else:
+                data_type=predefined_target_input.dtype
+                used_sample_size=predefined_target_input.shape[0]
+                used_device=predefined_target_input.device
+        else:
+
+            if(seed is not None):
+                numpy.random.seed(seed)
+
+            unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_target_dim))
+
+            unit_gauss_samples = (
+                torch.from_numpy(unit_gauss).type(data_type).to(device)
+            )
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(self.total_target_dim).type(data_type).to(device),
+                covariance_matrix=torch.eye(self.total_target_dim)
+                .type(data_type)
+                .to(device),
+            ).log_prob(unit_gauss_samples)
+
+            x = unit_gauss_samples
+
+        log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
 
         extra_conditional_input=[]
         new_targets=[]
@@ -1111,7 +1149,10 @@ class pdf(nn.Module):
         return torch.cat(new_targets, dim=1), unit_gauss_samples, -log_det + log_gauss_evals, log_gauss_evals
 
     def get_returnable_target_dim(self):
-
+        """
+        This function is used in the autoregressive structure and returns the total dimension of all sub PDFs. Embedded Manifold PDFs add one dimension
+        to return the embedding space dimension.
+        """
         tot_dim=0
         for pdf_index, pdf_type in enumerate(self.pdf_defs_list):
             tot_dim+=self.target_dims[pdf_index]

@@ -20,14 +20,12 @@ from jammy_flows import helper_fns
 import pylab
 from matplotlib import rc
 rc('text', usetex=True)
-from pytorch_lightning import seed_everything
+
 
 ############################
 
 if __name__ == "__main__":
 
-    seed_everything(3)
-    
     ## define PDF
     word_pdf=jammy_flows.pdf("s2", "n")
 
