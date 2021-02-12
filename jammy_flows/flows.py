@@ -1042,6 +1042,8 @@ class pdf(nn.Module):
             used_device = data_summary.device
 
         x=None
+        log_gauss_evals=0.0
+        unit_gauss_samples=0.0
 
         if(predefined_target_input is not None):
 
