@@ -691,8 +691,17 @@ def plot_joint_pdf(pdf,
         ## adjust axis bounds
         if (new_bounds is not None):
             ax.set_xlim(new_bounds[0][0], new_bounds[0][1])
-            ax.set_ylim(new_bounds[1][0], new_bounds[1][1])
+            ax.set_ylim(new_bounds[1][0], new_bounds[1][1]) 
 
+        ### overwrite any bounds for spherical
+        if(pdf.pdf_defs_list[0]=="s2"):
+          if(s2_norm=="standard"):
+            ax.set_xlim(0, numpy.pi)
+            ax.set_ylim(0, 2*numpy.pi) 
+          else:
+            ax.set_xlim(-2.0,2.0)
+            ax.set_ylim(-2.0,2.0) 
+            
         if (hide_labels):
             ax.set_yticklabels([])
             ax.set_xticklabels([])
