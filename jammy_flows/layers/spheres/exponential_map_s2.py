@@ -357,6 +357,9 @@ class exponential_map_s2(sphere_base.sphere_base):
         x_eucl=self.spherical_to_eucl_embedding(x)
 
         potential_pars=self.potential_pars.to(x)
+        if(extra_inputs is not None):
+            potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
+
 
         v, jac_squared, _=self.get_exp_map_and_jacobian(x_eucl, potential_pars)
         sign, slog_det=torch.slogdet(jac_squared)
@@ -377,6 +380,9 @@ class exponential_map_s2(sphere_base.sphere_base):
         x_eucl=self.spherical_to_eucl_embedding(x)
 
         potential_pars=self.potential_pars.to(x)
+
+        if(extra_inputs is not None):
+            potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
 
 
         inv_result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x_eucl, potential_pars )
