@@ -112,7 +112,7 @@ Hopefully following soon. In the meantime check out the [example script](example
 
 - [x] Autoregressive conditional structure is taken care of behind the scenes
 - [x] Coverage is straightforward. Everything, including spherical dimensions, is based on a Gaussian base distribution ([arXiv:2008.0582](https://arxiv.org/abs/2008.05825)).
-- [x] Bisection & Newton iterations for differentiable inverse (used for Gaussianization flow and Moebius flow)
+- [x] Bisection & Newton iterations for differentiable inverse (used for Gaussianization flow/Moebius flow/Exponential map flow)
 - [x] amortizable MLPs that use low-rank approximations
 - [x] unit tests that make sure backwards / and forward flow passes of implemented flow-layers agree 
 - [x] include log-lambda as an additional flow parameter to define parametrized Poisson-Processes
@@ -133,6 +133,7 @@ Hopefully following soon. In the meantime check out the [example script](example
 
 ### S2:
 - [x] Autorregressive flow for N-Spheres (inspired by [arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"n"**)
+- [x] Exponential map Flow ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"v"**)
 - [ ] ODE-manifold flow ala FFJORD [arXiv:2006.10254](https://arxiv.org/abs/2006.10254)/[arXiv:2006.10605](https://arxiv.org/abs/2006.10605)
  
 ### Interval Flows:

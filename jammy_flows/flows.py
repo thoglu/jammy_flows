@@ -205,7 +205,8 @@ class pdf(nn.Module):
         self.flow_dict["v"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = False
-        self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear / quadratic / exponential
+        self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear  / exponential
+        self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## supported linear  / exponential
 
 
         """
