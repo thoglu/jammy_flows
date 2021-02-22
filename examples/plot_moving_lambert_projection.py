@@ -21,13 +21,19 @@ import pylab
 from matplotlib import rc
 rc('text', usetex=True)
 
+from pytorch_lightning import seed_everything
 
 ############################
 
 if __name__ == "__main__":
-
+    seed_everything(0)
     ## define PDF
-    word_pdf=jammy_flows.pdf("s2", "n")
+    word_pdf=jammy_flows.pdf("s2", "vv")
+
+    #res,_,_,_=word_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
+
+   
+    #res,_,_,_=word_pdf.sample(samplesize=20)
 
     num_steps=20
     for ind in range(num_steps):
@@ -44,8 +50,10 @@ if __name__ == "__main__":
         true_azi=min_azi+ind*azi_step
 
         ## visualize PDF for different "true positions", i.e. from different vantage points
+        bounds=[ [-2.0,2.0], [-2.0,2.0]]
+      
         fig=pylab.figure()
-        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=100000, true_values=torch.Tensor([true_zen,true_azi]), bounds=[ [-2.0,2.0], [-2.0,2.0]], s2_rotate_to_true_value=True)
+        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="standard", nsamples=10000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, bounds=bounds, s2_rotate_to_true_value=True)
 
         if(not os.path.exists("figs")):
             os.makedirs("figs")

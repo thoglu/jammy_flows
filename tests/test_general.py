@@ -69,7 +69,7 @@ def check_gf_trafo(flow, crude_trafo, new_trafo, new_deriv, new_log_deriv,  plot
   
     return log_deriv_diff, torch_deriv_diff, y_deriv_of_deriv_torch.sum()
 
-def compare_two_arrays(arr1, arr2, name1, name2):
+def compare_two_arrays(arr1, arr2, name1, name2, diff_value=1e-7):
 
     num_non_finite_1=(numpy.isfinite((arr1))==0).sum()
 
@@ -87,7 +87,7 @@ def compare_two_arrays(arr1, arr2, name1, name2):
         raise Exception()
 
 
-    diff_value=1e-7
+ 
     diff_too_large_mask=numpy.fabs(arr1-arr2)>diff_value
 
     if(diff_too_large_mask.sum()>0):
@@ -144,7 +144,7 @@ class Test(unittest.TestCase):
                             self.flow_inits.append([[pdf_def, flow_def], d])
         
 
-        
+        self.flow_inits.append([ ["s2", "vvv"], dict()])
 
         extra_flow_defs=dict()
         extra_flow_defs["flow_defs_detail"]=dict()
@@ -167,6 +167,13 @@ class Test(unittest.TestCase):
         
         for ind, init in enumerate(self.flow_inits):
             
+            tolerance=1e-7
+
+            if("v" in init[0][1]):
+                ## exponential map flows get a little less strict tolerance check for now
+                tolerance=1e-3
+
+            print("tolerance ", tolerance)
             print("checking ...", init)
             #seed_everything(0)
             this_flow=f.pdf(*init[0], **init[1])
@@ -186,44 +193,9 @@ class Test(unittest.TestCase):
 
             #this_flow.count_parameters()
 
-            compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2")
-            compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2")
-            compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2")
-    
-    
-    
-    def test_sphere_singular_points(self):
-
-
-        print("Testing singular points")
-        extra_flow_defs=dict()
-        extra_flow_defs["m"]=dict()
-        extra_flow_defs["m"]["kwargs"]=dict()
-        extra_flow_defs["m"]["kwargs"]["use_extra_householder"]=0
-
-
-        this_flow=f.pdf("s1", "m", flow_defs_detail=extra_flow_defs)
-        input=torch.from_numpy(numpy.array([0.0,numpy.pi*2.0])[:,None])
-
-        ev,_,_=this_flow(input)
-
-        self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
-
-
-
-        extra_flow_defs=dict()
-        extra_flow_defs["n"]=dict()
-        extra_flow_defs["n"]["kwargs"]=dict()
-        extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
-        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=1
-
-        this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
-        input=torch.from_numpy(numpy.array([[0.00,2.0],[numpy.pi,2.0]]))
-
-        ev,_,_=this_flow(input)
-
-        self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
-    
+            compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
+            compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
+            compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
 
     def test_gpu(self):
 
@@ -248,43 +220,13 @@ class Test(unittest.TestCase):
                 print(res)
 
 
-    def test_2d_sphere_evals(self):
-
-
-        print("-> Testing singular points on S2 <-")
-        extra_flow_defs=dict()
-        extra_flow_defs["n"]=dict()
-        extra_flow_defs["n"]["kwargs"]=dict()
-        extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
-        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
-        #seed_everything(1)
-        this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
-
-        theta=torch.linspace(0.0001, numpy.pi-0.0001,700)
-        phi=torch.linspace(0.0001, 2*numpy.pi-0.0001,700)
-        area=(theta[1]-theta[0])*(phi[1]-phi[0])
-
-        mesh_theta, mesh_phi=torch.meshgrid(theta,phi)
-
-        mesh_theta=mesh_theta.flatten().unsqueeze(1)
-        mesh_phi=mesh_phi.flatten().unsqueeze(1)
-
-        combined_coords=torch.cat([mesh_theta,mesh_phi],dim=1).type(torch.float64)
-      
-        fig=pylab.figure()
-
-        helper_fns.visualize_pdf(this_flow, fig, nsamples=100000, s2_norm="standard", total_pdf_eval_pts=10000)  
-
-        pylab.savefig("sphere_standard.png")  
-        
-        fig=pylab.figure()
-
-        helper_fns.visualize_pdf(this_flow, fig, nsamples=100000, s2_norm="lambert", total_pdf_eval_pts=10000)  
-
-        pylab.savefig("sphere_lambert.png")  
     
     def test_derivative(self):
         print("Testing derivatives of Gaussianization flows")
+
+        plotting=False
+
+
         icdf_approximations=["inormal_full_pade", "inormal_partly_crude", "inormal_partly_precise", "isigmoid"]
         #seed_everything(0)
 
@@ -323,7 +265,7 @@ class Test(unittest.TestCase):
                     return gf_layer.sigmoid_inv_error_pass_log_derivative(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights)
 
 
-                log_deriv_check, residual_sum_of_derivative_difference, deriv_of_deriv_sums=check_gf_trafo(this_flow, fn_crude, fn_new, fn_new_deriv,fn_new_deriv_log, plot=True, name="test_gf_pade_mode_%s.png"%(icdf_approx))
+                log_deriv_check, residual_sum_of_derivative_difference, deriv_of_deriv_sums=check_gf_trafo(this_flow, fn_crude, fn_new, fn_new_deriv,fn_new_deriv_log, plot=plotting, name="test_gf_pade_mode_%s.png"%(icdf_approx))
                 
                 if(residual_sum_of_derivative_difference>1e-4 or numpy.isfinite(residual_sum_of_derivative_difference)==False):
                     raise Exception("Sum of automatic-manual derivatives too large", icdf_approx, residual_sum_of_derivative_difference)

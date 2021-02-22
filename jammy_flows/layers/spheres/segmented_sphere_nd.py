@@ -26,6 +26,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         if(dimension==1):
             raise Exception("The moebius flow should be used for dimension 1!")
         
+        if(higher_order_cylinder_parametrization==False):
+            raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
 
         ## a moebius layer
         self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
@@ -189,7 +191,11 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         #    print("extra params MLP", extra_inputs[0,self.num_mlp_params-self.total_euclidean_pars:self.num_mlp_params])
         ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
         [x,log_det]=inputs
-      
+
+        ## this implementation requires another sin(theta) factor here
+        ## 
+        log_det+=-torch.log(torch.sin(x[:,0]))
+
         moebius_extra_inputs=None
         if(extra_inputs is not None):
             
@@ -311,6 +317,9 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             
 
         op=torch.cat([potential_eucl, xm],dim=1)
+
+        ## another sin(theta) factor 
+        log_det+=torch.log(torch.sin(op[:,0]))
 
         return op, log_det
 

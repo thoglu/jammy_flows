@@ -124,3 +124,51 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
                 
     return prev
 
+
+def inverse_bisection_n_newton_sphere(combined_func, find_orthogonal_vecs_func, basic_exponential_map_func, target_arg, *args, num_newton_iter=30):
+    """
+    Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map.
+    """
+
+    ## start with 0,0,1 everywhere
+    prev=torch.zeros_like(target_arg)
+
+    prev[:,2]=1.0
+
+    #test_arg=target_arg[0:1]#torch.Tensor([[1.0,0.0,0.0]]).to(target_arg)
+    for i in range(num_newton_iter):
+        
+        phi_res, _, jac_phi=combined_func(prev, *args)
+
+        ## minimize 
+        pot_func=-(phi_res*target_arg).sum(axis=1)
+
+        res_vec=-torch.bmm(jac_phi.permute(0,2,1), target_arg.unsqueeze(2))
+        
+        grad_lens=(res_vec**2).sum(axis=1).sqrt()
+
+        ## find the tangent vector along direction of negative gradient (newton iter)
+        vs=find_orthogonal_vecs_func(prev, -res_vec)
+      
+        projection=-(vs*res_vec).sum(axis=1)
+
+
+        # We use the projection again in an exponential map.. this should not be larger than pi to not wrap arround the sphere more than maximally once.
+        assert(projection.max()<numpy.pi)
+
+        ## mirror because both are negative by construction
+        vs=-vs.squeeze(-1)
+        projection=-projection
+
+        ## A "Newton step" along the exponential map, where "vs" is the tangent vector, "projection" is its length or the step size, and prev is the previous point on the sphere.
+        ## The next Point after this exponential map should be closer to "target_arg"
+        prev=basic_exponential_map_func(prev, vs, projection)
+        """
+        distance=((prev-new)**2).sum(axis=1).sqrt()
+
+        print("distances .. ", distance)
+
+        prev=new
+        """
+        
+    return prev

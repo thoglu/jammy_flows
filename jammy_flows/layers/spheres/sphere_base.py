@@ -152,9 +152,12 @@ class sphere_base(layer_base.layer_base):
                 transformed_coords.append(radius)
                 keep_sign=(x>=0)*1.0
 
-                if(self.higher_order_cylinder_parametrization==False):
+                """
+                    Jacobi determinante for r cancels out later, so we leave it out
+                """
+                #if(self.higher_order_cylinder_parametrization==False):
                     ## standard jacobian 
-                    log_det+=-torch.log(radius[:,0])*(self.dimension-1)
+                #    log_det+=-torch.log(radius[:,0])*(self.dimension-1)
                                     
             else:
                 
@@ -188,10 +191,12 @@ class sphere_base(layer_base.layer_base):
 
         
             ## standard jacobian .. not needed if corresponding inverse factor in *sphere_to_plane* is not used
+            """
+                Jacobi determinante for r cancels out later, so we leave it out
+            """
+            #if(self.higher_order_cylinder_parametrization==False):
 
-            if(self.higher_order_cylinder_parametrization==False):
-
-                log_det+=torch.log(x[:,0])
+            #    log_det+=torch.log(x[:,0])
 
             return torch.cat([x_val,y_val], dim=1), log_det
 
@@ -266,7 +271,9 @@ class sphere_base(layer_base.layer_base):
                 inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
 
                 ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
-                log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
+                ## we also drop the sin(theta) factor, to be in accord with the spherical measure
+                # log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
+                log_det+=-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
         
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
 
@@ -338,8 +345,11 @@ class sphere_base(layer_base.layer_base):
                 # |dr/dtheta| = (1/r)/(1-cos(theta)) * sin(theta)
                 ## sin(theta) is the area element factor
 
-                # standard factor
-                log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))+torch.log(torch.sin(new_theta[:,0]))
+                ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
+                ## we also drop the sin(theta) factor, to be in accord with the spherical measure
+
+                #log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
+                log_det-=-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
                 #log_det-=torch.log(1.0-torch.cos(new_theta[:,0]))+torch.log(torch.sin(new_theta[:,0]))
                 #
                
@@ -382,14 +392,14 @@ class sphere_base(layer_base.layer_base):
 
             x=self.eucl_to_spherical_embedding(eucl)
 
-
+            print("doing the extra householder..")
         
         ## correction required due to sphere
         if(x.shape[1]==2):
             #print("inv 1) x ", x[:,0:1])
             safe_angles=self.return_safe_angle(x[:,0:1])
             x=torch.cat( [safe_angles, x[:,1:]], dim=1)
-            log_det+=-torch.log(torch.sin(x[:,0]))
+            #log_det+=-torch.log(torch.sin(x[:,0]))
           
             #print("inv 1) ld ", -torch.log(torch.sin(x[:,0])))
         ## (2) apply sphere intrinsic inverse flow function
@@ -436,7 +446,7 @@ class sphere_base(layer_base.layer_base):
 
             x=torch.cat( [safe_angles, x[:,1:]], dim=1)
 
-            log_det+=torch.log(torch.sin(x[:,0]))
+            #log_det+=torch.log(torch.sin(x[:,0]))
     
         ## (3) apply householder rotation in embedding space if wanted
         #extra_input_counter=0
@@ -503,7 +513,7 @@ class sphere_base(layer_base.layer_base):
         Intended to be used for crosschecks and plotting purposes, since coordinates close to the poles can make problems for spheres.
         """
         if(self.use_extra_householder==False):
-            return x
+            return torch.Tensor([])
        
         eucl=self.spherical_to_eucl_embedding(x)
 

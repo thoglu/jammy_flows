@@ -211,7 +211,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
         zen_vals=numpy.sin(numpy.linspace(mins_maxs[ind][0]+1e-4, mins_maxs[ind][1]-1e-4, npts))
 
-        ## log val, adding
+        ## log val, adding zenith factors where needed
         res+=numpy.log(zen_vals[slice_mask])
 
 
@@ -616,6 +616,10 @@ def plot_joint_pdf(pdf,
         s2_rotate_to_true_value=s2_rotate_to_true_value,
         true_values=true_values)
 
+   
+    total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
+    
+   
     if (dim == 1):
         ax = fig.add_subplot(gridspec)
         ax.hist(samples[:, 0], bins=50, density=True)
@@ -644,17 +648,20 @@ def plot_joint_pdf(pdf,
 
         ## plot the density and contours from density
         if (plot_density):
+           
             plot_density_with_contours(ax, log_evals, evalpositions,
                                        bin_volumes, pts_per_dim)
         
         ## plot a histogram density from samples
+
+        
         if (plot_only_contours == False and plot_density == False):
 
             ax.hist2d(samples[:, 0],
                       samples[:, 1],
                       bins=hist_bounds,
                       density=True)
-
+        
 
         ## plot contours from samples
         new_bounds = None
@@ -671,6 +678,7 @@ def plot_joint_pdf(pdf,
 
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
+          
           ax.plot(unreliable_spherical_regions[:,0], unreliable_spherical_regions[:,1], color="orange", marker="x", lw=0.0)
 
         ## plot true values
@@ -792,7 +800,7 @@ def visualize_pdf(pdf,
                   gridspec=None,
                   subgridspec=None,
                   conditional_input=None,
-                  nsamples=1000,
+                  nsamples=10000,
                   total_pdf_eval_pts=10000,
                   bounds=None,
                   true_values=None,
@@ -809,46 +817,46 @@ def visualize_pdf(pdf,
                   s2_show_gridlines=True):
 
     with torch.no_grad():
-        sample_conditional_input = conditional_input
-        if (conditional_input is not None):
-            if (len(conditional_input.shape) == 1):
-                sample_conditional_input = sample_conditional_input.unsqueeze(
-                    0)
+      sample_conditional_input = conditional_input
+      if (conditional_input is not None):
+          if (len(conditional_input.shape) == 1):
+              sample_conditional_input = sample_conditional_input.unsqueeze(
+                  0)
 
-            if (sample_conditional_input.shape[0] == 1):
-                sample_conditional_input = sample_conditional_input.repeat(
-                    nsamples, 1)
+          if (sample_conditional_input.shape[0] == 1):
+              sample_conditional_input = sample_conditional_input.repeat(
+                  nsamples, 1)
 
-        if (gridspec is None):
-            gridspec = fig.add_gridspec(1, 1)[0, 0]
+      if (gridspec is None):
+          gridspec = fig.add_gridspec(1, 1)[0, 0]
 
-        samples, samples_base, evals, evals_base = pdf.sample(
-            samplesize=nsamples,
-            conditional_input=sample_conditional_input,
-            seed=seed)
+      samples, samples_base, evals, evals_base = pdf.sample(
+          samplesize=nsamples,
+          conditional_input=sample_conditional_input,
+          seed=seed)
 
-        higher_dim_spheres = False
+      higher_dim_spheres = False
 
-        new_subgridspec = plot_joint_pdf(
-            pdf,
-            fig,
-            gridspec,
-            samples,
-            subgridspec=subgridspec,
-            conditional_input=conditional_input,
-            bounds=bounds,
-            multiplot=False,
-            total_pdf_eval_pts=total_pdf_eval_pts,
-            true_values=true_values,
-            plot_only_contours=plot_only_contours,
-            contour_probs=contour_probs,
-            contour_color=contour_color,
-            autoscale=autoscale,
-            skip_plotting_density=skip_plotting_density,
-            hide_labels=hide_labels,
-            s2_norm=s2_norm,
-            colormap=colormap,
-            s2_rotate_to_true_value=s2_rotate_to_true_value,
-            s2_show_gridlines=s2_show_gridlines)
+      new_subgridspec = plot_joint_pdf(
+          pdf,
+          fig,
+          gridspec,
+          samples,
+          subgridspec=subgridspec,
+          conditional_input=conditional_input,
+          bounds=bounds,
+          multiplot=False,
+          total_pdf_eval_pts=total_pdf_eval_pts,
+          true_values=true_values,
+          plot_only_contours=plot_only_contours,
+          contour_probs=contour_probs,
+          contour_color=contour_color,
+          autoscale=autoscale,
+          skip_plotting_density=skip_plotting_density,
+          hide_labels=hide_labels,
+          s2_norm=s2_norm,
+          colormap=colormap,
+          s2_rotate_to_true_value=s2_rotate_to_true_value,
+          s2_show_gridlines=s2_show_gridlines)
 
-    return samples, new_subgridspec
+      return samples, new_subgridspec

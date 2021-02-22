@@ -7,6 +7,7 @@ from .layers.euclidean.polynomial_stretch_flow import psf_block
 from .layers.spheres.sphere_base import sphere_base
 from .layers.spheres.moebius_1d import moebius
 from .layers.spheres.segmented_sphere_nd import segmented_sphere_nd
+from .layers.spheres.exponential_map_s2 import exponential_map_s2
 from .layers.spheres.spherical_do_nothing import spherical_do_nothing
 
 from .layers.euclidean.euclidean_base import euclidean_base
@@ -148,6 +149,9 @@ class pdf(nn.Module):
         ## provide standard settings
         self.flow_dict = dict()
 
+        """ 
+        Euclidean flows
+        """
         self.flow_dict["g"] = dict()
         self.flow_dict["g"]["module"] = gf_block
         self.flow_dict["g"]["type"] = "e"
@@ -168,15 +172,21 @@ class pdf(nn.Module):
         self.flow_dict["p"]["kwargs"]["num_transforms"] = 3
         self.flow_dict["p"]["kwargs"]["exact_mode"] = True
 
+        """
+        S1 flows
+        """
         self.flow_dict["m"] = dict()
         self.flow_dict["m"]["module"] = moebius
         self.flow_dict["m"]["type"] = "s"
         self.flow_dict["m"]["kwargs"] = dict()
         self.flow_dict["m"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["m"]["kwargs"]["use_extra_householder"] = 1
+        self.flow_dict["m"]["kwargs"]["use_extra_householder"] = 0
         self.flow_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["m"]["kwargs"]["num_moebius"] = 5
 
+        """
+        S2 flows
+        """
         self.flow_dict["n"] = dict()
         self.flow_dict["n"]["module"] = segmented_sphere_nd
         self.flow_dict["n"]["type"] = "s"
@@ -187,6 +197,20 @@ class pdf(nn.Module):
         self.flow_dict["n"]["kwargs"]["num_moebius"] = 5
         self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = True
 
+        self.flow_dict["v"] = dict()
+        self.flow_dict["v"]["module"] = exponential_map_s2
+        self.flow_dict["v"]["type"] = "s"
+        self.flow_dict["v"]["kwargs"] = dict()
+        self.flow_dict["v"]["kwargs"]["use_extra_householder"] = 0
+        self.flow_dict["v"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
+        self.flow_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = False
+        self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear / quadratic / exponential
+
+
+        """
+        Spherical and Euclidean flows that do nothing
+        """
         self.flow_dict["x"] = dict()
         self.flow_dict["x"]["module"] = euclidean_do_nothing
         self.flow_dict["x"]["type"] = "e"
@@ -197,17 +221,7 @@ class pdf(nn.Module):
         self.flow_dict["y"]["type"] = "s"
         self.flow_dict["y"]["kwargs"] = dict()
 
-        """
-        self.flow_dict["b"] = dict()
-        self.flow_dict["b"]["module"] = moebius_block
-        self.flow_dict["b"]["kwargs"] = dict()
-        self.flow_dict["b"]["kwargs"]["use_permanent_parameters"]=0
-
-        self.flow_dict["m"] = dict()
-        self.flow_dict["m"]["module"] = moebius_block
-        self.flow_dict["m"]["kwargs"] = dict()
-        self.flow_dict["m"]["kwargs"]["use_permanent_parameters"]=0
-        """
+  
 
         for k in flow_defs_detail:
             if k not in self.flow_dict.keys():
