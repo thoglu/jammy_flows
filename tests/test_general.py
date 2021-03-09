@@ -5,13 +5,20 @@ import torch
 import numpy
 import pylab
 import torch.autograd.functional
+import random
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 import jammy_flows.flows as f
-#from pytorch_lightning import seed_everything
+
 import jammy_flows.helper_fns as helper_fns
+
+
+def seed_everything(seed_no):
+    random.seed(seed_no)
+    numpy.random.seed(seed_no)
+    torch.manual_seed(seed_no)
 
 def check_gf_trafo(flow, crude_trafo, new_trafo, new_deriv, new_log_deriv,  plot=False, name="test.png"):
 
@@ -142,9 +149,25 @@ class Test(unittest.TestCase):
                             d["flow_defs_detail"]=gf_setting
 
                             self.flow_inits.append([[pdf_def, flow_def], d])
-        
+        ### exponential map
+        extra_flow_defs=dict()
+        extra_flow_defs["flow_defs_detail"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=0
 
-        self.flow_inits.append([ ["s2", "vvv"], dict()])
+
+        self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["flow_defs_detail"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
+        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=1
+        self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
+
+        ######################
+
 
         extra_flow_defs=dict()
         extra_flow_defs["flow_defs_detail"]=dict()
@@ -153,6 +176,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
         extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
 
+        ## general flow
         pdf_def="s2+e2+s1"
         flow_def="n+gg+m"
 
@@ -166,15 +190,16 @@ class Test(unittest.TestCase):
         samplesize=10000
         
         for ind, init in enumerate(self.flow_inits):
-            
+            ## seed everything to have consistent tests
+            seed_everything(1)
             tolerance=1e-7
 
             if("v" in init[0][1]):
                 ## exponential map flows get a little less strict tolerance check for now
-                tolerance=1e-3
+                
+                tolerance=1e-4
 
-            print("tolerance ", tolerance)
-            print("checking ...", init)
+       
             #seed_everything(0)
             this_flow=f.pdf(*init[0], **init[1])
             this_flow.double()
@@ -185,11 +210,12 @@ class Test(unittest.TestCase):
                 rvec=numpy.random.normal(size=(samplesize,2))*100.0
                 cinput=torch.from_numpy(rvec)
 
-            samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput)
-            
-         
-            ## evaluate the samples and see if the reverse direction is compatible
-            evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput)
+            with torch.no_grad():
+                samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput)
+                
+             
+                ## evaluate the samples and see if the reverse direction is compatible
+                evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput)
 
             #this_flow.count_parameters()
 

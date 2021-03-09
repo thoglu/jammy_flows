@@ -111,7 +111,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
         elif(pdf=="s2"):
           raise Exception("s2_norm ", s2_norm, " unknown .")
         else:
-         
+            
             for ind, mm in enumerate(mins_maxs[glob_ind:glob_ind +
                                                this_sub_dim]):
 
@@ -504,7 +504,8 @@ def plot_joint_pdf(pdf,
                    s2_norm="standard",
                    colormap=cm.rainbow,
                    s2_rotate_to_true_value=True,
-                   s2_show_gridlines=True):
+                   s2_show_gridlines=True,
+                   skip_plotting_samples=False):
 
     plot_density = False
     dim = len(samples[0])
@@ -550,7 +551,7 @@ def plot_joint_pdf(pdf,
     samples = samples.detach().clone()
 
     gridline_dict=None
-    if(s2_show_gridlines):
+    if(s2_show_gridlines and "s2" in pdf.pdf_defs_list):
       gridline_dict=dict()
       for ind, pdf_type in enumerate(pdf.pdf_defs_list):
         if(pdf_type=="s2"):
@@ -655,7 +656,7 @@ def plot_joint_pdf(pdf,
         ## plot a histogram density from samples
 
         
-        if (plot_only_contours == False and plot_density == False):
+        if (plot_only_contours == False and plot_density == False and skip_plotting_samples==False):
 
             ax.hist2d(samples[:, 0],
                       samples[:, 1],
@@ -665,7 +666,7 @@ def plot_joint_pdf(pdf,
 
         ## plot contours from samples
         new_bounds = None
-        if (contour_probs != []):
+        if (contour_probs != [] and skip_plotting_samples==False):
             new_bounds = show_sample_contours(ax,
                                               samples,
                                               bins=hist_bounds,
@@ -689,8 +690,8 @@ def plot_joint_pdf(pdf,
                     ms=3.0)
 
         ## plot gridlines if desired
-        if(s2_show_gridlines):
-          print(gridline_dict.keys())
+        if(s2_show_gridlines and gridline_dict is not None):
+          
           for gl in gridline_dict[(0,2)]:
             np_gl=gl.numpy()
 
@@ -814,7 +815,8 @@ def visualize_pdf(pdf,
                   s2_norm="standard",
                   colormap=cm.rainbow,
                   s2_rotate_to_true_value=True,
-                  s2_show_gridlines=True):
+                  s2_show_gridlines=True,
+                  skip_plotting_samples=False):
 
     with torch.no_grad():
       sample_conditional_input = conditional_input
@@ -857,6 +859,7 @@ def visualize_pdf(pdf,
           s2_norm=s2_norm,
           colormap=colormap,
           s2_rotate_to_true_value=s2_rotate_to_true_value,
-          s2_show_gridlines=s2_show_gridlines)
+          s2_show_gridlines=s2_show_gridlines,
+          skip_plotting_samples=skip_plotting_samples)
 
       return samples, new_subgridspec

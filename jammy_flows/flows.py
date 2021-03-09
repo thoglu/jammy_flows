@@ -207,7 +207,7 @@ class pdf(nn.Module):
         self.flow_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = False
         self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear  / exponential
         self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## supported linear  / exponential
-
+        self.flow_dict["v"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction
 
         """
         Spherical and Euclidean flows that do nothing
@@ -981,6 +981,7 @@ class pdf(nn.Module):
 
             this_target=z[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
 
+            
             ## reverse mapping is required for pdf evaluation
             for l, layer in reversed(list(enumerate(pdf_layers))):
 

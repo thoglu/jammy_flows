@@ -52,8 +52,7 @@ class Test(unittest.TestCase):
 
 
         ###
-
-   
+     
         this_flow=f.pdf("s2", "vvv")
         input=torch.from_numpy(numpy.array([[0.00,2.0],[numpy.pi,2.0]]))
 
@@ -61,7 +60,7 @@ class Test(unittest.TestCase):
 
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
     
-
+      
 
     def test_2d_sphere_evals(self):
 
@@ -131,10 +130,24 @@ class Test(unittest.TestCase):
         """
         ## Exponential map flow
 
-       
+        extra_flow_defs=dict()
+        extra_flow_defs["v"]=dict()
+        extra_flow_defs["v"]["kwargs"]=dict()
+        extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
 
-        this_flow=f.pdf("s2", "vv")
+        this_flow=f.pdf("s2", "vv", flow_defs_detail=extra_flow_defs)
         check_flow(this_flow)
+
+        ##
+
+        extra_flow_defs=dict()
+        extra_flow_defs["v"]=dict()
+        extra_flow_defs["v"]["kwargs"]=dict()
+        extra_flow_defs["v"]["kwargs"]["natural_direction"]=1
+
+        this_flow=f.pdf("s2", "vv", flow_defs_detail=extra_flow_defs)
+        with torch.no_grad():
+            check_flow(this_flow)
 
 
 
