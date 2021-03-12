@@ -28,7 +28,14 @@ from pytorch_lightning import seed_everything
 if __name__ == "__main__":
     seed_everything(0)
     ## define PDF
-    word_pdf=jammy_flows.pdf("s2", "vv")
+
+    extra_flow_defs=dict()
+    extra_flow_defs["v"]=dict()
+    extra_flow_defs["v"]["kwargs"]=dict()
+    extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
+    extra_flow_defs["v"]["kwargs"]["num_components"]=1
+
+    word_pdf=jammy_flows.pdf("s2", "v", flow_defs_detail=extra_flow_defs)
 
     #res,_,_,_=word_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
 
@@ -53,7 +60,7 @@ if __name__ == "__main__":
         bounds=[ [-2.0,2.0], [-2.0,2.0]]
       
         fig=pylab.figure()
-        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="standard", nsamples=10000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, bounds=bounds, s2_rotate_to_true_value=True)
+        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=5000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=True, bounds=bounds, s2_rotate_to_true_value=True)
 
         if(not os.path.exists("figs")):
             os.makedirs("figs")

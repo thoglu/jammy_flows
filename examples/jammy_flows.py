@@ -19,6 +19,9 @@ import jammy_flows
 from jammy_flows import helper_fns
 import pylab
 from matplotlib import rc
+
+from pytorch_lightning import seed_everything
+
 rc('text', usetex=True)
 
 ## Generate data that follows letter shapes using some TTF template
@@ -222,9 +225,10 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     colors=pylab.cm.tab10.colors
 
     cov_ax=fig.add_subplot(gridspec[0,num_words])
+
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=10000, nsamples=100000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=100000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -260,13 +264,15 @@ if __name__ == "__main__":
 
     parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
     parser.add_argument("-pdf_def", type=str, default="e4+s2+e4")
-    parser.add_argument("-layer_def", type=str, default="gggg+n+gggg") 
+    parser.add_argument("-layer_def", type=str, default="gggg+vvv+gggg") 
     parser.add_argument("-train_size", type=int, default=20000)
     parser.add_argument("-batch_size", type=int, default=20)
     parser.add_argument("-test_size", type=int, default=1000)
     parser.add_argument("-lr", type=float, default=0.001)
 
     args=parser.parse_args()
+
+    seed_everything(0)
 
     assert(args.train_size % args.batch_size==0)
 
@@ -277,7 +283,11 @@ if __name__ == "__main__":
     test_data, test_labels=sample_data(args.pdf_def, args.sentence, num_samples=args.test_size)
 
     ## define PDF
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1])
+    extra_flow_defs=dict()
+    extra_flow_defs["v"]=dict()
+    extra_flow_defs["v"]["kwargs"]=dict()
+    extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,hidden_mlp_dims_sub_pdfs="")
 
     ## initalize params with test sample (only advantage gains for Gaussianization flows)
     word_pdf.init_params(data=test_labels)
@@ -316,12 +326,14 @@ if __name__ == "__main__":
             ## plot test data
             if(glob_counter%plot_every_n==0):
 
+
                 with torch.no_grad():
-                    
+                    print("VALIDATION EVAL")    
                     val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_data)
                     val_loss=-val_log_pdf.mean()
                     print("ep: %d / batch_id: %d / val-loss %.3f" % (ep_id, batch_id, val_loss))
-
+                    print("before plotting")
+                    print("----------------------------->")
                     plot_test(test_data, test_labels, word_pdf, args.sentence.split(" "), fname="./figs/%.6d.png" % glob_counter)
 
             glob_counter+=1
