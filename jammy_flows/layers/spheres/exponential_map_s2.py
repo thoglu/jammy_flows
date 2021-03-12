@@ -22,7 +22,6 @@ import torch.autograd
 """
 An implementation of exponential map flows as suggested in https://arxiv.org/abs/2002.02428 ("Normalizing Flows on Tori and Spheres"),
 which intself is based upon earlier work https://arxiv.org/abs/0906.0874 ("A Jacobian inequality for gradient maps on the sphere and its application to directional statistics").
-
 """
 
 

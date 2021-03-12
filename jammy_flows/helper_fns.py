@@ -627,7 +627,7 @@ def plot_joint_pdf(pdf,
 
         if (plot_density):
 
-            ax.plot(evalpositions[:, 0], log_evals.exp(), color="k")
+            ax.plot(evalpositions[:, 0], numpy.exp(log_evals), color="k")
 
         if (true_values is not None):
             ax.axvline(true_values[0], color="red", lw=2.0)

@@ -6,7 +6,7 @@ from . import sphere_base
 from ..bisection_n_newton import inverse_bisection_n_newton
 
 class moebius(sphere_base.sphere_base):
-    def __init__(self, dimension, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5):
+    def __init__(self, dimension=1, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5):
 
         super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters)
         

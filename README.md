@@ -138,7 +138,7 @@ Hopefully following soon. In the meantime check out the [example script](example
  
 ### Interval Flows:
 
-- [ ] Spline Flows (e.g. use Pyro implementation)
+- [ ] "Neural spline flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)
 
 ## Requirements
 

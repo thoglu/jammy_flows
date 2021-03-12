@@ -13,6 +13,10 @@ from .layers.spheres.spherical_do_nothing import spherical_do_nothing
 from .layers.euclidean.euclidean_base import euclidean_base
 from .layers.euclidean.euclidean_do_nothing import euclidean_do_nothing
 
+from .layers.intervals.interval_base import interval_base
+from .layers.intervals.interval_do_nothing import interval_do_nothing
+from .layers.intervals.rational_quadratic_spline import rational_quadratic_spline
+
 from .layers import extra_functions
 from .layers.extra_functions import list_from_str, NONLINEARITIES
 
@@ -206,11 +210,23 @@ class pdf(nn.Module):
         self.flow_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = False
         self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear  / exponential
-        self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## supported linear  / exponential
-        self.flow_dict["v"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction
+        self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## number of components in convex superposition
+        self.flow_dict["v"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
 
         """
-        Spherical and Euclidean flows that do nothing
+        Interval flows
+        """
+        self.flow_dict["r"] = dict()
+        self.flow_dict["r"]["module"] = rational_quadratic_spline
+        self.flow_dict["r"]["type"] = "i"
+        self.flow_dict["r"]["kwargs"] = dict()
+        self.flow_dict["r"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["r"]["kwargs"]["euclidean_to_interval_as_first"] = 0
+        self.flow_dict["r"]["kwargs"]["num_basis_elements"] = 10
+
+
+        """
+        Spherical/Euclidean/Interval flows that do nothing
         """
         self.flow_dict["x"] = dict()
         self.flow_dict["x"]["module"] = euclidean_do_nothing
@@ -222,6 +238,10 @@ class pdf(nn.Module):
         self.flow_dict["y"]["type"] = "s"
         self.flow_dict["y"]["kwargs"] = dict()
 
+        self.flow_dict["z"] = dict()
+        self.flow_dict["z"]["module"] = interval_do_nothing
+        self.flow_dict["z"]["type"] = "i"
+        self.flow_dict["z"]["kwargs"] = dict()
   
 
         for k in flow_defs_detail:
@@ -254,6 +274,7 @@ class pdf(nn.Module):
         self.conditional_manifold_input_embedding=dict()
         self.conditional_manifold_input_embedding["e"]=0
         self.conditional_manifold_input_embedding["s"]=1
+        self.conditional_manifold_input_embedding["i"]=1
 
         for k in conditional_manifold_input_embedding_overwrite.keys():
             self.conditional_manifold_input_embedding[k]=conditional_manifold_input_embedding_overwrite[k]
@@ -275,7 +296,9 @@ class pdf(nn.Module):
 
         for p in self.pdf_defs_list:
 
-            self.target_dims.append(int(p[1:]))
+            ## need to separate interval from rest
+            main_def=p.split("_")[0]
+            self.target_dims.append(int(main_def[1:]))
             self.target_dim_indices.append((total_dim, total_dim+self.target_dims[-1]))
 
            
@@ -283,9 +306,11 @@ class pdf(nn.Module):
                 
             ### place holder base layers to define embedding mappings
             if(p[0]=="e"):
-                self.basic_layers.append(euclidean_base(dimension=int(p[1])))
+                self.basic_layers.append(euclidean_base(dimension=int(main_def[1])))
             elif(p[0]=="s"):
-                self.basic_layers.append(sphere_base(dimension=int(p[1])))
+                self.basic_layers.append(sphere_base(dimension=int(main_def[1])))
+            elif(p[0]=="i"):
+                self.basic_layers.append(interval_base(dimension=1))
             else:
                 raise Exception("undefined base layer type :", p[0])
 
@@ -461,14 +486,25 @@ class pdf(nn.Module):
                 if(subflow_index>0):
                     this_kwargs["use_permanent_parameters"] = 0
 
-                ## this flow is a spherical flow, so the first layer should also project from plane to sphere or vice versa
+                
 
                 if("s" in subflow_description):
-                    
+                    ## this flow is a spherical flow, so the first layer should also project from plane to sphere or vice versa
                     if(layer_ind==0):
                         this_kwargs["euclidean_to_sphere_as_first"]=1
+                elif("i" in subflow_description):
+                    ## this flow is an interval flow, so the first layer should also project from real line to interval or vice versa
 
-                if("e" in subflow_description):
+                    interval_boundaries=subflow_description.split("_")[1:]
+
+                    print("HM ?")                  
+                    if(layer_ind==0):
+                        print("000000==!")
+                        this_kwargs["euclidean_to_interval_as_first"]=1
+                        this_kwargs["low_boundary"]=float(interval_boundaries[0])
+                        this_kwargs["high_boundary"]=float(interval_boundaries[1])
+
+                elif("e" in subflow_description):
                     if(layer_type!="x"):
                         if(layer_ind==(this_num_layers-1)):
                             this_kwargs["model_offset"]=1
