@@ -60,7 +60,9 @@ if __name__ == "__main__":
         bounds=[ [-2.0,2.0], [-2.0,2.0]]
       
         fig=pylab.figure()
+
         helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=5000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=True, bounds=bounds, s2_rotate_to_true_value=True)
+
 
         if(not os.path.exists("figs")):
             os.makedirs("figs")
