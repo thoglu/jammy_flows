@@ -19,9 +19,13 @@ import jammy_flows
 from jammy_flows import helper_fns
 import pylab
 from matplotlib import rc
-rc('text', usetex=True)
+import random
 
-from pytorch_lightning import seed_everything
+
+def seed_everything(seed_no):
+    random.seed(seed_no)
+    numpy.random.seed(seed_no)
+    torch.manual_seed(seed_no)
 
 ############################
 
@@ -30,12 +34,14 @@ if __name__ == "__main__":
     ## define PDF
 
     extra_flow_defs=dict()
-    extra_flow_defs["v"]=dict()
-    extra_flow_defs["v"]["kwargs"]=dict()
-    extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
-    extra_flow_defs["v"]["kwargs"]["num_components"]=1
+    extra_flow_defs["n"]=dict()
+    extra_flow_defs["n"]["kwargs"]=dict()
+    extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
+    extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=1
+    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="r"
+    
 
-    word_pdf=jammy_flows.pdf("s2", "v", flow_defs_detail=extra_flow_defs)
+    word_pdf=jammy_flows.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
 
     #res,_,_,_=word_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
 
@@ -61,7 +67,7 @@ if __name__ == "__main__":
       
         fig=pylab.figure()
 
-        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=5000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=True, bounds=bounds, s2_rotate_to_true_value=True)
+        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=500000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=False, bounds=bounds, s2_rotate_to_true_value=True)
 
 
         if(not os.path.exists("figs")):

@@ -19,7 +19,7 @@ class interval_base(layer_base.layer_base):
         self.interval_width=high_boundary-low_boundary
 
         self.euclidean_to_interval_as_first=euclidean_to_interval_as_first
-        print("EUCL IN TERAL FIRST ", self.euclidean_to_interval_as_first)
+        
         assert(self.high_boundary > self.low_boundary)
     
     def real_line_to_interval(self, inputs):
@@ -31,10 +31,6 @@ class interval_base(layer_base.layer_base):
 
    
         res=res*self.interval_width+self.low_boundary
-
-        print("RES MIN MAX ")
-        print(res.min())
-        print(res.max())
      
         log_det+=-(x[:,0]**2)/2.0-0.5*numpy.log(2*numpy.pi)+numpy.log(self.interval_width)
 

@@ -187,6 +187,7 @@ class pdf(nn.Module):
         self.flow_dict["m"]["kwargs"]["use_extra_householder"] = 0
         self.flow_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["m"]["kwargs"]["num_moebius"] = 5
+        self.flow_dict["m"]["kwargs"]["natural_direction"] = 0
 
         """
         S2 flows
@@ -198,8 +199,10 @@ class pdf(nn.Module):
         self.flow_dict["n"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["n"]["kwargs"]["use_extra_householder"] = 1
         self.flow_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["n"]["kwargs"]["num_moebius"] = 5
+        self.flow_dict["n"]["kwargs"]["num_moebius"] = 10
         self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = True
+        self.flow_dict["n"]["kwargs"]["zenith_type_layers"] = "r"
+        self.flow_dict["n"]["kwargs"]["max_rank"] = -1
 
         self.flow_dict["v"] = dict()
         self.flow_dict["v"]["module"] = exponential_map_s2
@@ -497,12 +500,14 @@ class pdf(nn.Module):
 
                     interval_boundaries=subflow_description.split("_")[1:]
 
-                    print("HM ?")                  
+                    ## overwrite the boundary parameters
+                    this_kwargs["low_boundary"]=float(interval_boundaries[0])
+                    this_kwargs["high_boundary"]=float(interval_boundaries[1])
+                 
                     if(layer_ind==0):
-                        print("000000==!")
+                        
                         this_kwargs["euclidean_to_interval_as_first"]=1
-                        this_kwargs["low_boundary"]=float(interval_boundaries[0])
-                        this_kwargs["high_boundary"]=float(interval_boundaries[1])
+                    
 
                 elif("e" in subflow_description):
                     if(layer_type!="x"):

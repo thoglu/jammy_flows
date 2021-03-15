@@ -166,8 +166,31 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=1
         self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
 
-        ######################
+        ###################### Interval flows
 
+        extra_flow_defs=dict()
+        extra_flow_defs["conditional_input_dim"]=2
+
+        self.flow_inits.append([ ["i1_-1.0_1.0", "r"], extra_flow_defs])
+
+        ####
+
+        for z_layer in ["g", "p", "x", "z", "r"]:
+            extra_flow_defs=dict()
+            extra_flow_defs["flow_defs_detail"]=dict()
+            extra_flow_defs["flow_defs_detail"]["n"]=dict()
+            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]=dict()
+            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
+            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
+            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["zenith_type_layers"]=z_layer
+            ## all n-type flows
+
+            pdf_def="s2"
+            flow_def="n"
+
+            self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
+
+        # more general flow
 
         extra_flow_defs=dict()
         extra_flow_defs["flow_defs_detail"]=dict()

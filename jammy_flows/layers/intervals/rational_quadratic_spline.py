@@ -9,8 +9,9 @@ from . import interval_base
 def searchsorted(bin_locations, inputs, eps=1e-6):
     bin_locations[..., -1] += eps
     return torch.sum(
-        inputs[..., None] >= bin_locations,
-        dim=-1
+        inputs >= bin_locations,
+        dim=-1,
+        keepdims=True
     ) - 1
 
 """
@@ -79,7 +80,7 @@ class rational_quadratic_spline(interval_base.interval_base):
             
         else:
             self.rel_log_widths=torch.zeros(self.num_basis_elements).type(torch.double).unsqueeze(0)
-
+      
         ## heights of intervals in rational spline
         if(use_permanent_parameters):
             self.rel_log_heights=nn.Parameter(torch.randn(self.num_basis_elements).type(torch.double).unsqueeze(0))
@@ -89,12 +90,12 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         ## derivatives
         if(use_permanent_parameters):
-            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_elements).type(torch.double).unsqueeze(0))
+            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_elements+1).type(torch.double).unsqueeze(0))
             
         else:
-            self.rel_log_derivatives=torch.zeros(self.num_basis_elements).type(torch.double).unsqueeze(0)
+            self.rel_log_derivatives=torch.zeros(self.num_basis_elements+1).type(torch.double).unsqueeze(0)
 
-        self.total_param_num+=3*self.num_basis_elements
+        self.total_param_num+=3*self.num_basis_elements+1
 
         ## minimum values to which relative logarithmic values are added with softmax
      
@@ -113,10 +114,9 @@ class rational_quadratic_spline(interval_base.interval_base):
                               min_bin_width=1e-3,
                               min_bin_height=1e-3,
                               min_derivative=1e-3):
-        print("inputs ", inputs)
-        print(inputs.max())
-        print(inputs.min())
+        
         if torch.min(inputs) < left or torch.max(inputs) > right:
+           
             raise Exception("outside boundaries in rational-spline flow!")
 
         num_bins = unnormalized_widths.shape[-1]
@@ -125,10 +125,12 @@ class rational_quadratic_spline(interval_base.interval_base):
             raise ValueError('Minimal bin width too large for the number of bins')
         if min_bin_height * num_bins > 1.0:
             raise ValueError('Minimal bin height too large for the number of bins')
-
+        
         widths = F.softmax(unnormalized_widths, dim=-1)
         widths = min_bin_width + (1 - min_bin_width * num_bins) * widths
+     
         cumwidths = torch.cumsum(widths, dim=-1)
+        
         cumwidths = F.pad(cumwidths, pad=(1, 0), mode='constant', value=0.0)
         cumwidths = (right - left) * cumwidths + left
         cumwidths[..., 0] = left
@@ -146,23 +148,38 @@ class rational_quadratic_spline(interval_base.interval_base):
         cumheights[..., -1] = top
         heights = cumheights[..., 1:] - cumheights[..., :-1]
 
+       
+        
         if inverse:
-            bin_idx = searchsorted(cumheights, inputs)[..., None]
+            bin_idx = searchsorted(cumheights, inputs)#[..., None]
         else:
-            bin_idx = searchsorted(cumwidths, inputs)[..., None]
+            bin_idx = searchsorted(cumwidths, inputs)#[..., None]
+        
+        if(cumwidths.shape[0]==1 and bin_idx.shape[0]>1):
+          
+          cumwidths=cumwidths.repeat(bin_idx.shape[0], 1)
+          widths=widths.repeat(bin_idx.shape[0], 1)
+          heights=heights.repeat(bin_idx.shape[0], 1)
+          cumheights=cumheights.repeat(bin_idx.shape[0], 1)
+          derivatives=derivatives.repeat(bin_idx.shape[0], 1)
 
-        input_cumwidths = cumwidths.gather(-1, bin_idx)[..., 0]
-        input_bin_widths = widths.gather(-1, bin_idx)[..., 0]
 
-        input_cumheights = cumheights.gather(-1, bin_idx)[..., 0]
+       
+        input_cumwidths = cumwidths.gather(-1, bin_idx)#[..., 0]
+
+        
+        input_bin_widths = widths.gather(-1, bin_idx)#[..., 0]
+
+        input_cumheights = cumheights.gather(-1, bin_idx)#[..., 0]
         delta = heights / widths
-        input_delta = delta.gather(-1, bin_idx)[..., 0]
+        input_delta = delta.gather(-1, bin_idx)#[..., 0]
 
-        input_derivatives = derivatives.gather(-1, bin_idx)[..., 0]
-        input_derivatives_plus_one = derivatives[..., 1:].gather(-1, bin_idx)[..., 0]
+        input_derivatives = derivatives.gather(-1, bin_idx)#[..., 0]
+        input_derivatives_plus_one = derivatives[..., 1:].gather(-1, bin_idx)#[..., 0]
+ 
+        input_heights = heights.gather(-1, bin_idx)#[..., 0]
 
-        input_heights = heights.gather(-1, bin_idx)[..., 0]
-
+      
         if inverse:
             a = (((inputs - input_cumheights) * (input_derivatives
                                                  + input_derivatives_plus_one
@@ -203,24 +220,25 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          + 2 * input_delta * theta_one_minus_theta
                                                          + input_derivatives * (1 - theta).pow(2))
             logabsdet = torch.log(derivative_numerator) - 2 * torch.log(denominator)
-
+           
             return outputs, logabsdet
 
     def _flow_mapping(self, inputs, extra_inputs=None,): 
         
         [x, log_det]=inputs
 
+      
         widths=self.rel_log_widths.to(x)
         heights=self.rel_log_heights.to(x)
         derivatives=self.rel_log_derivatives.to(x)
 
         if(extra_inputs is not None):
-            widths=widths+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
-            heights=heights+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
-            derivatives=derivatives+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
+            
+            widths=widths+extra_inputs[:,:self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
+            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
+            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
         
-        print("before the actual mapping ")
-        print(x)
+       
         x, log_det_update=self.rational_quadratic_spline(x, 
                                                          widths, 
                                                          heights, 
@@ -234,8 +252,8 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_bin_height=self.min_height,
                                                          min_derivative=self.min_derivative
                                                          )
-
-        log_det+=log_det_update
+        
+        log_det+=log_det_update.sum(axis=-1)
 
         return x, log_det
 
@@ -248,9 +266,9 @@ class rational_quadratic_spline(interval_base.interval_base):
         derivatives=self.rel_log_derivatives.to(x)
 
         if(extra_inputs is not None):
-            widths=widths+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
-            heights=heights+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
-            derivatives=derivatives+extra_inputs[:,self.num_basis_elements].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
+            widths=widths+extra_inputs[:,:self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
+            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
+            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
         
         x, log_det_update=self.rational_quadratic_spline(x, 
                                                          widths, 
@@ -265,8 +283,8 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_bin_height=self.min_height,
                                                          min_derivative=self.min_derivative
                                                          )
-
-        log_det+=log_det_update
+        
+        log_det+=log_det_update.sum(axis=-1)
 
         return x, log_det
 
@@ -277,17 +295,18 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         desired_param_vec=[]
 
-        desired_param_vec.append(torch.ones(self.num_basis_elements*3))
+        ## 0.54 as start value in log space seems to result in a rather flat spline (defined by the log-derivatives in particular)
+        desired_param_vec.append(torch.ones(self.num_basis_elements*3+1)*0.54)
 
         return torch.cat(desired_param_vec)
 
     def _init_params(self, params):
 
         counter=0
-        self.rel_log_widths.data=params[counter:counter+self.num_basis_elements]    
+        self.rel_log_widths.data[0,:]=params[counter:counter+self.num_basis_elements]    
 
         counter+=self.num_basis_elements
-        self.rel_log_widths.data=params[counter:counter+self.num_basis_elements]
+        self.rel_log_heights.data[0,:]=params[counter:counter+self.num_basis_elements]
 
         counter+=self.num_basis_elements
-        self.rel_log_widths.data=params[counter:counter+self.num_basis_elements]
+        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_elements+1]

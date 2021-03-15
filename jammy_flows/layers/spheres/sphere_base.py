@@ -272,7 +272,8 @@ class sphere_base(layer_base.layer_base):
 
                 ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
-                # log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
+                ### FULL TERM:
+                ### log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
                 log_det+=-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
         
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
@@ -347,11 +348,10 @@ class sphere_base(layer_base.layer_base):
 
                 ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
-
-                #log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
+                ## FULL TERM:
+                ## log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
                 log_det-=-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
-                #log_det-=torch.log(1.0-torch.cos(new_theta[:,0]))+torch.log(torch.sin(new_theta[:,0]))
-                #
+              
                
                 x=torch.cat([new_theta, x[:,1:2]],dim=1)
 
@@ -392,7 +392,7 @@ class sphere_base(layer_base.layer_base):
 
             x=self.eucl_to_spherical_embedding(eucl)
 
-            print("doing the extra householder..")
+
         
         ## correction required due to sphere
         if(x.shape[1]==2):
@@ -512,9 +512,10 @@ class sphere_base(layer_base.layer_base):
         This function allows to return the coordinates after (inverse) or before (forward) the householder rotation. 
         Intended to be used for crosschecks and plotting purposes, since coordinates close to the poles can make problems for spheres.
         """
+        
         if(self.use_extra_householder==False):
             return torch.Tensor([])
-       
+        
         eucl=self.spherical_to_eucl_embedding(x)
 
         ## householder dimension is one higher than sphere dimension (we rotate in embedding space)

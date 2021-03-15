@@ -6,7 +6,7 @@ from . import sphere_base
 from ..bisection_n_newton import inverse_bisection_n_newton
 
 class moebius(sphere_base.sphere_base):
-    def __init__(self, dimension=1, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5):
+    def __init__(self, dimension=1, euclidean_to_sphere_as_first=True, use_extra_householder=True, natural_direction=0, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5):
 
         super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters)
         
@@ -30,6 +30,9 @@ class moebius(sphere_base.sphere_base):
         else:
             self.moebius_pars=torch.zeros(self.num_moebius,self.num_omega_pars).type(torch.double).unsqueeze(0)
 
+        ## natural direction means no bisection in the forward pass, but in the backward pass
+        self.natural_direction=natural_direction
+
     def _inv_flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
 
         [x,logdet]=inputs
@@ -45,13 +48,15 @@ class moebius(sphere_base.sphere_base):
         xmask=x>numpy.pi
         x=(xmask)*(x-2*numpy.pi)+(~xmask)*x
 
-        
-        ## do ivnerse in -pi/pi
-        x=inverse_bisection_n_newton(self.simple_moebius_trafo, self.simple_moebius_trafo_deriv, x, moebius_pars, min_boundary=-numpy.pi, max_boundary=numpy.pi, num_bisection_iter=20, num_newton_iter=20)
-        
-        log_deriv=-torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
-        
-
+        if(self.natural_direction):
+            ## do inverse in -pi/pi
+            x=inverse_bisection_n_newton(self.simple_moebius_trafo, self.simple_moebius_trafo_deriv, x, moebius_pars, min_boundary=-numpy.pi, max_boundary=numpy.pi, num_bisection_iter=20, num_newton_iter=20)
+            
+            log_deriv=-torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
+            
+        else:
+            log_deriv=torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
+            x=self.simple_moebius_trafo(x, moebius_pars) 
         ## switch back to 0-2pi
         smaller_mask=x<0
         x=(smaller_mask)*(2*numpy.pi+x)+(~smaller_mask)*x
@@ -82,9 +87,13 @@ class moebius(sphere_base.sphere_base):
         xmask=x>numpy.pi
         x=(xmask)*(x-2*numpy.pi)+(~xmask)*x
 
-        log_deriv=torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
-        x=self.simple_moebius_trafo(x, moebius_pars)  
-
+        if(self.natural_direction):
+            log_deriv=torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
+            x=self.simple_moebius_trafo(x, moebius_pars)  
+        else:
+            x=inverse_bisection_n_newton(self.simple_moebius_trafo, self.simple_moebius_trafo_deriv, x, moebius_pars, min_boundary=-numpy.pi, max_boundary=numpy.pi, num_bisection_iter=20, num_newton_iter=20)
+            
+            log_deriv=-torch.log(self.simple_moebius_trafo_deriv(x,moebius_pars)).sum(axis=-1)
         ## switch back to 0/2pi
         smaller_mask=x<0
         x=(smaller_mask)*(2*numpy.pi+x)+(~smaller_mask)*x

@@ -111,23 +111,23 @@ class Test(unittest.TestCase):
             assert( numpy.fabs(pdf_sums[-1]-1.0) < 1e-2)
 
 
-        ## Autoregressive flow With cylinder parametrization
-   
+        ## Autoregressive flow With various options
 
-        this_flow=f.pdf("s2", "n")
-        check_flow(this_flow)
+        for zenith_layer_type in ["g", "p", "x", "z", "r"]:
+            for cyl_para in [1]:
 
-        ## Autoregressive flow *without* cylinder parametrization
-        """
-        extra_flow_defs=dict()
-        extra_flow_defs["n"]=dict()
-        extra_flow_defs["n"]["kwargs"]=dict()
-        extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
-        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=False
+                extra_flow_defs=dict()
+                extra_flow_defs["n"]=dict()
+                extra_flow_defs["n"]["kwargs"]=dict()
+                extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
+                extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=cyl_para
+                extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]=zenith_layer_type
+             
+                this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
 
-        this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
-        check_flow(this_flow)
-        """
+                check_flow(this_flow)
+
+      
         ## Exponential map flow
 
         extra_flow_defs=dict()

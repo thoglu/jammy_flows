@@ -9,6 +9,8 @@ from ..extra_functions import AmortizableMLP, list_from_str
 from ..euclidean.gaussianization_flow import gf_block, find_init_pars_of_chained_gf_blocks
 from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
+from ..intervals.interval_do_nothing import interval_do_nothing
+from ..intervals.rational_quadratic_spline import rational_quadratic_spline
 
 import sys
 import os
@@ -16,10 +18,8 @@ import copy
 
 #sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
-
-
 class segmented_sphere_nd(sphere_base.sphere_base):
-    def __init__(self, dimension, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5, euclidean_layers="g", max_rank=2, hidden_dims="64", subspace_mapping="logistic", higher_order_cylinder_parametrization=False):
+    def __init__(self, dimension, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5, zenith_type_layers="g", max_rank=20, hidden_dims="64", subspace_mapping="logistic", higher_order_cylinder_parametrization=False):
 
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
         
@@ -30,23 +30,25 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
 
         ## a moebius layer
-        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
+        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=1, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
         self.num_moebius_pars=self.moebius_trafo.total_param_num
         self.total_param_num+=self.num_moebius_pars
 
         self.subspace_mapping=subspace_mapping
 
-        self.euclidean_layer_list=nn.ModuleList()
+        self.zenith_type_layer_list=nn.ModuleList()
         self.num_parameter_list=[]
 
         self.flow_dict = dict()
+
+        ### euclidean layers - for these layers the input (0 - pi) has to be transformed to a real line first
 
         self.flow_dict["g"] = dict()
         self.flow_dict["g"]["module"] = gf_block
         self.flow_dict["g"]["type"] = "e"
         self.flow_dict["g"]["kwargs"] = dict()
-        self.flow_dict["g"]["kwargs"]["fit_normalization"] = 0
-        self.flow_dict["g"]["kwargs"]["use_permanent_parameters"]=1
+        self.flow_dict["g"]["kwargs"]["fit_normalization"] = 1
+        self.flow_dict["g"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["g"]["kwargs"]["num_householder_iter"] = -1
         self.flow_dict["g"]["kwargs"]["num_kde"] = 10
         self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
@@ -56,7 +58,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         self.flow_dict["p"]["module"] = psf_block
         self.flow_dict["p"]["type"] = "e"
         self.flow_dict["p"]["kwargs"] = dict()
-        self.flow_dict["p"]["kwargs"]["use_permanent_parameters"]=1
+        self.flow_dict["p"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["p"]["kwargs"]["num_householder_iter"] = -1
         self.flow_dict["p"]["kwargs"]["num_transforms"] = 3
 
@@ -65,14 +67,41 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         self.flow_dict["x"]["type"] = "e"
         self.flow_dict["x"]["kwargs"]=dict()
 
-        self.euclidean_layer_defs=euclidean_layers
+        ### interval layers - for these layers, the input (0-pi) only has to be transformed to 0-1 via a cos-transformation
 
+        self.flow_dict["r"] = dict()
+        self.flow_dict["r"]["module"] = rational_quadratic_spline
+        self.flow_dict["r"]["type"] = "i"
+        self.flow_dict["r"]["kwargs"] = dict()
+        self.flow_dict["r"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["r"]["kwargs"]["num_basis_elements"]=5
+        self.flow_dict["r"]["kwargs"]["low_boundary"] = 0
+        self.flow_dict["r"]["kwargs"]["high_boundary"] = 1.0
+
+        self.flow_dict["z"] = dict()
+        self.flow_dict["z"]["module"] = interval_do_nothing
+        self.flow_dict["z"]["type"] = "i"
+        self.flow_dict["z"]["kwargs"]=dict()
+
+
+        self.zenith_type_layer_defs=zenith_type_layers
+
+        if("z" in self.zenith_type_layer_defs or "r" in self.zenith_type_layer_defs):
+            self.subspace_is_euclidean=False
+            assert("x" not in self.zenith_type_layer_defs)
+            assert("g" not in self.zenith_type_layer_defs)
+            assert("p" not in self.zenith_type_layer_defs)
+        if("g" in self.zenith_type_layer_defs or "p" in self.zenith_type_layer_defs or "x" in self.zenith_type_layer_defs):
+            self.subspace_is_euclidean=True
+            assert("z" not in self.zenith_type_layer_defs)
+            assert("r" not in self.zenith_type_layer_defs)
+            
         self.total_euclidean_pars=0
 
         ## if there are no euclidean layers the transformation does not exist, might use empty layer then
-        assert(len(self.euclidean_layer_defs)>0)
+        assert(len(self.zenith_type_layer_defs)>0)
 
-        for layer_ind, layer_type in enumerate(self.euclidean_layer_defs):
+        for layer_ind, layer_type in enumerate(self.zenith_type_layer_defs):
            
             this_kwargs = copy.deepcopy(self.flow_dict[layer_type]["kwargs"])
 
@@ -83,14 +112,14 @@ class segmented_sphere_nd(sphere_base.sphere_base):
          
             ## this flow is a spherical flow, so the first layer should also project from plane to sphere or vice versa
 
-            self.euclidean_layer_list.append(
+            self.zenith_type_layer_list.append(
                 self.flow_dict[layer_type]["module"](self.dimension-1, **this_kwargs)
             )
 
-            #self.num_parameter_list.append(self.euclidean_layer_list[-1].total_param_num)
+            #self.num_parameter_list.append(self.zenith_type_layer_list[-1].total_param_num)
 
             #self.total_param_num+=self.num_parameter_list[-1]
-            self.total_euclidean_pars+=self.euclidean_layer_list[-1].total_param_num
+            self.total_euclidean_pars+=self.zenith_type_layer_list[-1].total_param_num
 
         self.num_mlp_params=0
 
@@ -103,22 +132,29 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         else:
             self.amortized_mlp=None
             
-    def to_euclidean_subspace(self, x, log_det, sf_extra=None):
+    def to_subspace(self, x, log_det, sf_extra=None):
+        """
+        Maps the zenith-type dimension to an appropriate subspace for further transformation.
+        """
 
         if(self.subspace_mapping=="logistic"):
 
+            # Cylinder parametrization uses a logarithmic parametrization to represent values arbitrarily close to boundaries in a differentiable fashion.
             if(self.higher_order_cylinder_parametrization):
 
-              
-                lcyl=x
-                sfcyl=sf_extra
+                if(self.subspace_is_euclidean):
+                    lcyl=x
+                    sfcyl=sf_extra
 
-                res=lcyl-sfcyl
-                #print("to subspace ", lcyl, sfcyl)
-                #log_det-=(res-2.0*lsexp).sum(axis=-1)
-                log_det+=(-lcyl-sfcyl).sum(axis=-1)
+                    res=lcyl-sfcyl
+                    #print("to subspace ", lcyl, sfcyl)
+                    #log_det-=(res-2.0*lsexp).sum(axis=-1)
+                    log_det+=(-lcyl-sfcyl).sum(axis=-1)
 
-                return res, log_det
+                    return res, log_det
+                else:
+
+                    return torch.exp(x), log_det
 
 
             else:
@@ -144,22 +180,30 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         else:
             raise Exception("Unknown subspace mapping", self.subspace_mapping)
 
-    def from_euclidean_subspace(self, x, log_det):
+    def from_subspace(self, x, log_det):
+        """
+        Maps the real/interval subspace back to the orginal zenith-type space.
+        """
 
-        #print("EUCL TO SPHERE INPUT ", x)
         if(self.subspace_mapping=="logistic"):
 
             sf_extra=None
             if(self.higher_order_cylinder_parametrization):
                 
-              
-                lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
-                log_det+=(x-2.0*lsexp).sum(axis=-1)
+                if(self.subspace_is_euclidean):
+                    lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
+                    log_det+=(x-2.0*lsexp).sum(axis=-1)
 
-                lncyl=x-lsexp
-                sf_extra=-lsexp
-                #print("from eucl subspace ", lncyl, sf_extra)
-                return lncyl, log_det, sf_extra
+                    lncyl=x-lsexp
+                    sf_extra=-lsexp
+                    #print("from eucl subspace ", lncyl, sf_extra)
+                    return lncyl, log_det, sf_extra
+                else:
+
+                    lncyl=torch.log(x)
+                    sf_extra=torch.log(1.0-x)
+
+                    return lncyl, log_det, sf_extra
 
             else:
                 
@@ -212,7 +256,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             #print("_inv flow beg x", x[:, :self.dimension-1])
             cos_coords=0.5-0.5*torch.cos(x[:, :self.dimension-1])
 
-            ## small angle approximation of cosinus for these values
+            ## small angle approximation of cosine for these values
             small_mask=x[:, :self.dimension-1]<1e-4
             large_mask=x[:, :self.dimension-1]>(numpy.pi-1e-4)
             
@@ -227,9 +271,9 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             log_det+=0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
             #print("_inv flow cyl ln / sf", ln_cyl, sf_extra)
-        if(len(self.euclidean_layer_list)>0):
+        if(len(self.zenith_type_layer_list)>0):
 
-            eucl_x, log_det=self.to_euclidean_subspace(potential_eucl,log_det, sf_extra=sf_extra)
+            eucl_x, log_det=self.to_subspace(potential_eucl,log_det, sf_extra=sf_extra)
            
             ## loop through all layers in each pdf and transform "this_target"
 
@@ -243,7 +287,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 eucl_layer_pars=self.amortized_mlp(self.moebius_trafo._embedding_conditional_return(x[:,self.dimension-1:]), amortized_inputs)
 
                 extra_param_counter = 0
-                for l, layer in list(enumerate(self.euclidean_layer_list)):
+                for l, layer in list(enumerate(self.zenith_type_layer_list)):
                     
                   
                     this_extra_params = eucl_layer_pars[:, extra_param_counter : extra_param_counter + layer.total_param_num]
@@ -253,7 +297,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                     extra_param_counter += layer.total_param_num
 
          
-            potential_eucl, log_det, sf_extra=self.from_euclidean_subspace(eucl_x, log_det)
+            potential_eucl, log_det, sf_extra=self.from_subspace(eucl_x, log_det)
 
         op=torch.cat([potential_eucl, xm],dim=1)
         return op, log_det, sf_extra
@@ -274,10 +318,10 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
         ### 
 
-        if(len(self.euclidean_layer_list)>0):
+        if(len(self.zenith_type_layer_list)>0):
 
             
-            eucl_x, log_det=self.to_euclidean_subspace(potential_eucl, log_det, sf_extra=sf_extra)
+            eucl_x, log_det=self.to_subspace(potential_eucl, log_det, sf_extra=sf_extra)
             ## loop through all layers in each pdf and transform "this_target"
 
            
@@ -291,7 +335,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 extra_param_counter = 0
 
 
-                for l, layer in reversed(list(enumerate(self.euclidean_layer_list))):
+                for l, layer in reversed(list(enumerate(self.zenith_type_layer_list))):
                     
                     this_extra_params = None
                     
@@ -303,7 +347,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                    
                     extra_param_counter += layer.total_param_num
 
-            potential_eucl, log_det, sf_extra=self.from_euclidean_subspace(eucl_x, log_det)
+            potential_eucl, log_det, sf_extra=self.from_subspace(eucl_x, log_det)
 
            
         if(self.higher_order_cylinder_parametrization):
@@ -359,7 +403,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
         gf_init=True
 
-        for l in self.euclidean_layer_defs:
+        for l in self.zenith_type_layer_defs:
             if(l!="g"):
                 gf_init=False
 
@@ -373,13 +417,13 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         
 
             ## use that distribution as initilization to GF flow
-            desired_euclidean_pars=find_init_pars_of_chained_gf_blocks(self.euclidean_layer_list, pseudo_data,householder_inits="random")
+            desired_euclidean_pars=find_init_pars_of_chained_gf_blocks(self.zenith_type_layer_list, pseudo_data,householder_inits="random")
 
         else:
 
             ## get basic rough init...
             this_list=[]
-            for l in self.euclidean_layer_list:
+            for l in self.zenith_type_layer_list:
                 this_list.append(l.get_desired_init_parameters())
 
             desired_euclidean_pars=torch.cat(this_list)

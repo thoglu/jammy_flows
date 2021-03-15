@@ -19,10 +19,12 @@ import jammy_flows
 from jammy_flows import helper_fns
 import pylab
 from matplotlib import rc
+import random
 
-from pytorch_lightning import seed_everything
-
-rc('text', usetex=True)
+def seed_everything(seed_no):
+    random.seed(seed_no)
+    numpy.random.seed(seed_no)
+    torch.manual_seed(seed_no)
 
 ## Generate data that follows letter shapes using some TTF template
 ###################################################################
@@ -228,7 +230,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=100000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=100000, nsamples=100000, contour_probs=[0.68,0.95], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -264,7 +266,7 @@ if __name__ == "__main__":
 
     parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
     parser.add_argument("-pdf_def", type=str, default="e4+s2+e4")
-    parser.add_argument("-layer_def", type=str, default="gggg+vvv+gggg") 
+    parser.add_argument("-layer_def", type=str, default="gggg+n+gggg") 
     parser.add_argument("-train_size", type=int, default=20000)
     parser.add_argument("-batch_size", type=int, default=20)
     parser.add_argument("-test_size", type=int, default=1000)
@@ -272,7 +274,7 @@ if __name__ == "__main__":
 
     args=parser.parse_args()
 
-    seed_everything(0)
+    seed_everything(1)
 
     assert(args.train_size % args.batch_size==0)
 
@@ -282,12 +284,13 @@ if __name__ == "__main__":
     ## test used to calculate coverage
     test_data, test_labels=sample_data(args.pdf_def, args.sentence, num_samples=args.test_size)
 
-    ## define PDF
     extra_flow_defs=dict()
-    extra_flow_defs["v"]=dict()
-    extra_flow_defs["v"]["kwargs"]=dict()
-    extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,hidden_mlp_dims_sub_pdfs="")
+    extra_flow_defs["n"]=dict()
+    extra_flow_defs["n"]["kwargs"]=dict()
+    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="r"
+    extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
+
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], flow_defs_detail=extra_flow_defs)
 
     ## initalize params with test sample (only advantage gains for Gaussianization flows)
     word_pdf.init_params(data=test_labels)

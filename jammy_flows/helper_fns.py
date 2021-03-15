@@ -163,12 +163,16 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])
     if(conditional_input is None and model.pdf_defs_list[0]=="s2"):
-     
-      problematic_pars=model.layer_list[0][0].return_problematic_pars_between_hh_and_intrinsic(eval_positions[mask_inner])
+      
+      
+      problematic_pars=model.layer_list[0][0].return_problematic_pars_between_hh_and_intrinsic(eval_positions[mask_inner], flag_pole_distance=0.02)
 
       if(problematic_pars.shape[0]>0):
         if(s2_norm=="lambert"):
-          problematic_pars=spherical_to_cartesian_lambert(problematic_pars)
+          fix_point=None
+          if(s2_rotate_to_true_value and true_values is not None):
+              fix_point=true_values[model.target_dim_indices[ind][0]:model.target_dim_indices[ind][1]]
+          problematic_pars=spherical_to_cartesian_lambert(problematic_pars, fix_point=fix_point)
       flagged_coords=problematic_pars.detach().numpy()
 
     """
