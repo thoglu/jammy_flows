@@ -230,7 +230,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=100000, nsamples=100000, contour_probs=[0.68,0.95], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=100000, nsamples=100000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]

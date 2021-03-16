@@ -118,7 +118,7 @@ Hopefully following soon. In the meantime check out the [example script](example
 - [x] include log-lambda as an additional flow parameter to define parametrized Poisson-Processes
 - [x] easily extendible: define new Euclidean / spherical flow layers by subclassing Euclidean or spherical base classes
 
-- [ ] Interval flows
+- [x] Interval flows
 - [ ] Categorical variables for joint regression/classification
 
 ### Euclidean flows:
@@ -138,7 +138,7 @@ Hopefully following soon. In the meantime check out the [example script](example
  
 ### Interval Flows:
 
-- [ ] "Neural spline flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)
+- [x] "Neural spline flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)
 
 ## Requirements
 
