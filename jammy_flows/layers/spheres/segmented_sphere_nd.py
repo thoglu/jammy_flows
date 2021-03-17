@@ -30,7 +30,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
 
         ## a moebius layer
-        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=1, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
+        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=0, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
         self.num_moebius_pars=self.moebius_trafo.total_param_num
         self.total_param_num+=self.num_moebius_pars
 
