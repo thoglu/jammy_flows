@@ -5,13 +5,18 @@ import torch
 import numpy
 import pylab
 import torch.autograd.functional
+import random
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
 import jammy_flows.flows as f
-#from pytorch_lightning import seed_everything
 import jammy_flows.helper_fns as helper_fns
+
+def seed_everything(seed_no):
+    random.seed(seed_no)
+    numpy.random.seed(seed_no)
+    torch.manual_seed(seed_no)
 
 class Test(unittest.TestCase):
    
@@ -67,7 +72,7 @@ class Test(unittest.TestCase):
 
         print("-> Testing normalization of spheres <-")
 
-        #seed_everything(1)
+        seed_everything(1)
 
         def check_flow(fl):
             """ 

@@ -690,26 +690,10 @@ class pdf(nn.Module):
                     l = torch.nn.Linear(mlp_in_dims[i], mlp_out_dims[i])
 
                     nn_list.append(l)
-                    """
+                    
                     if i < (len(mlp_in_dims) - 1):
                         nn_list.append(NONLINEARITIES["tanh"])
-                    else:
-                        ## initialize prediction to match desired output from layers
-
-                        if(quasi_gaussian_initialization):
-                            
-                            nn_list[-1].weight.data/=1000.0
-
-                            bias_index=0
-                            for sublayer in self.layer_list[pdf_index]:
-                                
-                                these_params=sublayer.get_desired_init_parameters()
-                                if(these_params is not None):
-                                    nparams=len(these_params)
-                                    nn_list[-1].bias.data[bias_index:bias_index+nparams]=these_params
-                                    bias_index+=nparams
-                    """
-
+                    
                 
                 self.mlp_predictors.append(torch.nn.Sequential(*nn_list))
 
@@ -757,9 +741,8 @@ class pdf(nn.Module):
                             if i < (len(mlp_in_dims) - 1):
                                 nn_list.append(NONLINEARITIES["tanh"])
                             else:
-                                ## initialize prediction to match desired output from layers
+                                ## initialize some weights
 
-                       
                                 nn_list[-1].weight.data/=1000.0
 
                                 nn_list[-1].bias.data[0]=-1.0
@@ -1312,18 +1295,17 @@ class pdf(nn.Module):
                             raise NotImplementedError
 
 
-
+                # loop through all mlps
                 for ind, mlp_predictor in enumerate(self.mlp_predictors):
-                  
+                    
+                    # these are the desired params at initialization for the MLP -> set bias of last MLP layer to these values
+                    # and make the weights and bias in previous layers very small
                     these_params=params_list[ind]
 
                     if(len(these_params)>0):
 
                         if(mlp_predictor is not None):
-                            ## no mlps exist .. permanent parameters of flows should must be initialized
-
-                            
-
+                           
                             ## the first MLP can predict log_lambda if desired
                             if(self.predict_log_normalization):
                                 if(self.join_poisson_and_pdf_description):
@@ -1331,27 +1313,31 @@ class pdf(nn.Module):
                                         log_lambda_init=0.1
                                         these_params=torch.cat([these_params, torch.Tensor([log_lambda_init])])
 
-                            ## custom low-rank MLPs
+                            ## custom low-rank MLPs - initialization is done inside the custom MLP class
                             if(self.use_custom_low_rank_mlps):
-                                
                                 mlp_predictor.initialize_uvbs(init_b=these_params)
                             else:
-
-                               
-                                nn.init.kaiming_uniform_(mlp_predictor[-1].weight.data, a=numpy.sqrt(5))
-                                fan_in, _ = nn.init._calculate_fan_in_and_fan_out(mlp_predictor[-1].weight.data)
-                                bound = 1 / numpy.sqrt(fan_in)
+                                # initialize all layers
+                                for internal_layer in mlp_predictor:
                                     
-                                ## make weight updates initially very small
-                                mlp_predictor[-1].weight.data/=10000.0
+                                    # test if this is a real Linear layer or a nonlinearity
+                                    if(hasattr(internal_layer, "weight")):
 
+                                        # only initialize if a Linear layer
+                                        nn.init.kaiming_uniform_(internal_layer.weight.data, a=numpy.sqrt(5))
+                                        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(internal_layer.weight.data)
+                                        bound = 1 / numpy.sqrt(fan_in)
+
+                                        nn.init.uniform_(internal_layer.bias.data, -bound, bound)
+                                        
+                                        internal_layer.weight.data/=1000.0
+                                        internal_layer.bias.data/=1000.0
+                                    
+                                # finally overwrite bias to be equivalent to desired parameters at initialization
                                 mlp_predictor[-1].bias.data=these_params
 
-                              
-                          
                         else:
-                            #print("initalize base ............................. no MLP predictor")
-                            ## this bias of MLP predictors has to match params, while the weights must be reasonably small
+                            ## threre is no MLP - initialize parameters of flows directly
                             tot_param_index=0
                       
                             for layer_ind, layer in enumerate(self.layer_list[ind]):
