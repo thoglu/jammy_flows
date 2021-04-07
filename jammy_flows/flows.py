@@ -36,14 +36,16 @@ class pdf(nn.Module):
         data_summary_dim=None,
         input_encoder=None,
         hidden_mlp_dims_sub_pdfs="64-64",
-        rank_of_mlp_mappings_sub_pdfs=0,
         hidden_mlp_dims_meta="64-64",
         conditional_manifold_input_embedding_overwrite=dict(),
         predict_log_normalization=False,
         join_poisson_and_pdf_description=False,
         hidden_mlp_dims_poisson="64-64",
         rank_of_mlp_mappings_poisson=0,
-        use_custom_low_rank_mlps=False
+        ## the following arguments are defining specifically custom MLP settings
+        use_custom_low_rank_mlps=False,
+        rank_of_mlp_mappings_sub_pdfs=0,
+        custom_mlp_highway_mode=0
     ):  
         """
         Initializes a general flow pdf object.
@@ -81,6 +83,7 @@ class pdf(nn.Module):
         self.use_custom_low_rank_mlps=use_custom_low_rank_mlps
         self.predict_log_normalization=predict_log_normalization
         self.join_poisson_and_pdf_description=join_poisson_and_pdf_description
+        self.custom_mlp_highway_mode=custom_mlp_highway_mode
 
         ###################################################################
         ## CURRENT FIX .. if conditional_input_dim is not None, overwrite data_summary dim with conditional_input_dim and put input_encoder to "passthrough"
@@ -160,7 +163,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["module"] = gf_block
         self.flow_dict["g"]["type"] = "e"
         self.flow_dict["g"]["kwargs"] = dict()
-        self.flow_dict["g"]["kwargs"]["fit_normalization"] = 0
+        self.flow_dict["g"]["kwargs"]["fit_normalization"] = 1
         self.flow_dict["g"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["g"]["kwargs"]["num_householder_iter"] = -1
         self.flow_dict["g"]["kwargs"]["num_kde"] = 10
@@ -654,7 +657,7 @@ class pdf(nn.Module):
                 these_hidden_dims=list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
 
             
-                custom_mlp=extra_functions.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=True, svd_mode="smart")
+                custom_mlp=extra_functions.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=True, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
                 
                 """
                 if(quasi_gaussian_initialization):
@@ -722,7 +725,7 @@ class pdf(nn.Module):
 
                     if(self.use_custom_low_rank_mlps):
                        
-                        self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, svd_mode="smart")
+                        self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
 
                     else:
 
@@ -1100,6 +1103,14 @@ class pdf(nn.Module):
                 data_type=predefined_target_input.dtype
                 used_sample_size=predefined_target_input.shape[0]
                 used_device=predefined_target_input.device
+
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(self.total_target_dim).type(data_type).to(device),
+                covariance_matrix=torch.eye(self.total_target_dim)
+                .type(data_type)
+                .to(device),
+            ).log_prob(predefined_target_input)
+
         else:
 
             if(seed is not None):
