@@ -287,10 +287,10 @@ if __name__ == "__main__":
     extra_flow_defs=dict()
     extra_flow_defs["n"]=dict()
     extra_flow_defs["n"]["kwargs"]=dict()
-    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="r"
+    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="g"
     extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
 
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], hidden_mlp_dims_sub_pdfs="64-64-64-64",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=True,
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
     word_pdf.count_parameters(verbose=True)
