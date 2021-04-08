@@ -230,7 +230,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=100000, nsamples=100000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -267,7 +267,7 @@ if __name__ == "__main__":
     parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
     parser.add_argument("-pdf_def", type=str, default="e4+s2+e4")
     parser.add_argument("-layer_def", type=str, default="gggg+n+gggg") 
-    parser.add_argument("-train_size", type=int, default=20000)
+    parser.add_argument("-train_size", type=int, default=200000)
     parser.add_argument("-batch_size", type=int, default=20)
     parser.add_argument("-test_size", type=int, default=1000)
     parser.add_argument("-lr", type=float, default=0.001)
@@ -290,8 +290,10 @@ if __name__ == "__main__":
     extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="r"
     extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
 
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], flow_defs_detail=extra_flow_defs)
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], hidden_mlp_dims_sub_pdfs="64-64-64-64",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=True,
+        custom_mlp_highway_mode=4)
 
+    word_pdf.count_parameters(verbose=True)
     ## initalize params with test sample (only advantage gains for Gaussianization flows)
     word_pdf.init_params(data=test_labels)
 
