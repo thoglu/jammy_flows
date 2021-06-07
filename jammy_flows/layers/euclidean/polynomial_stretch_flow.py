@@ -210,7 +210,7 @@ class psf_block(euclidean_base.euclidean_base):
         for tr_iter in range(self.num_transforms):
 
             if(self.exact_mode==True):
-                log_det+=torch.log(self.fw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter)).sum(axis=1)
+                log_det=log_det+torch.log(self.fw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter)).sum(axis=1)
                
                 x=self.fw_loop(x, means1, means2, widths1, widths2, exponents, tr_iter)
             else:
@@ -219,7 +219,7 @@ class psf_block(euclidean_base.euclidean_base):
                 log_deriv=torch.log(self.rw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter))
 
                 #print("new positions ..", res)
-                log_det+=-log_deriv.sum(axis=-1)
+                log_det=log_det-log_deriv.sum(axis=-1)
 
             """
 
@@ -301,9 +301,8 @@ class psf_block(euclidean_base.euclidean_base):
         exponents=torch.exp(log_exponent)+self.exp_min
 
         for tr_iter in reversed(range(self.num_transforms)):
-           
-
-            log_det+=torch.log(self.rw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter)).sum(axis=1)
+            
+            log_det=log_det+torch.log(self.rw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter)).sum(axis=1)
            
             x=self.rw_loop(x, means1, means2, widths1, widths2, exponents, tr_iter)
 

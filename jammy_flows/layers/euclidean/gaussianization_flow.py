@@ -232,7 +232,12 @@ class gf_block(euclidean_base.euclidean_base):
                     pos_entry=2.0*(torch.sqrt((combined)**2-ln_fac/a)-(combined))
                     pos_entry[pos_entry<=0]=0.0
 
+                    #mask_neg=(cdf_l<=0.5).double()
+
                     total_factor=torch.sqrt(pos_entry)
+
+                    ## flip signs
+                    #total_factor=(-1.0*total_factor)*mask_neg+(1.0-mask_neg)*total_factor
 
                    
                 ## very HIGH CDF values
@@ -270,6 +275,7 @@ class gf_block(euclidean_base.euclidean_base):
 
     def sigmoid_inv_error_pass_derivative(self, x, datapoints, log_widths, log_norms):
         
+        """
         #datapoints = self.datapoints
 
         #cdf_l = self.logistic_kernel_cdf(x, datapoints, log_widths)
@@ -285,7 +291,6 @@ class gf_block(euclidean_base.euclidean_base):
             lse_cat=torch.cat([-log_sf_l[:,:,None],-log_cdf_l[:,:,None]], axis=-1)
             lse_sum=torch.logsumexp(lse_cat, axis=-1)
 
-         
             return torch.exp(lse_sum+log_pdf)
 
         else:
@@ -380,23 +385,11 @@ class gf_block(euclidean_base.euclidean_base):
 
                 return_derivs[full_deriv_mask]=(torch.exp(log_total-log_cdf_l-log_sf_l+log_pdf)*extra_plus_minus_factor)[full_deriv_mask]
 
-                #return_derivs=torch.exp(log_total-log_cdf_l-log_sf_l+log_pdf)*extra_plus_minus_factor
-                """
-                if(F_2.shape[0]>48000):
-                    print("F2")
-                    print("LN FAC/A",(ln_fac/a)[15974])
-                    print("log_cdf_l", log_cdf_l[15974])
-                    print("cdf_l", cdf_l[15974]==0.5)
-                    print("log sf ls", log_sf_l[15974])
-                    print((F_2-F)[15974])
-                  
-                    print("RETURN DERIV VALUE", return_derivs[15974])
-                    print("############")
-                    print(F_2[15974])
-                    print(log_numerator[15974])
-                    print(log_denominator[15974])
-                """
                 return return_derivs
+
+        """
+
+        return torch.exp(self.sigmoid_inv_error_pass_log_derivative(x,datapoints, log_widths,log_norms))
 
     def sigmoid_inv_error_pass_log_derivative(self, x, datapoints, log_widths, log_norms):
 
@@ -431,7 +424,7 @@ class gf_block(euclidean_base.euclidean_base):
                 if(self.inverse_function_type=="inormal_partly_crude"):
                      ## crude approximation beyond limits
                     ln_fac=log_cdf_l+log_sf_l
-                    total_factor=-0.5*torch.log(-2.0*(ln_fac))
+                    total_factor=-0.5*torch.log(-2.0*(ln_fac))-log_sf_l-log_cdf_l
 
                   
                 elif(self.inverse_function_type=="inormal_partly_precise"):
@@ -451,18 +444,43 @@ class gf_block(euclidean_base.euclidean_base):
                 
                     log_total=log_numerator-log_denominator
 
+                    
+                    total_factor=log_total-log_sf_l-log_cdf_l
+
+
+                    ##########
+
+                    
+                    """
+                    mask_neg=(cdf_l<0.5)
+                    total_factor=total_factor.masked_scatter(mask_neg, total_factor[mask_neg]+torch.log((1.0-2*cdf_l[mask_neg])))
+
+                    mask_pos=(cdf_l>0.5)
+                    total_factor=total_factor.masked_scatter(mask_pos, total_factor[mask_pos]+torch.log((-1.0+2*cdf_l[mask_pos])))
+                    """
+
                     mask_neg=(cdf_l<=0.5).double()
-                    extra_plus_minus_factor=(1.0-2*cdf_l)*mask_neg+(-1.0+2*cdf_l)*(1-mask_neg)
+                    extra_plus_minus_factor=torch.log((1.0-2*cdf_l)*mask_neg+(-1.0+2*cdf_l)*(1-mask_neg))
 
-                    total_factor=log_total
+                    total_factor=total_factor+extra_plus_minus_factor
 
+                    ######
+                    
+                    bad_deriv_mask=( (cdf_l>0.49999) & (cdf_l < 0.50001))
+                    
+                    total_factor=total_factor.masked_fill(bad_deriv_mask, numpy.log(2.506628))
+
+                        
                 cdf_mask_right = (cdf_l >= 1. - (self.pade_approximation_bound)).double()
                 cdf_l_bad_right_log = total_factor * cdf_mask_right  -0.5*(1.0-cdf_mask_right)
-                derivative += cdf_mask_right*(cdf_l_bad_right_log-log_sf_l+log_pdf)
+                derivative += cdf_mask_right*(cdf_l_bad_right_log+log_pdf)
                 # 3) Step3: invert BAD small CDF
                 cdf_mask_left = (cdf_l <= self.pade_approximation_bound).double()
                 cdf_l_bad_left_log = total_factor * cdf_mask_left  -0.5*(1.0-cdf_mask_left)
-                derivative+=cdf_mask_left*(cdf_l_bad_left_log-log_cdf_l+log_pdf)
+                derivative+=cdf_mask_left*(cdf_l_bad_left_log+log_pdf)
+
+                
+
 
                 return derivative
 
@@ -475,12 +493,20 @@ class gf_block(euclidean_base.euclidean_base):
 
                 F=ln_fac/2.0+c
 
+                # at cdf values of 0.5 the derivative is computationally unstable, avoid this region, and fix derivative to ~ 2.506628 which is the approximate numerical value
+                ## Check e.g. wolfram alpha:
+                ## https://www.wolframalpha.com/input/?i=derivative+of+sqrt%28+2*+%28+++sqrt%28++++%282%2F%280.147*pi%29+%2B+ln%284*x-4*x**2%29+%2F2.0+%29**2-+ln%284*x-4*x**2%29%2F0.147++%29+-++%282%2F%280.147*pi%29+%2B+ln%284*x-4*x**2%29+%2F2.0+%29++++++%29+%29+++++at+x%3D0.4995+++++++
+                full_deriv_mask=( (cdf_l<0.49999) | (cdf_l > 0.50001))
+
+                assert( (-ln_fac[full_deriv_mask].detach()<=0).sum()==0)
+
+                return_derivs=torch.ones_like(x)*numpy.log(2.506628)+log_pdf
+
                 F_2=torch.sqrt(F**2-ln_fac/a)
                 
                 log_numerator=torch.log((-1.0)*(F-1.0/a-F_2))
 
                 
-               
                 log_denominator=0.5*numpy.log(8)+0.5*(torch.log(F_2-F))+torch.log(F_2)
 
                 log_total=log_numerator-log_denominator
@@ -488,9 +514,11 @@ class gf_block(euclidean_base.euclidean_base):
                 mask_neg=(cdf_l<=0.5).double()
                 extra_plus_minus_factor=(1.0-2*cdf_l)*mask_neg+(-1.0+2*cdf_l)*(1-mask_neg)
 
-                return_derivs=torch.ones_like(x)*numpy.log(2.506628)+log_pdf
-                full_deriv_mask=( (cdf_l<0.49999) | (cdf_l > 0.50001))
                 return_derivs[full_deriv_mask]=(log_total-log_cdf_l-log_sf_l+log_pdf+torch.log(extra_plus_minus_factor))[full_deriv_mask]
+
+
+                #######
+
 
                 return return_derivs
 
@@ -546,7 +574,7 @@ class gf_block(euclidean_base.euclidean_base):
      
         log_deriv=self.sigmoid_inv_error_pass_log_derivative(res, this_datapoints, this_hs,this_log_norms)
 
-        log_det+=-log_deriv.sum(axis=-1)
+        log_det=log_det-log_deriv.sum(axis=-1)
 
         if self.use_householder:
          
@@ -655,10 +683,23 @@ class gf_block(euclidean_base.euclidean_base):
 
             if(self.fit_normalization):
                 this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.log_kde_weights.shape[1], self.log_kde_weights.shape[2]])
+        
+        log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms).sum(axis=-1)
+        if(torch.isnan(log_det).sum()>0):
+            print("x bef ", x[80:100])
+            print("LOG DET AFTER ", log_det[80:100])
+            print("datapoints ", this_datapoints[80:100])
+            print("this hs", this_hs[80:100])
+            print("this log norms", this_log_norms[80:100])
 
-        log_det+=self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms).sum(axis=-1)
 
         x=self.sigmoid_inv_error_pass(x, this_datapoints, this_hs,this_log_norms)
+
+        if(torch.isnan(log_det).sum()>0):
+            print("new x ", x)
+            print("nan issue")
+            sys.exit(-1)
+
         
         return x, log_det#, cur_datapoints_update
 

@@ -40,6 +40,10 @@ def compare_two_arrays(arr1, arr2, name1, name2):
 
 
     diff_value=1e-7
+
+    print(name1, name2)
+    print(arr1)
+    print(arr2)
     diff_too_large_mask=numpy.fabs(arr1-arr2)>diff_value
 
     if(diff_too_large_mask.sum()>0):
@@ -66,24 +70,28 @@ class Test(unittest.TestCase):
         
         pdf_def="e2"
         flow_def="ppp"
-        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":True}}} }
+        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":True,"skip_model_offset": 1}}} }
 
         #self.flow_inits.append( [ [pdf_def, flow_def], dict()] )
         self.init_exact= [ [pdf_def, flow_def], settings] 
         
-        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":False}}} }
+        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":False,"skip_model_offset": 1}}} }
 
         self.init_numerical= [ [pdf_def, flow_def], settings] 
 
        
     
     def test_newton(self):
-
+        """ 
+        We form derivatives of various quantities, once of the exact version, and once of the verrsion with the numerical inverse.
+        Parameters that can be exactly 0 (or None) are skipped (vs / mean)
+        """
         print("Testing self consistency of sampling")
+
         samplesize=10000
         
         
-        seed_everything(0)
+        seed_everything(1)
         flow_exact=f.pdf(*self.init_exact[0], **self.init_exact[1])
         flow_exact.double()
 
@@ -109,6 +117,9 @@ class Test(unittest.TestCase):
 
         for name, p in flow_exact.named_parameters():
             print("name ", name)
+
+            if("vs" in name or "mean" in name):
+                continue
             #print(torch.autograd.grad(samples[0][0], p))
             res=torch.autograd.grad(mean_evals, p, allow_unused=True, retain_graph=True)
             print(res)
@@ -136,11 +147,12 @@ class Test(unittest.TestCase):
         eval_derivs_again_detached_1=torch.cat(eval_derivs_again_detached_1)
         sample_derivs_1=torch.cat(sample_derivs_1)
 
-        seed_everything(0)
+        seed_everything(1)
 
         flow_numerical=f.pdf(*self.init_numerical[0], **self.init_numerical[1])
         flow_numerical.double()
 
+   
 
         samples_num, base_samples_num, evals_num, base_evals_num=flow_numerical.sample(samplesize=samplesize, allow_gradients=True)
         
@@ -162,6 +174,8 @@ class Test(unittest.TestCase):
 
         for name, p in flow_numerical.named_parameters():
             print(name)
+            if("vs" in name or "mean" in name):
+                continue
 
             res=torch.autograd.grad(mean_evals_num, p, allow_unused=True, retain_graph=True)
             print(res)

@@ -253,7 +253,7 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_derivative=self.min_derivative
                                                          )
         
-        log_det+=log_det_update.sum(axis=-1)
+        log_det=log_det+log_det_update.sum(axis=-1)
 
         return x, log_det
 
@@ -284,7 +284,7 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_derivative=self.min_derivative
                                                          )
         
-        log_det+=log_det_update.sum(axis=-1)
+        log_det=log_det+log_det_update.sum(axis=-1)
 
         return x, log_det
 

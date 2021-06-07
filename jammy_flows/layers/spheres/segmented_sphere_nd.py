@@ -149,7 +149,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                     res=lcyl-sfcyl
                     #print("to subspace ", lcyl, sfcyl)
                     #log_det-=(res-2.0*lsexp).sum(axis=-1)
-                    log_det+=(-lcyl-sfcyl).sum(axis=-1)
+                    log_det=log_det+(-lcyl-sfcyl).sum(axis=-1)
 
                     return res, log_det
                 else:
@@ -166,7 +166,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
        
                 ## FIXME .. this is only correct for 2-d!!
                 scaled=-torch.cos(x)/2.0+1.0/2.0
-                log_det+=torch.log(torch.sin(x[:,0])/2.0)
+                log_det=log_det+torch.log(torch.sin(x[:,0])/2.0)
                 ##########
 
                 good_scaled=(scaled>0) & (scaled < 1.0)
@@ -174,7 +174,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
                 inv=(torch.log(scaled)-torch.log(1.0-scaled))
                
-                log_det+=(-torch.log(scaled)-torch.log(1.0-scaled)).sum(axis=-1)
+                log_det=log_det+(-torch.log(scaled)-torch.log(1.0-scaled)).sum(axis=-1)
 
                 return inv, log_det
         else:
@@ -192,7 +192,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 
                 if(self.subspace_is_euclidean):
                     lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
-                    log_det+=(x-2.0*lsexp).sum(axis=-1)
+                    log_det=log_det+(x-2.0*lsexp).sum(axis=-1)
 
                     lncyl=x-lsexp
                     sf_extra=-lsexp
@@ -209,7 +209,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 
                 lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
             
-                log_det+=(x-2.0*lsexp).sum(axis=-1)
+                log_det=log_det+(x-2.0*lsexp).sum(axis=-1)
 
                 res=1.0/(1.0+torch.exp(-x))
 
@@ -223,7 +223,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 
                 #log_det+=-0.5*torch.log(res-res**2)[:,0]
                 res=torch.acos(1.0-2*res)
-                log_det+=-torch.log(torch.sin(res[:,0])/2.0)
+                log_det=log_det-torch.log(torch.sin(res[:,0])/2.0)
                 
                 return res, log_det, None
         else:
@@ -238,7 +238,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
         ## this implementation requires another sin(theta) factor here
         ## 
-        log_det+=-torch.log(torch.sin(x[:,0]))
+        log_det=log_det-torch.log(torch.sin(x[:,0]))
 
         moebius_extra_inputs=None
         if(extra_inputs is not None):
@@ -268,7 +268,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
             potential_eucl=ln_cyl
             ## ddx = sin(x)/2
-            log_det+=0.5*(ln_cyl+sf_extra).sum(axis=-1)
+            log_det=log_det+0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
             #print("_inv flow cyl ln / sf", ln_cyl, sf_extra)
         if(len(self.zenith_type_layer_list)>0):
@@ -355,7 +355,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             ln_cyl=potential_eucl
 
             ## ddx = sin(x)/2
-            log_det+=-0.5*(ln_cyl+sf_extra).sum(axis=-1)
+            log_det=log_det-0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
             potential_eucl=torch.acos(1.0-2.0*ln_cyl.exp())
             
@@ -363,7 +363,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         op=torch.cat([potential_eucl, xm],dim=1)
 
         ## another sin(theta) factor 
-        log_det+=torch.log(torch.sin(op[:,0]))
+        log_det=log_det+torch.log(torch.sin(op[:,0]))
 
         return op, log_det
 

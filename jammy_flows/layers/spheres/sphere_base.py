@@ -172,7 +172,7 @@ class sphere_base(layer_base.layer_base):
                     new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
                 else:
                     raise NotImplementedError("D>2 not implemented for D-spheres currently")
-                    log_det+=torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
+                    log_det=log_det+torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
 
                 transformed_coords.append(new_angle)
 
@@ -242,7 +242,7 @@ class sphere_base(layer_base.layer_base):
            
           
             ## take inverse derivative coz its easier to calculate
-            log_det+=-numpy.log(numpy.sqrt(2.0*numpy.pi)) + (x[:,0]**2)/2.0    
+            log_det=log_det-numpy.log(numpy.sqrt(2.0*numpy.pi)) + (x[:,0]**2)/2.0    
 
         elif(self.dimension==2):
             
@@ -253,7 +253,7 @@ class sphere_base(layer_base.layer_base):
                 lnr=0.5*torch.log(-2.0*x[:,0:1])
 
                 #log_det+=(-lnr-x[:,0:1]).sum(axis=-1)
-                log_det+=(-x[:,0:1]).sum(axis=-1)
+                log_det=log_det+(-x[:,0:1]).sum(axis=-1)
 
                 x[:,0:1]=torch.exp(lnr)#
 
@@ -274,7 +274,7 @@ class sphere_base(layer_base.layer_base):
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ### FULL TERM:
                 ### log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
-                log_det+=-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
+                log_det=log_det-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
         
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
 
@@ -294,7 +294,7 @@ class sphere_base(layer_base.layer_base):
         ## first coordinate is now radial coordinate, other coordinates are angles
         if(self.dimension==1):
             
-            log_det+=numpy.log(numpy.sqrt(2.0*numpy.pi))-(x[:,0]**2)/2.0
+            log_det=log_det+numpy.log(numpy.sqrt(2.0*numpy.pi))-(x[:,0]**2)/2.0
             
             x=numpy.pi*(1.0-torch.erf(x/numpy.sqrt(2.0)))
             
@@ -313,7 +313,7 @@ class sphere_base(layer_base.layer_base):
 
                 ####
                 #log_det+=(lnr+lncyl).sum(axis=-1)
-                log_det+=(lncyl).sum(axis=-1)
+                log_det=log_det+(lncyl).sum(axis=-1)
                 
                 large_r_bound=10.0
                 small_r_bound=0.001
@@ -350,7 +350,7 @@ class sphere_base(layer_base.layer_base):
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ## FULL TERM:
                 ## log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
-                log_det-=-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
+                log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
               
                
                 x=torch.cat([new_theta, x[:,1:2]],dim=1)

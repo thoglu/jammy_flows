@@ -104,7 +104,9 @@ def compare_two_arrays(arr1, arr2, name1, name2, diff_value=1e-7):
         print("selected array 2 values ...")
         print(arr2[diff_too_large_mask])
         print(".. diffs")
-        print(numpy.fabs(arr1-arr2)[diff_too_large_mask])
+        diffs=numpy.fabs(arr1-arr2)[diff_too_large_mask]
+        print(diffs)
+        print("min / maxn diff: ", diffs.min(), "/ ", diffs.max())
         raise Exception()
 
     print("largest diff between ", name1, " and ", name2, " (%d items): " % len(arr1),numpy.fabs(arr1-arr2).max() )
@@ -165,6 +167,23 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
         extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=1
         self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
+
+        #######
+
+        """
+        extra_flow_defs=dict()
+        extra_flow_defs["flow_defs_detail"]=dict()
+        extra_flow_defs["flow_defs_detail"]["c"]=dict()
+        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]=dict()
+        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["natural_direction"]=1
+        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["solver"]="rk4"
+        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["cnf_network_hidden_dims"]=""
+        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["num_charts"]=20
+        extra_flow_defs["conditional_input_dim"]=2
+
+        self.flow_inits.append([ ["s2", "c"], extra_flow_defs])
+        """
+
 
         ###################### Interval flows
 
@@ -246,6 +265,8 @@ class Test(unittest.TestCase):
             compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
             compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
 
+            if("c" in init[0][1]):
+                sys.exit(-1)
     def test_gpu(self):
 
         print("-> Testing gpu-support <-")

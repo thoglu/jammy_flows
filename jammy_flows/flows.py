@@ -9,6 +9,7 @@ from .layers.spheres.moebius_1d import moebius
 from .layers.spheres.segmented_sphere_nd import segmented_sphere_nd
 from .layers.spheres.exponential_map_s2 import exponential_map_s2
 from .layers.spheres.spherical_do_nothing import spherical_do_nothing
+from .layers.spheres.cnf_sphere_charts import cnf_sphere_charts
 
 from .layers.euclidean.euclidean_base import euclidean_base
 from .layers.euclidean.euclidean_do_nothing import euclidean_do_nothing
@@ -169,6 +170,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["num_kde"] = 10
         self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
         self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
+        self.flow_dict["g"]["kwargs"]["skip_model_offset"]=0
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block
@@ -176,8 +178,9 @@ class pdf(nn.Module):
         self.flow_dict["p"]["kwargs"] = dict()
         self.flow_dict["p"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["p"]["kwargs"]["num_householder_iter"] = -1
-        self.flow_dict["p"]["kwargs"]["num_transforms"] = 3
+        self.flow_dict["p"]["kwargs"]["num_transforms"] = 1
         self.flow_dict["p"]["kwargs"]["exact_mode"] = True
+        self.flow_dict["p"]["kwargs"]["skip_model_offset"]=0
 
         """
         S1 flows
@@ -218,6 +221,21 @@ class pdf(nn.Module):
         self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear  / exponential
         self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## number of components in convex superposition
         self.flow_dict["v"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
+
+        self.flow_dict["c"] = dict()
+        self.flow_dict["c"]["module"] = cnf_sphere_charts
+        self.flow_dict["c"]["type"] = "s"
+        self.flow_dict["c"]["kwargs"] = dict()
+        self.flow_dict["c"]["kwargs"]["use_extra_householder"] = 0
+        self.flow_dict["c"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
+        self.flow_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = False
+        self.flow_dict["c"]["kwargs"]["num_charts"] = 10
+        self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "128" # hidden dims of cnf MLP network
+        self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 1 # mlp highway dim - 0-4
+        self.flow_dict["c"]["kwargs"]["cnf_network_rank"] = 0 # 0 means full rank
+        self.flow_dict["c"]["kwargs"]["natural_direction"] = 1 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
+        self.flow_dict["c"]["kwargs"]["solver"] = "rk4" ## 
 
         """
         Interval flows
@@ -514,13 +532,17 @@ class pdf(nn.Module):
 
                 elif("e" in subflow_description):
                     if(layer_type!="x"):
-                        if(layer_ind==(this_num_layers-1)):
+                        if(layer_ind==(this_num_layers-1) and this_kwargs["skip_model_offset"]==0):
+                            
                             this_kwargs["model_offset"]=1
                         elif(layer_ind==0):
                             if(layer_type=="g"):
                                 if(this_kwargs["replace_first_sigmoid_with_icdf"]>0 and this_kwargs["inverse_function_type"]=="isigmoid"):
                                     this_kwargs["inverse_function_type"]="inormal_partly_precise"
-                    
+
+                ## this is not a real parameter - delete it
+                if("skip_model_offset" in this_kwargs):
+                    del this_kwargs["skip_model_offset"]
                 ## we dont want to pass this to layer
                 if(layer_type=="g"):
                     del this_kwargs["replace_first_sigmoid_with_icdf"]
@@ -729,10 +751,8 @@ class pdf(nn.Module):
 
                     else:
 
-                        mlp_in_dims = (this_summary_dim,) + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-                        mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + (
-                            num_predicted_pars,
-                        )
+                        mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
+                        mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
 
                         nn_list = []
                         for i in range(len(mlp_in_dims)):
@@ -1049,6 +1069,48 @@ class pdf(nn.Module):
 
         return log_pdf + log_det, log_pdf, base_pos
 
+    def forward_subpdf(self, subpdf_index, this_x, extra_params=None):
+        """
+        Forward function of a single sub-pdf. Is used in the calculation of the total correlation.
+        """
+        log_det = torch.zeros(this_x.shape[0]).type_as(this_x)
+
+        this_target=this_x
+
+        pdf_layers=self.layer_list[subpdf_index]
+
+        ## reverse mapping is required for pdf evaluation
+
+        this_extra_params=None
+        extra_param_counter=0
+
+        for l, layer in reversed(list(enumerate(pdf_layers))):
+
+            if extra_params is not None:
+
+                if extra_param_counter == 0:
+                        this_extra_params = extra_params[:, -layer.total_param_num :]
+                else:
+
+                    this_extra_params = extra_params[
+                        :,
+                        -extra_param_counter
+                        - layer.total_param_num : -extra_param_counter,
+                    ]
+               
+
+            this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+
+            extra_param_counter += layer.total_param_num
+
+        log_pdf = torch.distributions.MultivariateNormal(
+            torch.zeros_like(this_x).to(this_x),
+            covariance_matrix=torch.eye(self.target_dims[subpdf_index]).type_as(this_x).to(this_x),
+        ).log_prob(this_target)
+
+
+        return log_pdf + log_det, log_pdf, this_target
+
     def sample(self, conditional_input=None, samplesize=1,  seed=None, device=torch.device("cpu"), allow_gradients=False):
         """ 
         Samples from the (conditional) PDF. 
@@ -1181,7 +1243,7 @@ class pdf(nn.Module):
                     this_extra_params = extra_params[:, extra_param_counter : extra_param_counter + layer.total_param_num]
                     
 
-                this_target, logdet = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+                this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
 
                 extra_param_counter += layer.total_param_num
 
@@ -1281,7 +1343,7 @@ class pdf(nn.Module):
                     params_list.append(params.type(torch.float64))
 
                 else:
-
+                   
                     ## get basic rough init...
                     this_list=[]
                     for l in this_layer_list:
@@ -1345,6 +1407,7 @@ class pdf(nn.Module):
                                         internal_layer.bias.data/=1000.0
                                     
                                 # finally overwrite bias to be equivalent to desired parameters at initialization
+                                
                                 mlp_predictor[-1].bias.data=these_params
 
                         else:
@@ -1362,5 +1425,5 @@ class pdf(nn.Module):
 
 
 
-
-
+    
+    

@@ -314,10 +314,10 @@ class AmortizableMLP(nn.Module):
                 max_num_pars=(mlp_def["inputs"][ind]*mlp_def["outputs"][ind])
 
                 # smart flag = 0 -> standard low rank approximation for this matrix
-                if( (used_ranks[ind]*(mlp_def["inputs"][ind]+mlp_def["outputs"][ind]) ) < max_num_pars ):
+                if( ((used_ranks[ind]*(mlp_def["inputs"][ind]+mlp_def["outputs"][ind]) ) < max_num_pars) and (mlp_def["low_rank_approximations"][ind]>0) ):
                     mlp_def["num_u_s"].append(used_ranks[ind]*mlp_def["outputs"][ind])
                     mlp_def["num_v_s"].append(used_ranks[ind]*mlp_def["inputs"][ind])
-                    num_amortization_params+=(self.used_ranks[ind]*mlp_def["inputs"][ind]+used_ranks[ind]*mlp_def["outputs"][ind])
+                    num_amortization_params+=(used_ranks[ind]*mlp_def["inputs"][ind]+used_ranks[ind]*mlp_def["outputs"][ind])
                     mlp_def["smart_flags"].append(0)
                 else:
                     # smart_flag = 1 -> full matrix (all parameters of the full matrix are stored in the *v* vector)
@@ -521,7 +521,6 @@ class AmortizableMLP(nn.Module):
 
     def forward(self, i, extra_inputs=None):
 
-
         amortization_params=self.u_v_b_pars.to(i)
 
         if(extra_inputs is not None):
@@ -611,87 +610,4 @@ class AmortizableMLP(nn.Module):
                     ### add nonlinear to previous result
                     prev=prev+nonlinear
 
-
-
-
-            """
-            for ind in range(len(mlp_def["outputs"])):
-                #print("IND ", ind)
-                nonlinear=0
-
-                this_rank=mlp_def["used_ranks"][ind]
-
-                #unsqueezed_weights=0
-                #unsqueezed_bias=0
-            
-                this_u, amortization_params=amortization_params[:, :mlp_def["num_u_s"][ind]], amortization_params[:, mlp_def["num_u_s"][ind]:]
-                this_v, amortization_params=amortization_params[:, :mlp_def["num_v_s"][ind]], amortization_params[:, mlp_def["num_v_s"][ind]:]
-                this_b, amortization_params=amortization_params[:, :mlp_def["num_b_s"][ind]], amortization_params[:, mlp_def["num_b_s"][ind]:]
-
-                if(mlp_def["svd_mode"]=="smart"):
-                    
-                    ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product
-                    if(mlp_def["smart_flags"][ind]):
-                        # no svd decomposition, the whole weight matrix is stored in the "u" vector
-                        A=this_u.view(i.shape[0], mlp_def["outputs"][ind], mlp_def["inputs"][ind])
-                       
-                        nonlinear=self._adaptive_matmul(A, prev)
-
-                    else:
-                        ## we do the standard svd decomposition (without proper normalization) .. normalization is implicit in the u/v definition
-                        this_u=this_u.view(i.shape[0],  int(this_u.shape[1]/this_rank), this_rank) # U
-                        this_v=this_v.view(i.shape[0], this_rank, int(this_v.shape[1]/this_rank)) # V^T
-
-                        res_intermediate=self._adaptive_matmul(this_v, prev)
-                        nonlinear=self._adaptive_matmul(this_u, res_intermediate)
-
-                elif(self.svd_mode=="explicit_svd"):
-                    
-                    ## code not working anymore
-                    raise NotImplementedError()
-
-                    this_u=this_u.view(i.shape[0], int(this_u.shape[1]/this_rank), this_rank) # U
-                    this_v=this_v.view(i.shape[0], this_rank,int(this_v.shape[1]/this_rank)) # V^T
-
-                    #print(amortization_params)
-                    this_sigmas, amortization_params=amortization_params[:, :mlp_def["sigmas"][ind]], amortization_params[:, mlp_def["sigmas"][ind]:]
-                    this_sigmas=NONLINEARITIES["softplus"](this_sigmas.view(i.shape[0], this_rank))+torch.ones_like(this_sigmas)*0.1
-                    
-                    #print("SIGMAS", this_sigmas[0])
-                    res=torch.diag_embed(this_sigmas)
-                 
-                    A=torch.bmm(this_u, res)
-                    
-                    A=torch.bmm(A, this_v)
-
-                ## add bias
-
-                if(mlp_def["num_b_s"][ind]>0):
-
-                    bias_broadcast=nonlinear.dim()-this_b.dim()
-                    assert (bias_broadcast >= 0)
-
-                    slices=[slice(None,None)]+[None]*bias_broadcast+[slice(None,None)]
-                    nonlinear=nonlinear+this_b[slices]
-
-                prev=mlp_def["activations"][ind](nonlinear)
-                
-            ## we have an extra linear connection from start to end
-
-            
-            """
-            """
-            if(self.highway_mode==1):
-
-                #print("am bef ", amortization_params.shape)
-                linear_def=self.sub_mlp_structures["linear_highway"]
-                linear_result, _= self.apply_amortized_mlp(linear_def, i, amortization_params)
-                prev=prev+linear_result
-
-                #print(_.shape)
-                assert(_.shape[1]==0)
-            else:
-                assert(amortization_params.shape[1]==0)
-            """
-        
         return prev

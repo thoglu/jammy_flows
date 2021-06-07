@@ -146,6 +146,7 @@ Hopefully following soon. In the meantime check out the [example script](example
 - numpy (>=1.18.5)
 - scipy (>=1.5.4)
 - matplotlib (>=3.3.3)
+- torchdiffeq (>=0.2.1)
 
 The package has been built and tested with these versions, but might work just fine with older ones.
 

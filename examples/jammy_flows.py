@@ -165,7 +165,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     word_ids=torch.nn.functional.one_hot(torch.arange(num_words), num_words).type(torch.float64)
 
     ## 2 * log_pdf differences
-    pdf_res, base_pdf_res, _=model(test_labels, conditional_input=test_data)
+    pdf_res, base_pdf_res, _=model(test_labels)#, conditional_input=test_data)
 
     dim=test_labels.shape[1]
 
@@ -230,7 +230,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=None, total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -290,7 +290,7 @@ if __name__ == "__main__":
     extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="g"
     extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
 
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=test_data.shape[1], hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=None, hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
     word_pdf.count_parameters(verbose=True)
@@ -317,10 +317,12 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             ## evaluate PDF
-            log_pdf, _,_=word_pdf(batch_labels, conditional_input=batch_data)
+            log_pdf, _,_=word_pdf(batch_labels)#, conditional_input=batch_data)
            
             ## neg log-loss
             loss=-log_pdf.mean()
+
+            print("loss ", loss)
 
             ## backprop
             loss.backward()
@@ -334,7 +336,7 @@ if __name__ == "__main__":
 
                 with torch.no_grad():
                     print("VALIDATION EVAL")    
-                    val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_data)
+                    val_log_pdf, _, _=word_pdf(test_labels)#, conditional_input=test_data)
                     val_loss=-val_log_pdf.mean()
                     print("ep: %d / batch_id: %d / val-loss %.3f" % (ep_id, batch_id, val_loss))
                     print("before plotting")

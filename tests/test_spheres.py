@@ -78,7 +78,7 @@ class Test(unittest.TestCase):
             """ 
             Check that PDF volume approximates 1.0 for more and more bins
             """
-            eval_nums=[10,50,100]
+            eval_nums=[10,50,100, 200]
 
             pdf_sums=[]
 
@@ -86,7 +86,7 @@ class Test(unittest.TestCase):
 
             for num_per_dim in eval_nums:
 
-
+                print("NO ", num_per_dim)
                 theta=torch.linspace(0, numpy.pi,num_per_dim)[1:-1]
                 phi=torch.linspace(0, 2*numpy.pi, len(theta)+1)[:-1]
 
@@ -151,6 +151,19 @@ class Test(unittest.TestCase):
         extra_flow_defs["v"]["kwargs"]["natural_direction"]=1
 
         this_flow=f.pdf("s2", "vv", flow_defs_detail=extra_flow_defs)
+        with torch.no_grad():
+            check_flow(this_flow)
+
+        ##
+
+        extra_flow_defs=dict()
+        extra_flow_defs["c"]=dict()
+        extra_flow_defs["c"]["kwargs"]=dict()
+        extra_flow_defs["c"]["kwargs"]["natural_direction"]=1
+        extra_flow_defs["c"]["kwargs"]["cnf_network_hidden_dims"]=""
+        extra_flow_defs["c"]["kwargs"]["num_charts"]=30
+
+        this_flow=f.pdf("s2", "c", flow_defs_detail=extra_flow_defs)
         with torch.no_grad():
             check_flow(this_flow)
 

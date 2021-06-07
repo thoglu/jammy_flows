@@ -65,7 +65,7 @@ class moebius(sphere_base.sphere_base):
         ### moebius is actually the inverse mapping
         
         
-        logdet+=log_deriv
+        logdet=logdet+log_deriv
 
     
        
@@ -98,7 +98,7 @@ class moebius(sphere_base.sphere_base):
         smaller_mask=x<0
         x=(smaller_mask)*(2*numpy.pi+x)+(~smaller_mask)*x
 
-        logdet+=log_deriv
+        logdet=logdet+log_deriv
 
         return x, logdet
 

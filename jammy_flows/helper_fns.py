@@ -159,7 +159,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     
 
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput)
-
+ 
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])
     if(conditional_input is None and model.pdf_defs_list[0]=="s2"):
@@ -208,6 +208,8 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     resized_torch_positions.resize([npts] * len(mins_maxs) + [len(mins_maxs)])
 
     ## add in sin(theta) factors into density
+
+    
 
     for ind, sz in enumerate(sin_zen_mask):
       if(sz==1):
@@ -348,6 +350,8 @@ def show_sample_contours(ax,
             new_samples[:, 0] = somex
             new_samples[:, 1] = somey
 
+
+
     bin_fillings, xedges, yedges = numpy.histogram2d(new_samples[:, 0],
                                                      new_samples[:, 1],
                                                      bins=bins,
@@ -372,30 +376,38 @@ def show_sample_contours(ax,
           sin_zen=numpy.sin(0.5*(yedges[1:]+yedges[:-1]))
           bin_volumes*=sin_zen[None,:]
     """
-
+    
     contour_values = calculate_contours(bin_fillings, bin_volumes, probs=contour_probs)
     ## reverse
     contour_values = contour_values[::-1]
 
-    ret = ax.contour(xvals,
-                     yvals,
-                     bin_fillings.T,
-                     levels=contour_values,
-                     colors=color)
+    bounds=None
 
-    fmt_dict = dict()
+    try:
+      ret = ax.contour(xvals,
+                       yvals,
+                       bin_fillings.T,
+                       levels=contour_values,
+                       colors=color)
 
-    for ind, cprob in enumerate(contour_probs[::-1]):
-        if(ind<len(contour_values)):
-            fmt_dict[contour_values[ind]] = "%d" % (int(cprob * 100)) + r" %"
+      fmt_dict = dict()
 
-    ax.clabel(ret,
-              fontsize=9,
-              inline=1,
-              fmt=fmt_dict,
-              levels=contour_values,
-              colors=color)
-    bounds = get_bounds_from_contour(ret)
+      for ind, cprob in enumerate(contour_probs[::-1]):
+          if(ind<len(contour_values)):
+              fmt_dict[contour_values[ind]] = "%d" % (int(cprob * 100)) + r" %"
+
+      ax.clabel(ret,
+                fontsize=9,
+                inline=1,
+                fmt=fmt_dict,
+                levels=contour_values,
+                colors=color)
+
+     
+      bounds = get_bounds_from_contour(ret)
+    except:
+      return [[-1.0,1.0], [-1.0,1.0]]
+
 
     return [[bounds[0], bounds[1]], [bounds[2], bounds[3]]]
 
@@ -527,6 +539,9 @@ def plot_joint_pdf(pdf,
         plot_density = False
 
     mms = get_minmax_values(samples)
+
+    
+
     if (bounds is not None):
         mms = bounds
 
@@ -612,6 +627,7 @@ def plot_joint_pdf(pdf,
     if (pdf_conditional_input is not None):
         pdf_conditional_input = pdf_conditional_input[0:1]
 
+
     evalpositions, log_evals, bin_volumes, sin_zen_mask, unreliable_spherical_regions= get_pdf_on_grid(
         pure_float_mms,
         pts_per_dim,
@@ -624,7 +640,7 @@ def plot_joint_pdf(pdf,
    
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
     
-   
+  
     if (dim == 1):
         ax = fig.add_subplot(gridspec)
         ax.hist(samples[:, 0], bins=50, density=True)
@@ -641,7 +657,7 @@ def plot_joint_pdf(pdf,
             ax.set_xticklabels([])
 
     elif (dim == 2 and multiplot == False):
-
+     
         if (subgridspec is None):
             subgridspec = gridspec.subgridspec(1, 1)
 
@@ -653,15 +669,52 @@ def plot_joint_pdf(pdf,
 
         ## plot the density and contours from density
         if (plot_density):
-           
-            plot_density_with_contours(ax, log_evals, evalpositions,
-                                       bin_volumes, pts_per_dim)
-        
+
+            
+            if (contour_probs != [] and skip_plotting_samples==False):
+            
+              two_d_bounds_for_better_density = show_sample_contours(ax,
+                                                samples,
+                                                bins=50,
+                                                color=contour_color,
+                                                contour_probs=contour_probs,
+                                                sin_zen_mask=sin_zen_mask)
+
+              x_width=two_d_bounds_for_better_density[0][1]-two_d_bounds_for_better_density[0][0]
+              y_width=two_d_bounds_for_better_density[1][1]-two_d_bounds_for_better_density[1][0]
+
+              extra_x=x_width*0.2
+              extra_y=y_width*0.2
+
+              two_d_bounds_for_better_density[0][0]-=extra_x
+              two_d_bounds_for_better_density[0][1]+=extra_x
+
+              two_d_bounds_for_better_density[1][0]-=extra_y
+              two_d_bounds_for_better_density[1][1]+=extra_y
+
+
+              evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
+                two_d_bounds_for_better_density,
+                pts_per_dim,
+                pdf,
+                conditional_input=pdf_conditional_input,
+                s2_norm=s2_norm,
+                s2_rotate_to_true_value=s2_rotate_to_true_value,
+                true_values=true_values)
+             
+              plot_density_with_contours(ax, log_evals_2d, evalpositions_2d,
+                                         bin_volumes_2d, pts_per_dim)
+
+            else:
+              
+              plot_density_with_contours(ax, log_evals, evalpositions,
+                                         bin_volumes, pts_per_dim)
+     
         ## plot a histogram density from samples
 
         
-        if (plot_only_contours == False and plot_density == False and skip_plotting_samples==False):
-
+        if ( (plot_only_contours == False) and (plot_density == False) and (skip_plotting_samples==False)):
+           
             ax.hist2d(samples[:, 0],
                       samples[:, 1],
                       bins=hist_bounds,
@@ -671,16 +724,19 @@ def plot_joint_pdf(pdf,
         ## plot contours from samples
         new_bounds = None
         if (contour_probs != [] and skip_plotting_samples==False):
+            
             new_bounds = show_sample_contours(ax,
                                               samples,
                                               bins=hist_bounds,
                                               color=contour_color,
                                               contour_probs=contour_probs,
                                               sin_zen_mask=sin_zen_mask)
-
+            
+       
         if (bounds is not None):
             new_bounds = bounds
-
+            
+       
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
           
@@ -688,6 +744,7 @@ def plot_joint_pdf(pdf,
 
         ## plot true values
         if (plotted_true_values is not None):
+            
             ax.plot([plotted_true_values[0]], [plotted_true_values[1]],
                     color="red",
                     marker="o",
@@ -700,12 +757,14 @@ def plot_joint_pdf(pdf,
             np_gl=gl.numpy()
 
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
-
+       
         ## adjust axis bounds
+
+        
         if (new_bounds is not None):
             ax.set_xlim(new_bounds[0][0], new_bounds[0][1])
             ax.set_ylim(new_bounds[1][0], new_bounds[1][1]) 
-
+        
         ### overwrite any bounds for spherical
         if(pdf.pdf_defs_list[0]=="s2"):
           if(s2_norm=="standard"):
@@ -718,15 +777,16 @@ def plot_joint_pdf(pdf,
         if (hide_labels):
             ax.set_yticklabels([])
             ax.set_xticklabels([])
-
+       
     else:
 
+        
         if (subgridspec is None):
             subgridspec = gridspec.subgridspec(dim, dim)
 
         for ind1 in range(dim):
             for ind2 in range(dim):
-
+               
                 if (ind2 < ind1):
 
                     ax = fig.add_subplot(subgridspec[ind1, ind2])
@@ -796,7 +856,7 @@ def plot_joint_pdf(pdf,
                         ax.set_yticklabels([])
                         ax.set_xticklabels([])
 
-
+    
     return subgridspec
 
 
@@ -865,5 +925,6 @@ def visualize_pdf(pdf,
           s2_rotate_to_true_value=s2_rotate_to_true_value,
           s2_show_gridlines=s2_show_gridlines,
           skip_plotting_samples=skip_plotting_samples)
-
-      return samples, new_subgridspec
+        
+    
+    return samples, new_subgridspec

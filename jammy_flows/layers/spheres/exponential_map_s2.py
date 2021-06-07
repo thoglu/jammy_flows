@@ -472,12 +472,12 @@ class exponential_map_s2(sphere_base.sphere_base):
             _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
-            log_det-=0.5*slog_det
+            log_det=log_det-0.5*slog_det
         else:
             result, jac_squared, _=self.get_exp_map_and_jacobian(x_eucl, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
 
-            log_det+=0.5*slog_det
+            log_det=log_det+0.5*slog_det
 
         ## sqrt of det(jacobian^T * jacobian)
         
@@ -501,14 +501,14 @@ class exponential_map_s2(sphere_base.sphere_base):
             result, jac_squared, _=self.get_exp_map_and_jacobian(x_eucl, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
 
-            log_det+=0.5*slog_det
+            log_det=log_det+0.5*slog_det
         else:
             result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x_eucl, potential_pars )
 
             _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
-            log_det-=0.5*slog_det
+            log_det=log_det-0.5*slog_det
 
         
         res=self.eucl_to_spherical_embedding(result)
