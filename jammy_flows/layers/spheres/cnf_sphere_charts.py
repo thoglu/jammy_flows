@@ -20,6 +20,8 @@ import torch.autograd
 Code implementation of "Neural manifold ordinary differential equations" (https://arxiv.org/abs/2006.10254), 
 mostly adapted from https://github.com/CUAI/Neural-Manifold-Ordinary-Differential-Equations. This implemenation
 of manifold flows involves multiple charts that stick together and together form a global diffeomophism by repeated projection and flow operations.
+
+NOTE: NOT YET WORKING PROPERLY
 """
 
 sphere=Sphere()
