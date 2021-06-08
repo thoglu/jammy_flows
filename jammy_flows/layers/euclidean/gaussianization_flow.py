@@ -698,7 +698,7 @@ class gf_block(euclidean_base.euclidean_base):
         if(torch.isnan(log_det).sum()>0):
             print("new x ", x)
             print("nan issue")
-            sys.exit(-1)
+            raise Exception()
 
         
         return x, log_det#, cur_datapoints_update

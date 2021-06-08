@@ -455,17 +455,6 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         if(self.natural_direction):
 
-           
-            #jaaa=torch.autograd.functional.jacobian(f, x_eucl[1:2])
-
-            #print("FINAL JACOBIAN")
-            #print(jaaa)
-
-            #if((torch.isfinite(jaaa)==False).sum()>0):
-
-            #    sys.exit(-1)
-
-            #sys.exit(-1)
 
             result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x_eucl, potential_pars )
 
