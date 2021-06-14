@@ -156,5 +156,4 @@ pip install git+https://github.com/thoglu/jammy_flows.git
 ```
 ## Contributions
 
-If you want to implement your own layer or have bug / feature suggestions, just file an issue, and we can discuss the pull request process.
-Any other questions / comments: thorsten.glu@gmail.com
+If you want to implement your own layer or have bug / feature suggestions, just file an issue.
