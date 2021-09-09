@@ -39,7 +39,7 @@ def list_from_str(spec):
 
 class AmortizableMLP(nn.Module):
 
-    def __init__(self, input_dim, hidden_dims, output_dim, highway_mode=0, low_rank_approximations=0, nonlinearity="tanh",  use_permanent_parameters=True, svd_mode="smart"):
+    def __init__(self, input_dim, hidden_dims, output_dim, highway_mode=0, low_rank_approximations=0, nonlinearity="tanh",  use_permanent_parameters=True, svd_mode="smart", precise_mlp_structure=dict()):
         """
         input dim: input dimension of the MLP
         output dim: output dimension of the MLP
@@ -59,94 +59,157 @@ class AmortizableMLP(nn.Module):
         self.nonlinearity=nonlinearity
         self.svd_mode=svd_mode
 
-       
-        ## setup hidden dims correctly
-        if(type(hidden_dims)==str):
-            self.hidden_dims=list_from_str(hidden_dims)
-        elif(type(hidden_dims)==int):
-            self.hidden_dims=[hidden_dims]
-        elif(type(hidden_dims)==list):
-            self.hidden_dims=hidden_dims
-            for i in self.hidden_dims:
-                assert(type(i)==int)
+        if(len(precise_mlp_structure.keys())>0):
+            self.sub_mlp_structures=precise_mlp_structure
+            
+            if(self.highway_mode>0):
+                assert("linear_highway" in self.sub_mlp_structures.keys())
+                
         else:
-            raise Exception("Unsupported type ", type(hidden_dims), " for hidden_dims .. can be int/str/list of ints")
 
-        ## check that low rank approximations match hidden dims depending on highway_mode
-        num_matrices=len(self.hidden_dims)+1
-       
-        if(self.highway_mode==0):
+
+           
+            ## setup hidden dims correctly
+            if(type(hidden_dims)==str):
+                self.hidden_dims=list_from_str(hidden_dims)
+            elif(type(hidden_dims)==int):
+                self.hidden_dims=[hidden_dims]
+            elif(type(hidden_dims)==list):
+                self.hidden_dims=hidden_dims
+                for i in self.hidden_dims:
+                    assert(type(i)==int)
+            else:
+                raise Exception("Unsupported type ", type(hidden_dims), " for hidden_dims .. can be int/str/list of ints")
+
+            ## check that low rank approximations match hidden dims depending on highway_mode
             num_matrices=len(self.hidden_dims)+1
-        elif(self.highway_mode==1):
-            num_matrices=len(self.hidden_dims)+2
-        elif(self.highway_mode>=2):
-            num_matrices=2*len(self.hidden_dims)+1
+           
+            if(self.highway_mode==0):
+                num_matrices=len(self.hidden_dims)+1
+            elif(self.highway_mode==1):
+                num_matrices=len(self.hidden_dims)+2
+            elif(self.highway_mode>=2):
+                num_matrices=2*len(self.hidden_dims)+1
 
-        assert(self.highway_mode <=4 and self.highway_mode >=0)
-        
-        ##########################
+            assert(self.highway_mode <=4 and self.highway_mode >=0)
+            
+            ##########################
 
-        ## setup low rank approximations
-        if(type(low_rank_approximations)==int):
-            self.total_low_rank_approximations=num_matrices*[low_rank_approximations]
-        if(type(low_rank_approximations)==list):
-            self.total_low_rank_approximations=low_rank_approximations
-            for i in self.total_low_rank_approximations:
-                assert(type(i)==int)
-        elif(type(low_rank_approximations)==str):
-            self.total_low_rank_approximations=list_from_str(low_rank_approximations)
+            ## setup low rank approximations
+            if(type(low_rank_approximations)==int):
+                self.total_low_rank_approximations=num_matrices*[low_rank_approximations]
+            if(type(low_rank_approximations)==list):
+                self.total_low_rank_approximations=low_rank_approximations
+                for i in self.total_low_rank_approximations:
+                    assert(type(i)==int)
+            elif(type(low_rank_approximations)==str):
+                self.total_low_rank_approximations=list_from_str(low_rank_approximations)
 
-        # assert len of low rank approximations matches number of matrices
-        assert( len(self.total_low_rank_approximations)==num_matrices)
+            # assert len of low rank approximations matches number of matrices
+            assert( len(self.total_low_rank_approximations)==num_matrices)
 
-        # 
-        self.svd_mode=svd_mode
-       
-        #self.skip_first_to_last_if_similar_dim=skip_first_to_last_if_similar_dim
+            self.sub_mlp_structures=dict()
+            self.sub_mlp_structures["mlp_list"]=[]
 
-        #self.maxranks=[]
-        #self.used_ranks=[]
-        #self.activations=[]
-
-        self.sub_mlp_structures=dict()
-        self.sub_mlp_structures["mlp_list"]=[]
-
-        if(self.highway_mode<2):
-            ## for no hidden layers or one hidden layer, it makes no sense to have skip connection
+            if(self.highway_mode<2):
+                ## for no hidden layers or one hidden layer, it makes no sense to have skip connection
 
 
-            inputs=[self.input_dim]+self.hidden_dims
-            outputs=self.hidden_dims+[self.output_dim]
+                inputs=[self.input_dim]+self.hidden_dims
+                outputs=self.hidden_dims+[self.output_dim]
 
-            mlp_dict=dict()
-            mlp_dict["inputs"]=inputs
-            mlp_dict["outputs"]=outputs
-            mlp_dict["max_ranks"]=[]
-            mlp_dict["used_ranks"]=[]
-            mlp_dict["activations"]=[]
-            mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations
-            mlp_dict["add_final_bias"]=True
-        
-            mlp_dict["num_u_s"]=[]
-            mlp_dict["num_v_s"]=[]
-            mlp_dict["num_b_s"]=[]
-            mlp_dict["smart_flags"]=[]
-            mlp_dict["sigmas"]=[]
-            mlp_dict["svd_mode"]=self.svd_mode
+                mlp_dict=dict()
+                mlp_dict["inputs"]=inputs
+                mlp_dict["outputs"]=outputs
+                mlp_dict["max_ranks"]=[]
+                mlp_dict["used_ranks"]=[]
+                mlp_dict["activations"]=[]
+                mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations
+                mlp_dict["add_final_bias"]=True
+            
+                mlp_dict["num_u_s"]=[]
+                mlp_dict["num_v_s"]=[]
+                mlp_dict["num_b_s"]=[]
+                mlp_dict["smart_flags"]=[]
+                mlp_dict["sigmas"]=[]
+                mlp_dict["svd_mode"]=self.svd_mode
 
-            self.sub_mlp_structures["mlp_list"].append(mlp_dict)
+                self.sub_mlp_structures["mlp_list"].append(mlp_dict)
 
-            ## only add linear skip connection if hidden dims > 0
-            if(self.highway_mode==1):
+                ## only add linear skip connection if hidden dims > 0
+                if(self.highway_mode==1):
 
-                self.sub_mlp_structures["mlp_list"][0]["low_rank_approximations"]=self.total_low_rank_approximations[:-1]
-                self.sub_mlp_structures["mlp_list"][0]["add_final_bias"]=False
+                    self.sub_mlp_structures["mlp_list"][0]["low_rank_approximations"]=self.total_low_rank_approximations[:-1]
+                    self.sub_mlp_structures["mlp_list"][0]["add_final_bias"]=False
 
-                ## reset mlp list if no hidden dims are given
-                if(len(self.hidden_dims)==0):
-                    self.sub_mlp_structures["mlp_list"]=[]
-                ## generate an extra linear layer
+                    ## reset mlp list if no hidden dims are given
+                    if(len(self.hidden_dims)==0):
+                        self.sub_mlp_structures["mlp_list"]=[]
+                    ## generate an extra linear layer
 
+                    mlp_dict=dict()
+                    mlp_dict["inputs"]=[self.input_dim]
+                    mlp_dict["outputs"]=[self.output_dim]
+                    mlp_dict["max_ranks"]=[]
+                    mlp_dict["used_ranks"]=[]
+                    mlp_dict["activations"]=[]
+                    mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[-1:]
+                    mlp_dict["add_final_bias"]=True
+                
+                    mlp_dict["num_u_s"]=[]
+                    mlp_dict["num_v_s"]=[]
+                    mlp_dict["num_b_s"]=[]
+                    mlp_dict["smart_flags"]=[]
+                    mlp_dict["sigmas"]=[]
+                    mlp_dict["svd_mode"]=self.svd_mode
+
+                    self.sub_mlp_structures["linear_highway"]=mlp_dict
+
+            else:
+                num_mlp_matrices=num_matrices-1
+                ## iterative adds by 1-hidden layer MLPs
+
+                assert(num_mlp_matrices==2*len(self.hidden_dims))
+
+                target_dim=self.output_dim
+
+                ## highway_mode=2 -> input to each MLP is the input_dim
+                mlp_start_dim=self.input_dim
+
+                if(self.highway_mode==3):
+                    ## input to each MLP is the target output
+                    mlp_start_dim=self.output_dim
+
+                elif(self.highway_mode==4):
+                    ## input to each MLP is the joint input and output dim
+                    mlp_start_dim=self.input_dim+self.output_dim
+
+                for ind in range(len(self.hidden_dims)):
+
+                    mlp_dict=dict()
+
+                    ## the first MLP is always taking the input dim as input
+                    if(ind==0):
+                        mlp_dict["inputs"]=[self.input_dim, self.hidden_dims[ind]]
+                    else:
+                        mlp_dict["inputs"]=[mlp_start_dim, self.hidden_dims[ind]]
+                    mlp_dict["outputs"]=[self.hidden_dims[ind], target_dim]
+                    mlp_dict["max_ranks"]=[]
+                    mlp_dict["used_ranks"]=[]
+                    mlp_dict["activations"]=[]
+                    mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[ind*2:ind*2+2]
+                    mlp_dict["add_final_bias"]=False
+                
+                    mlp_dict["num_u_s"]=[]
+                    mlp_dict["num_v_s"]=[]
+                    mlp_dict["num_b_s"]=[]
+                    mlp_dict["smart_flags"]=[]
+                    mlp_dict["sigmas"]=[]
+                    mlp_dict["svd_mode"]=self.svd_mode
+
+                    self.sub_mlp_structures["mlp_list"].append(mlp_dict)
+
+                ## the linear part
                 mlp_dict=dict()
                 mlp_dict["inputs"]=[self.input_dim]
                 mlp_dict["outputs"]=[self.output_dim]
@@ -164,97 +227,6 @@ class AmortizableMLP(nn.Module):
                 mlp_dict["svd_mode"]=self.svd_mode
 
                 self.sub_mlp_structures["linear_highway"]=mlp_dict
-
-        else:
-            num_mlp_matrices=num_matrices-1
-            ## iterative adds by 1-hidden layer MLPs
-
-            assert(num_mlp_matrices==2*len(self.hidden_dims))
-
-            target_dim=self.output_dim
-
-            ## highway_mode=2 -> input to each MLP is the input_dim
-            mlp_start_dim=self.input_dim
-
-            if(self.highway_mode==3):
-                ## input to each MLP is the target output
-                mlp_start_dim=self.output_dim
-
-            elif(self.highway_mode==4):
-                ## input to each MLP is the joint input and output dim
-                mlp_start_dim=self.input_dim+self.output_dim
-
-            for ind in range(len(self.hidden_dims)):
-
-                mlp_dict=dict()
-
-                ## the first MLP is always taking the input dim as input
-                if(ind==0):
-                    mlp_dict["inputs"]=[self.input_dim, self.hidden_dims[ind]]
-                else:
-                    mlp_dict["inputs"]=[mlp_start_dim, self.hidden_dims[ind]]
-                mlp_dict["outputs"]=[self.hidden_dims[ind], target_dim]
-                mlp_dict["max_ranks"]=[]
-                mlp_dict["used_ranks"]=[]
-                mlp_dict["activations"]=[]
-                mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[ind*2:ind*2+2]
-                mlp_dict["add_final_bias"]=False
-            
-                mlp_dict["num_u_s"]=[]
-                mlp_dict["num_v_s"]=[]
-                mlp_dict["num_b_s"]=[]
-                mlp_dict["smart_flags"]=[]
-                mlp_dict["sigmas"]=[]
-                mlp_dict["svd_mode"]=self.svd_mode
-
-                self.sub_mlp_structures["mlp_list"].append(mlp_dict)
-
-            ## the linear part
-            mlp_dict=dict()
-            mlp_dict["inputs"]=[self.input_dim]
-            mlp_dict["outputs"]=[self.output_dim]
-            mlp_dict["max_ranks"]=[]
-            mlp_dict["used_ranks"]=[]
-            mlp_dict["activations"]=[]
-            mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[-1:]
-            mlp_dict["add_final_bias"]=True
-        
-            mlp_dict["num_u_s"]=[]
-            mlp_dict["num_v_s"]=[]
-            mlp_dict["num_b_s"]=[]
-            mlp_dict["smart_flags"]=[]
-            mlp_dict["sigmas"]=[]
-            mlp_dict["svd_mode"]=self.svd_mode
-
-            self.sub_mlp_structures["linear_highway"]=mlp_dict
-
-
-
-
-
-        
-
-        #self.full_skip_connection=False
-
-        #num_hidden_layers=len(self.hidden_dims)
-
-        """
-        if(self.inputs[0]==self.outputs[-1]):
-            if(num_hidden_layers>0):
-                if(skip_first_to_last_if_similar_dim):
-                    if(skip_connections):
-                        self.full_skip_connection=True
-        """
-
-        #self.mappings=nn.ModuleList()
-        #self.identities=[]
-
-        ## contains number of us /vs/and bs needed in each step
-        #self.u_s=[]
-        #self.v_s=[]
-        #self.b_s=[]
-        #self.smart_flags=[]
-        #self.sigmas=[]
 
         num_amortization_params=0
 

@@ -171,6 +171,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
         self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
         self.flow_dict["g"]["kwargs"]["skip_model_offset"]=0
+        self.flow_dict["g"]["kwargs"]["softmax_for_width"]=0
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block

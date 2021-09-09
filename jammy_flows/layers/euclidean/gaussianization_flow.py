@@ -16,7 +16,7 @@ import pylab
 
 
 class gf_block(euclidean_base.euclidean_base):
-    def __init__(self, dimension, num_kde=5, num_householder_iter=-1, use_permanent_parameters=False, fit_normalization=0, inverse_function_type="inormal_partly_precise", model_offset=0):
+    def __init__(self, dimension, num_kde=5, num_householder_iter=-1, use_permanent_parameters=False, fit_normalization=0, inverse_function_type="inormal_partly_precise", model_offset=0, softmax_for_width=0):
         """
         Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
         to use reparametrization trick for VAEs due to Newton iterations.
@@ -70,6 +70,14 @@ class gf_block(euclidean_base.euclidean_base):
 
         self.fit_normalization=fit_normalization
 
+
+        self.softmax_for_width=softmax_for_width
+
+        self.exp_like_function=torch.exp
+        if(self.softmax_for_width):
+            self.exp_like_function=torch.nn.functional.softplus
+
+        
         if(fit_normalization):
 
             if(use_permanent_parameters):
@@ -112,7 +120,10 @@ class gf_block(euclidean_base.euclidean_base):
     
 
     def logistic_kernel_log_cdf(self, x, datapoints, log_widths, log_norms):
-        hs = torch.exp(log_widths)+self.hs_min
+        #hs = torch.exp(log_widths)+self.hs_min
+        r=self.exp_like_function(log_widths)
+        
+        hs = self.exp_like_function(log_widths)+self.hs_min
 
         x_unsqueezed=x.unsqueeze(1)
       
@@ -126,8 +137,9 @@ class gf_block(euclidean_base.euclidean_base):
         return log_cdf
 
     def logistic_kernel_log_sf(self, x, datapoints, log_widths,log_norms):
-        hs = torch.exp(log_widths)+self.hs_min
-        #hs = torch.max(hs, torch.ones_like(hs) * hs_min)
+        #hs = torch.exp(log_widths)+self.hs_min
+        hs = self.exp_like_function(log_widths)+self.hs_min
+
 
         x_unsqueezed=x.unsqueeze(1)
 
@@ -138,7 +150,9 @@ class gf_block(euclidean_base.euclidean_base):
         return log_sf
 
     def logistic_kernel_log_pdf(self, x, datapoints, log_widths,log_norms):
-        hs = torch.exp(log_widths)+self.hs_min
+        #hs = torch.exp(log_widths)+self.hs_min
+        hs = self.exp_like_function(log_widths)+self.hs_min
+
         log_hs=torch.log(hs)
         #hs = torch.max(hs, torch.ones_like(hs) * hs_min)
         #log_hs = torch.max(log_widths, torch.ones_like(hs) * numpy.log(hs_min))
