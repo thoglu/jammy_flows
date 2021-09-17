@@ -517,3 +517,15 @@ class exponential_map_s2(sphere_base.sphere_base):
         gaussian_init=torch.randn((self.num_potential_pars*self.num_components))
 
         return gaussian_init
+
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Implemented by Euclidean sublayers.
+        """
+
+        potential_pars=self.potential_pars
+        if(extra_inputs is not None):
+            potential_pars=potential_pars+extra_inputs
+
+        param_dict[extra_prefix+"potential_pars"]=potential_pars.data

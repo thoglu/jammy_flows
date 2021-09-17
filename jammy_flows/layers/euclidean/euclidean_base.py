@@ -1,5 +1,6 @@
 import torch
 from torch import nn
+import collections
 import numpy
 
 from .. import layer_base
@@ -112,7 +113,27 @@ class euclidean_base(layer_base.layer_base):
     def _flow_mapping(self, inputs, extra_inputs=None):
         raise NotImplementedError
 
-    
+    def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """
+
+        """
+        if(self.model_offset):
+            if(extra_inputs is not None):
+                param_dict["offset"]=extra_inputs[:,:self.dimension]
+                self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs[:,self.dimension:], previous_x=previous_x, extra_prefix=extra_prefix)
+            else:
+                param_dict["offset"]=self.offsets.data
+                self._obtain_layer_param_structure(param_dict, extra_inputs=None, previous_x=previous_x, extra_prefix=extra_prefix)
+        else:
+            self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs, previous_x=previous_x, extra_prefix=extra_prefix)
+
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Implemented by Euclidean sublayers.
+        """
+     
+        raise NotImplementedError
 
 
 

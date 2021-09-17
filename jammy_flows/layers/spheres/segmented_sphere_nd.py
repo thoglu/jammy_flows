@@ -436,3 +436,58 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         return gaussian_init
     
        
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+
+        moebius_extra_inputs=None
+
+        if(extra_inputs is not None):
+            
+            moebius_extra_inputs=extra_inputs[:,self.num_mlp_params:]
+        
+        ## we dont care about log_det for layer structure
+        ld=0.0
+       
+        xm,_=self.moebius_trafo.flow_mapping([previous_x[:,self.dimension-1:],ld], extra_inputs=moebius_extra_inputs)
+        self.moebius_trafo.obtain_layer_param_structure(param_dict, extra_inputs=moebius_extra_inputs)
+        #print("forw moeb af", xm)
+        #potential_eucl=x[:,:self.dimension-1]
+
+        ### 
+
+        if(len(self.zenith_type_layer_list)>0):
+
+            
+            #eucl_x, log_det=self.to_subspace(potential_eucl, log_det, sf_extra=sf_extra)
+            ## loop through all layers in each pdf and transform "this_target"
+
+           
+            if(self.num_mlp_params>0):
+                amortized_inputs=extra_inputs
+                if(extra_inputs is not None):
+                    amortized_inputs=extra_inputs[:,:self.num_mlp_params]
+                    param_dict[extra_prefix+"uvb_pars"]=amortized_inputs
+                else:
+                    param_dict[extra_prefix+"uvb_pars"]=self.amortized_mlp.u_v_b_pars
+
+                ## apply MLP that takes as input moebius output
+                eucl_layer_pars=self.amortized_mlp(self.moebius_trafo._embedding_conditional_return(xm), amortized_inputs)
+                extra_param_counter = 0
+
+
+                for l, layer in reversed(list(enumerate(self.zenith_type_layer_list))):
+                    
+                    this_extra_params = None
+                    
+                    this_extra_params = eucl_layer_pars[:, self.total_euclidean_pars-extra_param_counter-layer.total_param_num : self.total_euclidean_pars-extra_param_counter ]
+
+                    #eucl_x, log_det = layer.flow_mapping([eucl_x, log_det], extra_inputs=this_extra_params)
+
+                    #layer.obtain_layer_param_structure(param_dict, extra_inputs=this_extra_params, extra_prefix=extra_prefix+"%.2d" % l)
+                   
+                    extra_param_counter += layer.total_param_num
+
+            #potential_eucl, log_det, sf_extra=self.from_subspace(eucl_x, log_det)
+
+           
+       

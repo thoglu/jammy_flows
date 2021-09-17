@@ -1070,6 +1070,157 @@ class pdf(nn.Module):
 
         return log_pdf + log_det, log_pdf, base_pos
 
+    def obtain_flow_param_structure(self, conditional_input=None, predefined_target_input=None, seed=None):
+        """
+        Obtain values of flow parameters for given input along with their name. For debugging purposes mostly.
+        """
+
+        data_type = torch.float64
+        data_summary = None
+        used_sample_size = 1
+        used_device=torch.device("cpu")
+
+        this_layer_param_structure=collections.OrderedDict()
+
+        if conditional_input is not None:
+
+            data_summary=self._conditional_input_to_summary(conditional_input=conditional_input)
+
+            used_sample_size = data_summary.shape[0]
+            data_type = data_summary.dtype
+            used_device = data_summary.device
+
+            assert(data_summary.dim()==2)
+            assert(data_summary.shape[0]==1), ("Requiring batćh size of 1! .. having .. ", data_summary.shape[0])
+
+        x=None
+        log_gauss_evals=0.0
+        unit_gauss_samples=0.0
+
+        if(predefined_target_input is not None):
+
+            x=predefined_target_input
+
+            if(conditional_input is not None):
+
+                ## make sure inputs agree
+                assert(x.shape[0]==conditional_input.shape[0])
+                assert(x.dtype==data_summary.dtype)
+                assert(x.device==data_summary.device)
+
+            else:
+                data_type=predefined_target_input.dtype
+                used_sample_size=predefined_target_input.shape[0]
+                used_device=predefined_target_input.device
+
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(self.total_target_dim).type(data_type).to(device),
+                covariance_matrix=torch.eye(self.total_target_dim)
+                .type(data_type)
+                .to(device),
+            ).log_prob(predefined_target_input)
+
+        else:
+
+            if(seed is not None):
+                numpy.random.seed(seed)
+
+            unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_target_dim))
+
+            unit_gauss_samples = (
+                torch.from_numpy(unit_gauss).type(data_type).to(used_device)
+            )
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(self.total_target_dim).type(data_type).to(used_device),
+                covariance_matrix=torch.eye(self.total_target_dim)
+                .type(data_type)
+                .to(used_device),
+            ).log_prob(unit_gauss_samples)
+
+            x = unit_gauss_samples
+
+        log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
+
+        extra_conditional_input=[]
+        new_targets=[]
+
+        param_structure=[]
+
+        for pdf_index, pdf_layers in enumerate(self.layer_list):
+
+         
+            this_pdf_type=self.pdf_defs_list[pdf_index]
+            this_flow_def=self.flow_defs_list[pdf_index]
+
+            extra_params = None
+            if(data_summary is not None):
+               
+                this_data_summary=data_summary
+                if(len(extra_conditional_input)>0):
+                    this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+
+                extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+
+            else:
+
+                if(self.mlp_predictors[pdf_index] is not None):
+                    if(len(extra_conditional_input)>0):
+                        this_data_summary=torch.cat(extra_conditional_input, dim=1)
+                        
+                        extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+                    else:
+                        raise Exception("SAMPLE: extra conditional input is empty but required for encoding!")
+     
+            if(self.predict_log_normalization):
+
+                if(pdf_index==0 and self.join_poisson_and_pdf_description):
+                    extra_params=extra_params[:,:-1]
+
+            this_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
+
+            ## loop through all layers in each pdf and transform "this_target"
+            
+            extra_param_counter = 0
+            for l, layer in list(enumerate(pdf_layers)):
+
+                this_extra_params = None
+                
+
+                if extra_params is not None:
+                    
+                    this_extra_params = extra_params[:, extra_param_counter : extra_param_counter + layer.total_param_num]
+                    
+                this_param_dict=collections.OrderedDict()
+
+                layer.obtain_layer_param_structure(this_param_dict, extra_inputs=this_extra_params, previous_x=this_target)
+
+                this_layer_param_structure[("%.3d" % pdf_index)+"_"+this_flow_def+".%.3d" % l]=this_param_dict
+                #################
+
+                this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+
+                extra_param_counter += layer.total_param_num
+
+                
+           
+            new_targets.append(this_target)
+
+            prev_target=this_target
+            if(self.conditional_manifold_input_embedding[this_pdf_type[0]]==1):
+                ## return embedding value for next conditional inputs
+                prev_target=self.basic_layers[pdf_index]._embedding_conditional_return(prev_target)
+
+            extra_conditional_input.append(prev_target)
+
+        if (torch.isfinite(x) == 0).sum() > 0:
+            raise Exception("nonfinite samples generated .. this should never happen!")
+
+     
+        ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
+        return this_layer_param_structure
+
+
+       
     def forward_subpdf(self, subpdf_index, this_x, extra_params=None):
         """
         Forward function of a single sub-pdf. Is used in the calculation of the total correlation.
@@ -1182,13 +1333,13 @@ class pdf(nn.Module):
             unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_target_dim))
 
             unit_gauss_samples = (
-                torch.from_numpy(unit_gauss).type(data_type).to(device)
+                torch.from_numpy(unit_gauss).type(data_type).to(used_device)
             )
             log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(self.total_target_dim).type(data_type).to(device),
+                torch.zeros(self.total_target_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_target_dim)
                 .type(data_type)
-                .to(device),
+                .to(used_device),
             ).log_prob(unit_gauss_samples)
 
             x = unit_gauss_samples
@@ -1263,6 +1414,9 @@ class pdf(nn.Module):
      
         ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
         return torch.cat(new_targets, dim=1), unit_gauss_samples, -log_det + log_gauss_evals, log_gauss_evals
+
+    
+
 
     def get_returnable_target_dim(self):
         """

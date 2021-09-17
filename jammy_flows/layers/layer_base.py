@@ -28,4 +28,12 @@ class layer_base(nn.Module):
     def _embedding_conditional_return_num(self): 
         raise NotImplementedError
 
+    def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""):
+        """
+        Returns the parameter names along with actual values in a dict to get an idea about the layer structure.
+        Some layers (e.g. "n") might require previous x inputs to determine layer param structure.
+        """
+        raise NotImplementedError
+
+
     

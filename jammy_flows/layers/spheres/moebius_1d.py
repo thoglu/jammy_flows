@@ -235,3 +235,17 @@ class moebius(sphere_base.sphere_base):
         
         return torch.randn((self.num_moebius*self.num_omega_pars))
 
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Implemented by Euclidean sublayers.
+        """
+
+        moebius_pars=self.moebius_pars
+        #this_num_params=self.num_moebius*self.num_omega_pars
+        if(extra_inputs is not None):
+         
+            moebius_pars=extra_inputs
+
+        param_dict[extra_prefix+"moebius"]=moebius_pars.data
+        
+

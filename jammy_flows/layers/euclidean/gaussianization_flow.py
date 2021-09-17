@@ -717,6 +717,43 @@ class gf_block(euclidean_base.euclidean_base):
         
         return x, log_det#, cur_datapoints_update
 
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+
+
+        extra_input_counter=0
+
+        if self.use_householder:
+            this_vs=self.vs.reshape(1,-1)
+          
+            if(extra_inputs is not None):
+                this_vs=this_vs+extra_inputs[:,:self.num_householder_params]
+
+                extra_input_counter+=self.num_householder_params
+            
+            param_dict[extra_prefix+"vs"]=this_vs.data
+
+          
+        this_datapoints=self.datapoints.reshape(1,-1)
+        this_hs=self.log_hs.reshape(1,-1)
+        this_log_norms=self.log_kde_weights.reshape(1,-1)
+        
+        if(extra_inputs is not None):
+            
+            this_datapoints=this_datapoints+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+            extra_input_counter+=self.num_params_datapoints
+
+            this_hs=this_hs+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+            extra_input_counter+=self.num_params_datapoints
+
+            if(self.fit_normalization):
+                this_log_norms=this_log_norms+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+
+        param_dict[extra_prefix+"means"]=this_datapoints.data
+        param_dict[extra_prefix+"log_widths"]=this_hs.data
+
+        if(self.fit_normalization):
+            param_dict[extra_prefix+"log_norms"]=this_log_norms.data
+
 
 ## transformations
 
@@ -915,5 +952,6 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
     all_layers_params=torch.cat(all_layers_params[::-1])
 
     return all_layers_params
+
 
 

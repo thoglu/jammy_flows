@@ -1,6 +1,7 @@
 import torch
 from torch import nn
 import numpy
+import collections
 
 from .. import layer_base
 
@@ -101,6 +102,20 @@ class interval_base(layer_base.layer_base):
         raise NotImplementedError
 
     def _flow_mapping(self, inputs, extra_inputs=None):
+        raise NotImplementedError
+
+
+    def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+
+        self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs, previous_x=None, extra_prefix="")
+
+        return param_dict
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Implemented by Euclidean sublayers.
+        """
+     
         raise NotImplementedError
 
     

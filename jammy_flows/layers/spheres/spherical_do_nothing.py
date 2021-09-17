@@ -30,7 +30,6 @@ class spherical_do_nothing(sphere_base.sphere_base):
             ln_cyl=torch.log(cos_coords)
             sf_extra=torch.log(1.0-cos_coords)
 
-            print("LN CYL", ln_cyl)
             ## ddx = sin(x)/2
             log_det+=0.5*(ln_cyl+sf_extra).sum(axis=-1)
 

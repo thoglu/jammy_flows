@@ -223,6 +223,12 @@ class Test(unittest.TestCase):
         flow_def="n+gg+m"
 
         self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
+
+        ## general flow reversed
+        pdf_def="e2+s2+s1"
+        flow_def="gg+n+m"
+
+        self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
     
     
     def test_selfconsistency(self):
@@ -235,6 +241,8 @@ class Test(unittest.TestCase):
             ## seed everything to have consistent tests
             seed_everything(1)
             tolerance=1e-7
+
+            print ("INIT ", init)
 
             if("v" in init[0][1]):
                 ## exponential map flows get a little less strict tolerance check for now
@@ -265,8 +273,32 @@ class Test(unittest.TestCase):
             compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
             compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
 
+            """
+            Check self consistency in flow structure.
+            """
+            if(cinput is None):
+                flow_param_structure=this_flow.obtain_flow_param_structure()
+            else:
+                flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=cinput[:1,:])
+            
+            fps_num=0
+
+            for k in flow_param_structure.keys():
+                for k2 in flow_param_structure[k].keys():
+                  
+                    fps_num+=flow_param_structure[k][k2].numel()
+            
+            explicit_param_num=0
+            for pdf_index, pdf_layers in enumerate(this_flow.layer_list):
+
+                for l in pdf_layers:
+                    explicit_param_num+=l.total_param_num
+
+            assert(explicit_param_num==fps_num), ("explicit: ", explicit_param_num, "flow params num ", fps_num)
+
             if("c" in init[0][1]):
                 sys.exit(-1)
+
     def test_gpu(self):
 
         print("-> Testing gpu-support <-")

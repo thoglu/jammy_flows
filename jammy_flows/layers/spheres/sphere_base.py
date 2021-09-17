@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 import numpy
-
+import collections
 from .. import layer_base
 
 class sphere_base(layer_base.layer_base):
@@ -546,6 +546,28 @@ class sphere_base(layer_base.layer_base):
         #print("problematic points", problematic_points)
         return problematic_points
 
+    def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+
+        if(extra_inputs is None):
+            self._obtain_layer_param_structure(param_dict, previous_x=previous_x, extra_prefix=extra_prefix)
+        else:
+            self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs[:, self.num_householder_params:], previous_x=previous_x, extra_prefix=extra_prefix)
+
+        if(self.use_extra_householder):
+            hh_pars=self.householder_params
+
+            if(extra_inputs is not None):
+                
+                hh_pars=extra_inputs[:,:self.num_householder_params]
+
+            param_dict[extra_prefix+"householder"]=hh_pars
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Implemented by Euclidean sublayers.
+        """
+        raise NotImplementedError
+
     def _embedding_conditional_return(self, x):
         return self.spherical_to_eucl_embedding(x)
     def _embedding_conditional_return_num(self): 
@@ -566,6 +588,8 @@ class sphere_base(layer_base.layer_base):
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         raise NotImplementedError
+
+
 
     
 

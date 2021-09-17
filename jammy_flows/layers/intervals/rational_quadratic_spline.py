@@ -310,3 +310,24 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         counter+=self.num_basis_elements
         self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_elements+1]
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+
+
+        extra_input_counter=0
+
+        widths=self.rel_log_widths
+        heights=self.rel_log_heights
+        derivatives=self.rel_log_derivatives
+
+        if(extra_inputs is not None):
+            
+            widths=widths+extra_inputs[:,:self.num_basis_elements]
+            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]
+            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:]
+
+
+        param_dict[extra_prefix+"widths"]=widths
+        param_dict[extra_prefix+"heights"]=heights
+        param_dict[extra_prefix+"derivatives"]=derivatives
+       
