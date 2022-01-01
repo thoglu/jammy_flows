@@ -48,7 +48,9 @@ class AmortizableMLP(nn.Module):
                        1 - An extra Linear function is added to the final result, adding effectively a skip connection from input to output with additionaly weight multiplication
                        2 - Hidden dimensions define hidden dims of 1-hidden layer MLPs that are interleaved and always added to the previous layer. They depend on the previous layer and the first layer input,
                            and likely perform better when output_dim < input_dim. 
-        """ 
+
+                       3 - 
+        """             
         super(AmortizableMLP, self).__init__()
 
         self.input_dim=input_dim
@@ -121,16 +123,18 @@ class AmortizableMLP(nn.Module):
                 mlp_dict=dict()
                 mlp_dict["inputs"]=inputs
                 mlp_dict["outputs"]=outputs
-                mlp_dict["max_ranks"]=[]
-                mlp_dict["used_ranks"]=[]
+                #mlp_dict["max_ranks"]=[]
+                #mlp_dict["used_ranks"]=[]
                 mlp_dict["activations"]=[]
+                self._fill_activations(mlp_dict, mlp_dict["inputs"])
+                
                 mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations
                 mlp_dict["add_final_bias"]=True
             
                 mlp_dict["num_u_s"]=[]
                 mlp_dict["num_v_s"]=[]
                 mlp_dict["num_b_s"]=[]
-                mlp_dict["smart_flags"]=[]
+                mlp_dict["full_weight_matrix_flags"]=[]
                 mlp_dict["sigmas"]=[]
                 mlp_dict["svd_mode"]=self.svd_mode
 
@@ -150,16 +154,18 @@ class AmortizableMLP(nn.Module):
                     mlp_dict=dict()
                     mlp_dict["inputs"]=[self.input_dim]
                     mlp_dict["outputs"]=[self.output_dim]
-                    mlp_dict["max_ranks"]=[]
-                    mlp_dict["used_ranks"]=[]
+                    #mlp_dict["max_ranks"]=[]
+                    #mlp_dict["used_ranks"]=[]
                     mlp_dict["activations"]=[]
+                    self._fill_activations(mlp_dict, mlp_dict["inputs"])
+
                     mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[-1:]
                     mlp_dict["add_final_bias"]=True
                 
                     mlp_dict["num_u_s"]=[]
                     mlp_dict["num_v_s"]=[]
                     mlp_dict["num_b_s"]=[]
-                    mlp_dict["smart_flags"]=[]
+                    mlp_dict["full_weight_matrix_flags"]=[]
                     mlp_dict["sigmas"]=[]
                     mlp_dict["svd_mode"]=self.svd_mode
 
@@ -194,16 +200,18 @@ class AmortizableMLP(nn.Module):
                     else:
                         mlp_dict["inputs"]=[mlp_start_dim, self.hidden_dims[ind]]
                     mlp_dict["outputs"]=[self.hidden_dims[ind], target_dim]
-                    mlp_dict["max_ranks"]=[]
-                    mlp_dict["used_ranks"]=[]
+                    #mlp_dict["max_ranks"]=[]
+                    #mlp_dict["used_ranks"]=[]
                     mlp_dict["activations"]=[]
+                    self._fill_activations(mlp_dict, mlp_dict["inputs"])
+
                     mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[ind*2:ind*2+2]
                     mlp_dict["add_final_bias"]=False
                 
                     mlp_dict["num_u_s"]=[]
                     mlp_dict["num_v_s"]=[]
                     mlp_dict["num_b_s"]=[]
-                    mlp_dict["smart_flags"]=[]
+                    mlp_dict["full_weight_matrix_flags"]=[]
                     mlp_dict["sigmas"]=[]
                     mlp_dict["svd_mode"]=self.svd_mode
 
@@ -213,16 +221,17 @@ class AmortizableMLP(nn.Module):
                 mlp_dict=dict()
                 mlp_dict["inputs"]=[self.input_dim]
                 mlp_dict["outputs"]=[self.output_dim]
-                mlp_dict["max_ranks"]=[]
-                mlp_dict["used_ranks"]=[]
+                #mlp_dict["max_ranks"]=[]
+                #mlp_dict["used_ranks"]=[]
                 mlp_dict["activations"]=[]
+                self._fill_activations(mlp_dict, mlp_dict["inputs"])
                 mlp_dict["low_rank_approximations"]=self.total_low_rank_approximations[-1:]
                 mlp_dict["add_final_bias"]=True
             
                 mlp_dict["num_u_s"]=[]
                 mlp_dict["num_v_s"]=[]
                 mlp_dict["num_b_s"]=[]
-                mlp_dict["smart_flags"]=[]
+                mlp_dict["full_weight_matrix_flags"]=[]
                 mlp_dict["sigmas"]=[]
                 mlp_dict["svd_mode"]=self.svd_mode
 
@@ -256,6 +265,16 @@ class AmortizableMLP(nn.Module):
         #######################
         #print("first 10 uvb after init .. ", self.u_v_b_pars[0,:10])
 
+    def _fill_activations(self, mlp_def, input):
+
+        for ind in range(len(input)):
+
+            if(ind==(len(input)-1)):
+                mlp_def["activations"].append(lambda x: x)
+            else:
+                #print("nonlinear act ...........")
+                mlp_def["activations"].append(NONLINEARITIES[self.nonlinearity])
+
     def initialize_uv_structure(self, mlp_def):
             
         num_amortization_params=0
@@ -272,15 +291,32 @@ class AmortizableMLP(nn.Module):
             if(mlp_def["low_rank_approximations"][ind]>0):
                 used_ranks.append(min(max_ranks[ind], mlp_def["low_rank_approximations"][ind]))
             else:
-                used_ranks.append(max_ranks[ind])
+                if(mlp_def["svd_mode"]=="naive"):
+                    # append 0
+                    used_ranks.append(0)
+                else:
+                    ## smart mode just uses the max rank
+                    used_ranks.append(max_ranks[ind])
 
-            if(self.svd_mode=="naive"):
+            if(mlp_def["svd_mode"]=="naive"):
+                    
+                if(used_ranks[ind]>0):
+
+                    mlp_def["num_u_s"].append(used_ranks[ind]*mlp_def["outputs"][ind])
+                    mlp_def["num_v_s"].append(used_ranks[ind]*mlp_def["inputs"][ind])
+                    num_amortization_params+=(used_ranks[ind]*mlp_def["inputs"][ind]+used_ranks[ind]*mlp_def["outputs"][ind])
+                    
+                    mlp_def["full_weight_matrix_flags"].append(0)
+                else:
+
+                    mlp_def["num_u_s"].append(mlp_def["outputs"][ind]*mlp_def["inputs"][ind])
+                    mlp_def["num_v_s"].append(0)
+                    num_amortization_params+=(mlp_def["outputs"][ind]*mlp_def["inputs"][ind])
+                    
+                    mlp_def["full_weight_matrix_flags"].append(1)
+
                 
-                mlp_def["num_u_s"].append(used_ranks[ind]*mlp_def["outputs"][ind])
-                mlp_def["num_v_s"].append(used_ranks[ind]*mlp_def["inputs"][ind])
-                num_amortization_params+=(used_ranks[ind]*mlp_def["inputs"][ind]+used_ranks[ind]*mlp_def["outputs"][ind])
-            
-            elif(self.svd_mode=="smart"):
+            elif(mlp_def["svd_mode"]=="smart"):
                 ## smart mode takes a full matrix if the low-rank approximation has more parameters
                 
                 max_num_pars=(mlp_def["inputs"][ind]*mlp_def["outputs"][ind])
@@ -290,15 +326,15 @@ class AmortizableMLP(nn.Module):
                     mlp_def["num_u_s"].append(used_ranks[ind]*mlp_def["outputs"][ind])
                     mlp_def["num_v_s"].append(used_ranks[ind]*mlp_def["inputs"][ind])
                     num_amortization_params+=(used_ranks[ind]*mlp_def["inputs"][ind]+used_ranks[ind]*mlp_def["outputs"][ind])
-                    mlp_def["smart_flags"].append(0)
+                    mlp_def["full_weight_matrix_flags"].append(0)
                 else:
                     # smart_flag = 1 -> full matrix (all parameters of the full matrix are stored in the *v* vector)
                     mlp_def["num_u_s"].append(mlp_def["inputs"][ind]*mlp_def["outputs"][ind])
                     mlp_def["num_v_s"].append(0)
                     num_amortization_params+=(mlp_def["inputs"][ind]*mlp_def["outputs"][ind])
-                    mlp_def["smart_flags"].append(1)
+                    mlp_def["full_weight_matrix_flags"].append(1)
 
-            elif(self.svd_mode=="explicit_svd"):
+            elif(mlp_def["svd_mode"]=="explicit_svd"):
 
                 raise NotImplementedError()
                 """
@@ -320,7 +356,7 @@ class AmortizableMLP(nn.Module):
             ## no activation in last mapping (first if len=1, i.e. no hidden layer)
             if(ind==(len(mlp_def["inputs"])-1)):
 
-                mlp_def["activations"].append(lambda x: x)
+                #mlp_def["activations"].append(lambda x: x)
 
                 if(mlp_def["add_final_bias"]):
                     mlp_def["num_b_s"].append(mlp_def["outputs"][ind])
@@ -329,7 +365,7 @@ class AmortizableMLP(nn.Module):
                 #print("linear act ->>>>>>>>>")
             else:
                 #print("nonlinear act ...........")
-                mlp_def["activations"].append(NONLINEARITIES[self.nonlinearity])
+                #mlp_def["activations"].append(NONLINEARITIES[self.nonlinearity])
                 mlp_def["num_b_s"].append(mlp_def["outputs"][ind])
 
             num_amortization_params+=mlp_def["num_b_s"][-1]
@@ -353,7 +389,7 @@ class AmortizableMLP(nn.Module):
                 for ind in range(len(mlp_def["inputs"])):
 
                     ## this layer is not low-rank aproximated, use kaiming init
-                    if(mlp_def["smart_flags"][ind]==1):
+                    if(mlp_def["full_weight_matrix_flags"][ind]==1):
 
                         ## init weights
                         nn.init.kaiming_uniform_(self.u_v_b_pars.data[:,index:index+mlp_def["num_u_s"][ind]], a=numpy.sqrt(5))
@@ -433,15 +469,14 @@ class AmortizableMLP(nn.Module):
             this_v, amortization_params=amortization_params[:, :mlp_def["num_v_s"][ind]], amortization_params[:, mlp_def["num_v_s"][ind]:]
             this_b, amortization_params=amortization_params[:, :mlp_def["num_b_s"][ind]], amortization_params[:, mlp_def["num_b_s"][ind]:]
 
-            if(mlp_def["svd_mode"]=="smart"):
+            if(mlp_def["svd_mode"]=="smart" or mlp_def["svd_mode"]=="naive"):
                 
                 ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product
-                if(mlp_def["smart_flags"][ind]):
+                if(mlp_def["full_weight_matrix_flags"][ind]):
                     # no svd decomposition, the whole weight matrix is stored in the "u" vector
                     A=this_u.view(batch_size, mlp_def["outputs"][ind], mlp_def["inputs"][ind])
                     #print("A ", A)
                   
-                   
                     nonlinear=self._adaptive_matmul(A, prev)
 
                 else:

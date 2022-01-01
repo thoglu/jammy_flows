@@ -171,7 +171,10 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
         self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
         self.flow_dict["g"]["kwargs"]["skip_model_offset"]=0
-        self.flow_dict["g"]["kwargs"]["softmax_for_width"]=0
+        self.flow_dict["g"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
+        self.flow_dict["g"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths
+        self.flow_dict["g"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
+
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block

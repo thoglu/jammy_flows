@@ -16,7 +16,17 @@ import pylab
 
 
 class gf_block(euclidean_base.euclidean_base):
-    def __init__(self, dimension, num_kde=5, num_householder_iter=-1, use_permanent_parameters=False, fit_normalization=0, inverse_function_type="inormal_partly_precise", model_offset=0, softmax_for_width=0):
+    def __init__(self, 
+                 dimension, 
+                 num_kde=5, 
+                 num_householder_iter=-1, 
+                 use_permanent_parameters=False, 
+                 fit_normalization=0, 
+                 inverse_function_type="inormal_partly_precise", 
+                 model_offset=0, 
+                 softplus_for_width=0,
+                 lower_bound_for_widths=0.01,
+                 upper_bound_for_widths=-1):
         """
         Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
         to use reparametrization trick for VAEs due to Newton iterations.
@@ -30,14 +40,23 @@ class gf_block(euclidean_base.euclidean_base):
         """
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
         self.init = False
-        self.hs_min=0.1
 
-        
+        self.hs_min=lower_bound_for_widths
+
+        ## defines maximum width - None -> no maximum width .. only used for exponential width function to cap high values
+        self.hs_max=None
+
+        if(upper_bound_for_widths > 0):
+            self.hs_max=upper_bound_for_widths
+
         self.inverse_function_type=inverse_function_type
       
         assert(self.inverse_function_type=="inormal_partly_crude" or self.inverse_function_type=="inormal_partly_precise" or  self.inverse_function_type=="inormal_full_pade" or  self.inverse_function_type=="isigmoid")
 
+        ## p-value after which to switch to pade approximation
         self.pade_approximation_bound=0.5e-7
+
+        ## constant used for pade approximation of inverse gaussian CDF
         self.pade_const_a=0.147
 
         if num_householder_iter == -1:
@@ -51,11 +70,10 @@ class gf_block(euclidean_base.euclidean_base):
            
             self.use_householder=False
 
-      
-        #elf.layer = layer
         self.dimension = dimension
         self.num_kde = num_kde
-      
+        
+        ## initialization from Gaussianization flow paper
         bandwidth = (4. * numpy.sqrt(math.pi) / ((math.pi ** 4) * num_kde)) ** 0.2
         self.init_bandwidth=numpy.log(bandwidth)
 
@@ -71,11 +89,21 @@ class gf_block(euclidean_base.euclidean_base):
         self.fit_normalization=fit_normalization
 
 
-        self.softmax_for_width=softmax_for_width
+        self.softplus_for_width=softplus_for_width
 
-        self.exp_like_function=torch.exp
-        if(self.softmax_for_width):
+        print("-> GF FLow minimum width: ", self.hs_min)
+        if(self.softplus_for_width):
+            
             self.exp_like_function=torch.nn.functional.softplus
+        
+        else:
+            if(self.hs_max is None):
+                self.exp_like_function=torch.exp
+            else:
+                print("Using Flattend out exponential function .. flattens out at ", self.hs_max)
+                ## exponential function at beginning but flattens out at hs_max -> no infinite growth
+                self.exp_like_function=lambda x: self.hs_max/(1.0+torch.exp(-(x-numpy.log(self.hs_max))))
+
 
         
         if(fit_normalization):
@@ -121,7 +149,7 @@ class gf_block(euclidean_base.euclidean_base):
 
     def logistic_kernel_log_cdf(self, x, datapoints, log_widths, log_norms):
         #hs = torch.exp(log_widths)+self.hs_min
-        r=self.exp_like_function(log_widths)
+        #r=self.exp_like_function(log_widths)
         
         hs = self.exp_like_function(log_widths)+self.hs_min
 
@@ -606,27 +634,15 @@ class gf_block(euclidean_base.euclidean_base):
         if(self.num_householder_params > 0):
             desired_param_vec.append(torch.randn(self.householder_iter*self.dimension))
 
-        if(False):#self.inverse_function_type=="isigmoid"):
-            print("SIGMOID DESIRE!")
-             ## means
-            desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*0.0001)
+        ## means
+        desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
 
-            ## widths
-            desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*numpy.log(1.0))
+        ## widths
+        desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_bandwidth)
 
-            ## normalization
-            if(self.fit_normalization):
-                desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
-        else:
-            ## means
-            desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
-
-            ## widths
-            desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_bandwidth)
-
-            ## normalization
-            if(self.fit_normalization):
-                desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
+        ## normalization
+        if(self.fit_normalization):
+            desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
 
         return torch.cat(desired_param_vec)
 
