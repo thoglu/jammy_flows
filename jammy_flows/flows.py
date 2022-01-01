@@ -1117,10 +1117,10 @@ class pdf(nn.Module):
                 used_device=predefined_target_input.device
 
             log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(self.total_target_dim).type(data_type).to(device),
+                torch.zeros(self.total_target_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_target_dim)
                 .type(data_type)
-                .to(device),
+                .to(used_device),
             ).log_prob(predefined_target_input)
 
         else:
