@@ -133,7 +133,7 @@ class Test(unittest.TestCase):
         low_rank_ranks=["2-10-1000"]
 
 
-        gf_settings=[{"g":{"kwargs":{"softmax_for_width":1}}},{"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}},{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}},{"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}}]
+        gf_settings=[{"g":{"kwargs":{"softplus_for_width":1}}},{"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}},{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}},{"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}}]
 
         for enc in encoders:
             for mlp_hidden in mlp_hidden_dims:
