@@ -642,7 +642,22 @@ def plot_joint_pdf(pdf,
     
   
     if (dim == 1):
-        ax = fig.add_subplot(gridspec)
+
+        if (subgridspec is None):
+            
+            subgridspec = gridspec.subgridspec(1, 1)
+            ax = fig.add_subplot(subgridspec[0, 0])
+        else:
+            ## find ax in existing gridspec
+            for ax in fig.get_axes():
+                ax_geometry=ax.get_geometry()
+
+                if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
+                    continue
+
+                if(ax_geometry[0]==1 and ax_geometry[1]==1):
+                    break
+        
         ax.hist(samples[:, 0], bins=50, density=True)
 
         if (plot_density):
@@ -660,8 +675,18 @@ def plot_joint_pdf(pdf,
      
         if (subgridspec is None):
             subgridspec = gridspec.subgridspec(1, 1)
+            ax = fig.add_subplot(subgridspec[0, 0])
+        else:
+            for ax in fig.get_axes():
+                ax_geometry=ax.get_geometry()
 
-        ax = fig.add_subplot(subgridspec[0, 0])
+                if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
+                    continue
+
+                if(ax_geometry[0]==1 and ax_geometry[1]==1):
+                    break
+
+        
 
         hist_bounds = 50
         #if(bounds is not None):
@@ -782,14 +807,31 @@ def plot_joint_pdf(pdf,
 
         
         if (subgridspec is None):
+            
             subgridspec = gridspec.subgridspec(dim, dim)
 
+        
         for ind1 in range(dim):
             for ind2 in range(dim):
                
                 if (ind2 < ind1):
 
-                    ax = fig.add_subplot(subgridspec[ind1, ind2])
+                    found_ax=False
+                    for ax in fig.get_axes():
+                        ax_geometry=ax.get_geometry()
+                        num_rows=ax_geometry[0]
+                        this_gridspec=ax.get_gridspec()
+
+                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
+                            continue
+                      
+                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
+                            found_ax=True
+                           
+                            break
+
+                    if(found_ax==False):
+                        ax = fig.add_subplot(subgridspec[ind1, ind2])
 
                     ## make sure background looks similar to histogram empty bins
                     ax.set_facecolor(colormap(0.0))
@@ -838,8 +880,24 @@ def plot_joint_pdf(pdf,
 
                 elif (ind2 == ind1):
 
-                    ax = fig.add_subplot(subgridspec[ind1, ind2])
+                    found_ax=False
+                    for ax in fig.get_axes():
+                        ax_geometry=ax.get_geometry()
+                        num_rows=ax_geometry[0]
+                        
+                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
+                            continue
 
+                        
+                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
+                            found_ax=True
+                           
+                            break
+
+                    if(found_ax==False):
+                        ax = fig.add_subplot(subgridspec[ind1, ind2])
+
+                  
                     hist_bounds = 50
                     if (bounds is not None):
                         hist_bounds = numpy.linspace(bounds[ind2][0],
