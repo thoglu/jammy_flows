@@ -988,9 +988,9 @@ class pdf(nn.Module):
                 return self.log_normalization_mlp(data_summary)
         
          
-    def forward(self, x, conditional_input=None):
+    def forward(self, x, conditional_input=None, debug=False):
 
-        log_det = torch.zeros(x.shape[0]).type_as(x)
+        tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
         extra_params = None
 
@@ -1000,6 +1000,8 @@ class pdf(nn.Module):
         z = x
         extra_conditional_input=[]
         new_targets=[]
+
+        individual_logps=dict()
 
         for pdf_index, pdf_layers in enumerate(self.layer_list):
 
@@ -1032,7 +1034,7 @@ class pdf(nn.Module):
 
             this_target=z[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
 
-            
+            log_det=torch.zeros(x.shape[0]).type_as(x)
             ## reverse mapping is required for pdf evaluation
             for l, layer in reversed(list(enumerate(pdf_layers))):
 
@@ -1055,6 +1057,18 @@ class pdf(nn.Module):
 
                 extra_param_counter += layer.total_param_num
 
+            tot_log_det+=log_det
+
+            if(debug):
+
+                this_logp = torch.distributions.MultivariateNormal(
+                    torch.zeros_like(this_target).to(x),
+                    covariance_matrix=torch.eye(this_target.shape[1]).type_as(x).to(x),
+                ).log_prob(this_target)+log_det
+
+                individual_logps["%.2d_%s" % (pdf_index, this_pdf_type)]=this_logp
+
+
             new_targets.append(this_target)
 
             prev_target=z[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
@@ -1071,7 +1085,10 @@ class pdf(nn.Module):
             covariance_matrix=torch.eye(self.total_target_dim).type_as(x).to(x),
         ).log_prob(base_pos)
 
-        return log_pdf + log_det, log_pdf, base_pos
+        if(debug):
+            return log_pdf + tot_log_det, log_pdf, base_pos, individual_logps
+        else:
+            return log_pdf + tot_log_det, log_pdf, base_pos
 
     def obtain_flow_param_structure(self, conditional_input=None, predefined_target_input=None, seed=None):
         """
