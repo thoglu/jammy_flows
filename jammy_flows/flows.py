@@ -174,7 +174,9 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
         self.flow_dict["g"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
         self.flow_dict["g"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
-
+        self.flow_dict["g"]["kwargs"]["clamp_widths"]=0
+        self.flow_dict["g"]["kwargs"]["width_smooth_saturation"]=1 # 
+      
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block
@@ -1061,12 +1063,17 @@ class pdf(nn.Module):
 
             if(debug):
 
-                this_logp = torch.distributions.MultivariateNormal(
+                ind_base_eval=this_logp = torch.distributions.MultivariateNormal(
                     torch.zeros_like(this_target).to(x),
                     covariance_matrix=torch.eye(this_target.shape[1]).type_as(x).to(x),
-                ).log_prob(this_target)+log_det
+                ).log_prob(this_target)
 
-                individual_logps["%.2d_%s" % (pdf_index, this_pdf_type)]=this_logp
+                ind_logdet=log_det
+                
+
+                individual_logps["%.2d_%s" % (pdf_index, this_pdf_type)]=ind_base_eval+ind_logdet
+                individual_logps["%.2d_%s_logdet" % (pdf_index, this_pdf_type)]=ind_logdet
+                individual_logps["%.2d_%s_base" % (pdf_index, this_pdf_type)]=ind_base_eval
 
 
             new_targets.append(this_target)

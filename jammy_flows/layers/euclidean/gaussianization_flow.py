@@ -25,8 +25,10 @@ class gf_block(euclidean_base.euclidean_base):
                  inverse_function_type="inormal_partly_precise", 
                  model_offset=0, 
                  softplus_for_width=0,
+                 width_smooth_saturation=1,
                  lower_bound_for_widths=0.01,
-                 upper_bound_for_widths=-1):
+                 upper_bound_for_widths=100,
+                 clamp_widths=0):
         """
         Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
         to use reparametrization trick for VAEs due to Newton iterations.
@@ -41,6 +43,7 @@ class gf_block(euclidean_base.euclidean_base):
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
         self.init = False
 
+        assert(lower_bound_for_widths>0.0)
         self.hs_min=lower_bound_for_widths
 
         ## defines maximum width - None -> no maximum width .. only used for exponential width function to cap high values
@@ -48,6 +51,18 @@ class gf_block(euclidean_base.euclidean_base):
 
         if(upper_bound_for_widths > 0):
             self.hs_max=upper_bound_for_widths
+
+            ### clamp at three times the logarithm to upper bound log_width .. more than enough for whole range
+            self.log_width_max_to_clamp=numpy.log(self.hs_max)*3.0
+
+        self.width_smooth_saturation=width_smooth_saturation
+        if(self.width_smooth_saturation):
+            assert(self.hs_max is not None), "We require a maximum saturation level for smooth saturation!"
+
+        ## clamp at a hundreths of the smallest len allowed width hs_min (yields approximately clamp value below, as long as hs_max >> hs_min)
+        self.log_width_min_to_clamp=numpy.log(0.01*self.hs_min)
+
+        self.clamp_widths=clamp_widths
 
         self.inverse_function_type=inverse_function_type
       
@@ -91,18 +106,64 @@ class gf_block(euclidean_base.euclidean_base):
 
         self.softplus_for_width=softplus_for_width
 
-        print("-> GF FLow minimum width: ", self.hs_min)
         if(self.softplus_for_width):
-            
-            self.exp_like_function=torch.nn.functional.softplus
-        
-        else:
-            if(self.hs_max is None):
-                self.exp_like_function=torch.exp
+            ## softplus
+            if(clamp_widths):
+                upper_clamp=None
+                if(self.hs_max is not None):
+                    # clamp upper bound with exact hs_max value
+                    upper_clamp=numpy.log(self.hs_max)
+                self.exp_like_function_linear=lambda x: torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.hs_min
             else:
-                print("Using Flattend out exponential function .. flattens out at ", self.hs_max)
+                self.exp_like_function_linear=lambda x: torch.nn.functional.softplus(x)+self.hs_min
+            
+            self.use_linear_exp_like_function=True
+
+        else:
+            ## exponential-type width relation
+            if(self.width_smooth_saturation == 0):
+                ## normal, infinetly growing exponential
+                if(self.clamp_widths):
+                    # clamp upper bound with exact hs_max value
+                    upper_clamp=None
+                    if(self.hs_max is not None):
+                        upper_clamp=numpy.log(self.hs_max)
+                    self.exp_like_function_linear=lambda x: torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.hs_min
+                else:
+                    self.exp_like_function_linear=lambda x: torch.exp(x)+self.hs_min
+
+                self.use_linear_exp_like_function=True
+            else:
                 ## exponential function at beginning but flattens out at hs_max -> no infinite growth
-                self.exp_like_function=lambda x: self.hs_max/(1.0+torch.exp(-(x-numpy.log(self.hs_max))))
+                ## numerically stable via logsumexp .. clamping should not be necessary, but can be done to damp down large gradients
+                ## in weird regions of parameter space
+                
+                ln_hs_max=numpy.log(self.hs_max)
+                ln_hs_min=numpy.log(self.hs_min)
+
+                if(self.clamp_widths):
+
+                    def exp_like_fn(x):
+
+                        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-torch.clamp(x, min=self.log_width_min_to_clamp, max=self.log_width_max_to_clamp)+ln_hs_max).unsqueeze(-1)], dim=-1)
+
+                        first_term=ln_hs_max-torch.logsumexp(res, dim=-1, keepdim=True)
+
+                        return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_hs_min], dim=-1), dim=-1)
+
+                else:
+                    def exp_like_fn(x):
+
+                        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-x+ln_hs_max).unsqueeze(-1)], dim=-1)
+
+                        first_term=ln_hs_max-torch.logsumexp(res, dim=-1, keepdim=True)
+
+                        return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_hs_min], dim=-1), dim=-1)
+
+                self.exp_like_function_log=exp_like_fn
+
+                self.use_linear_exp_like_function=False
+
 
 
         
@@ -148,58 +209,70 @@ class gf_block(euclidean_base.euclidean_base):
     
 
     def logistic_kernel_log_cdf(self, x, datapoints, log_widths, log_norms):
-        #hs = torch.exp(log_widths)+self.hs_min
-        #r=self.exp_like_function(log_widths)
+       
+        if(self.use_linear_exp_like_function):
+            hs = self.exp_like_function_linear(log_widths)
+        else:
+            log_hs = self.exp_like_function_log(log_widths)
+            hs=torch.exp(log_hs)
         
-        hs = self.exp_like_function(log_widths)+self.hs_min
-
         x_unsqueezed=x.unsqueeze(1)
       
-
         log_cdfs = - F.softplus(-(x_unsqueezed - datapoints) / hs) + \
                    log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
 
         log_cdf = torch.logsumexp(log_cdfs, dim=1)
 
-
+      
         return log_cdf
 
     def logistic_kernel_log_sf(self, x, datapoints, log_widths,log_norms):
-        #hs = torch.exp(log_widths)+self.hs_min
-        hs = self.exp_like_function(log_widths)+self.hs_min
-
-
+       
+        if(self.use_linear_exp_like_function):
+            hs = self.exp_like_function_linear(log_widths)
+        else:
+            log_hs = self.exp_like_function_log(log_widths)
+            hs=torch.exp(log_hs)
+    
         x_unsqueezed=x.unsqueeze(1)
 
         log_sfs = -(x_unsqueezed - datapoints) / hs - \
                   F.softplus(-(x_unsqueezed- datapoints) / hs) + \
                   log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+
+    
         log_sf = torch.logsumexp(log_sfs, dim=1)
+
+
         return log_sf
 
     def logistic_kernel_log_pdf(self, x, datapoints, log_widths,log_norms):
-        #hs = torch.exp(log_widths)+self.hs_min
-        hs = self.exp_like_function(log_widths)+self.hs_min
-
-        log_hs=torch.log(hs)
-        #hs = torch.max(hs, torch.ones_like(hs) * hs_min)
-        #log_hs = torch.max(log_widths, torch.ones_like(hs) * numpy.log(hs_min))
-
+        
+        if(self.use_linear_exp_like_function):
+            hs = self.exp_like_function_linear(log_widths)
+            log_hs=torch.log(hs)
+        else:
+            log_hs = self.exp_like_function_log(log_widths)
+            hs=torch.exp(log_hs)
 
         x_unsqueezed=x.unsqueeze(1)
 
         log_pdfs = -(x_unsqueezed - datapoints) / hs - log_hs - \
                    2. * F.softplus(-(x_unsqueezed - datapoints) / hs) + \
                    log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+
+        
         log_pdf = torch.logsumexp(log_pdfs, dim=1)
-       
+    
+
         return log_pdf
 
     def logistic_kernel_pdf(self, x, datapoints, log_widths,log_norms):
         
         log_pdf=self.logistic_kernel_log_pdf(x,datapoints,log_widths,log_norms)
-
+        
         pdf = torch.exp(log_pdf)
+
 
         return pdf
 
@@ -207,7 +280,7 @@ class gf_block(euclidean_base.euclidean_base):
         # Using bandwidth formula
 
         log_cdf=self.logistic_kernel_log_cdf(x,datapoints,log_widths,log_norms)
-
+        
         cdf = torch.exp(log_cdf)
 
         return cdf
@@ -232,7 +305,7 @@ class gf_block(euclidean_base.euclidean_base):
    
     def sigmoid_inv_error_pass(self, x, datapoints, log_widths, log_norms):
 
-    
+      
         log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms)  # log(CDF)
         log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms)  # log(1-CDF)
 
@@ -555,7 +628,7 @@ class gf_block(euclidean_base.euclidean_base):
                 
                 mask_neg=(cdf_l<=0.5).double()
                 extra_plus_minus_factor=(1.0-2*cdf_l)*mask_neg+(-1.0+2*cdf_l)*(1-mask_neg)
-
+              
                 return_derivs[full_deriv_mask]=(log_total-log_cdf_l-log_sf_l+log_pdf+torch.log(extra_plus_minus_factor))[full_deriv_mask]
 
 
@@ -713,8 +786,10 @@ class gf_block(euclidean_base.euclidean_base):
 
             if(self.fit_normalization):
                 this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.log_kde_weights.shape[1], self.log_kde_weights.shape[2]])
-        
+       
         log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms).sum(axis=-1)
+
+    
         if(torch.isnan(log_det).sum()>0):
             print("x bef ", x[80:100])
             print("LOG DET AFTER ", log_det[80:100])
