@@ -12,6 +12,22 @@ import torch.distributions as tdist
 
 normal_dist=tdist.Normal(0, 1)
 
+def obtain_bounded_variable_fn(min_val=0, max_val=1):
+
+    difference=max_val-min_val
+
+    log_difference=numpy.log(difference)
+
+    def fn(x):
+
+        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-x).unsqueeze(-1)], dim=-1)
+
+        result=torch.exp(log_difference-torch.logsumexp(res, dim=-1))+min_val
+
+        return result
+
+    return fn
+
 class psf_block(euclidean_base.euclidean_base):
     def __init__(self, dimension, num_transforms=3, num_householder_iter=-1, use_permanent_parameters=False, model_offset=0, exact_mode=True):
         """
@@ -45,6 +61,10 @@ class psf_block(euclidean_base.euclidean_base):
 
         ## 5 param types * dimension * number of transforms
         self.total_transform_params=self.num_params_per_item*5
+
+        ## transformation functions for widths and the exponent
+        self.width_transform=obtain_bounded_variable_fn(min_val=0.01, max_val=10)
+        self.log_exponent_transform=obtain_bounded_variable_fn(min_val=-3, max_val=3)
 
         init_log_value=-0.1053605156 # 0.9
 
@@ -196,16 +216,16 @@ class psf_block(euclidean_base.euclidean_base):
             log_exponent=log_exponent+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_exponent.shape[1],  self.log_exponent.shape[2]])
             extra_input_counter+=self.num_params_per_item
 
-
+        """
         widths1 = torch.exp(log_widths1)+self.width_min
         widths2 = torch.exp(log_widths2)+self.width_min
-
-
-        #hs = torch.max(hs, torch.ones_like(hs) * hs_min)
         exponents=torch.exp(log_exponent)+self.exp_min
-
-        #y=self.fw_loop(x, means1, means2, widths1, widths2, exponents)
-      
+        """
+        
+        widths1=self.width_transform(log_widths1)
+        widths2=self.width_transform(log_widths2)
+        exponents=torch.exp(self.log_exponent_transform(log_exponent))
+        
 
         for tr_iter in range(self.num_transforms):
 
@@ -293,12 +313,16 @@ class psf_block(euclidean_base.euclidean_base):
             extra_input_counter+=self.num_params_per_item
 
 
+        """
         widths1 = torch.exp(log_widths1)+self.width_min
         widths2 = torch.exp(log_widths2)+self.width_min
-
-
-        #hs = torch.max(hs, torch.ones_like(hs) * hs_min)
         exponents=torch.exp(log_exponent)+self.exp_min
+        """
+        
+        widths1=self.width_transform(log_widths1)
+        widths2=self.width_transform(log_widths2)
+        exponents=torch.exp(self.log_exponent_transform(log_exponent))
+        
 
         for tr_iter in reversed(range(self.num_transforms)):
             
@@ -319,11 +343,12 @@ class psf_block(euclidean_base.euclidean_base):
             desired_param_vec.append(torch.randn(self.householder_iter*self.dimension))
 
         ## log-width 1
-        desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
+        #desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
+        desired_param_vec.append(torch.ones(self.num_params_per_item)*0.0)
 
         ## log-width 2
-        desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
-
+        #desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
+        desired_param_vec.append(torch.ones(self.num_params_per_item)*0.0)
         ## mean1
         desired_param_vec.append(torch.randn(self.num_params_per_item))
 
@@ -331,7 +356,8 @@ class psf_block(euclidean_base.euclidean_base):
         desired_param_vec.append(torch.randn(self.num_params_per_item))
 
         ## log_exponent
-        desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
+        #desired_param_vec.append(torch.ones(self.num_params_per_item)*-0.1053605156)
+        desired_param_vec.append(torch.ones(self.num_params_per_item)*0.0)
 
         return torch.cat(desired_param_vec)
         

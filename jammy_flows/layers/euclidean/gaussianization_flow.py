@@ -1,8 +1,11 @@
 import torch
 from torch import nn
 import numpy
+
 from .. import bisection_n_newton as bn
 from .. import layer_base
+from .. import extra_functions
+
 from . import euclidean_base
 
 import math
@@ -10,9 +13,35 @@ import torch.nn.functional as F
 import torch.distributions as tdist
 import scipy.linalg
 from scipy.optimize import minimize
+import time
 normal_dist=tdist.Normal(0, 1)
 
 import pylab
+
+def generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=10, center_around_zero=False):
+    
+    ## min and max values are in normal space -> must be positive
+    assert(min_val_normal_space > 0)
+
+    ln_max=numpy.log(max_val_normal_space)
+    ln_min=numpy.log(min_val_normal_space)
+
+    ## this shift makes the function equivalent to a normal exponential for small values
+    center_val=ln_max
+
+    ## can also center around zero (it will be centered in exp space, not in log space)
+    if(center_around_zero):
+        center_val=0.0
+
+    def f(x):
+
+        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-x+center_val).unsqueeze(-1)], dim=-1)
+
+        first_term=ln_max-torch.logsumexp(res, dim=-1, keepdim=True)
+
+        return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_min], dim=-1), dim=-1)
+
+    return f
 
 
 class gf_block(euclidean_base.euclidean_base):
@@ -28,7 +57,9 @@ class gf_block(euclidean_base.euclidean_base):
                  width_smooth_saturation=1,
                  lower_bound_for_widths=0.01,
                  upper_bound_for_widths=100,
-                 clamp_widths=0):
+                 clamp_widths=0,
+                 regulate_normalization=0,
+                 add_skewness=0):
         """
         Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
         to use reparametrization trick for VAEs due to Newton iterations.
@@ -99,10 +130,23 @@ class gf_block(euclidean_base.euclidean_base):
 
         self.num_params_datapoints=self.num_kde*self.dimension
 
-        self.log_kde_weights = torch.zeros(self.num_kde, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
+        
+        ## handling of normalization
 
         self.fit_normalization=fit_normalization
+        self.regulate_normalization=regulate_normalization
 
+        self.normalization_regulator = None
+        if(self.fit_normalization):
+            if(self.regulate_normalization):
+                ## bound normalization into a range that spans roughly ~ 100 . .we dont want huge discrepancies in normalization
+                ## this serves as a stabilizer during training compared to no free-floating normalization, but at the same time
+                ## avoids near zero normalizations which can also lead to unwanted side effects
+
+                self.normalization_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=100)
+
+
+        ###### handling of widths
 
         self.softplus_for_width=softplus_for_width
 
@@ -165,13 +209,17 @@ class gf_block(euclidean_base.euclidean_base):
                 self.use_linear_exp_like_function=False
 
 
-
-        
+        # normalization parameters
+        self.log_kde_weights = torch.zeros(self.num_kde, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
         if(fit_normalization):
 
             if(use_permanent_parameters):
                 self.log_kde_weights = nn.Parameter(torch.randn(num_kde, self.dimension).type(torch.double).unsqueeze(0))
-            
+
+
+            self.total_param_num+=self.num_params_datapoints
+
+        ## width parameters
         if(use_permanent_parameters):
             self.log_hs = nn.Parameter(
                 torch.ones(num_kde, dimension).type(torch.double).unsqueeze(0) * numpy.log(bandwidth)
@@ -179,12 +227,7 @@ class gf_block(euclidean_base.euclidean_base):
         else:
             self.log_hs = torch.zeros(num_kde, dimension).type(torch.double).unsqueeze(0)
                 
-        """
-        else:
-            self.log_hs = nn.Parameter(
-                torch.ones(1, dimension).type(torch.double) * numpy.log(bandwidth)
-            )
-        """
+        ## ROTATIONS
         self.num_householder_params=0
 
         if self.use_householder:
@@ -198,35 +241,75 @@ class gf_block(euclidean_base.euclidean_base):
             self.num_householder_params=self.householder_iter*self.dimension
 
 
-        #else:
-        #    self.register_buffer('matrix', torch.ones(dimension, dimension).type(torch.double))
-
         self.total_param_num+=self.num_params_datapoints*2+self.num_householder_params
+        #####################
 
-        if(fit_normalization):
+
+        #### skewness
+        self.add_skewness=add_skewness
+
+        ## shape to B X KDE index dim X dimension
+        self.skew_exponents=torch.DoubleTensor([1.0]).view(1,1,1)
+        self.skew_signs=torch.DoubleTensor([1.0])
+
+        if(self.add_skewness):
+
+            self.skew_signs=torch.ones( (1,self.num_kde,1)).type(torch.double)
+
+            num_negative=int(float(self.num_kde)/2.0)
+
+            ## half of the KDEs use a flipped prescription
+            self.skew_signs[:,num_negative:,:]=-1.0
+
+            if(use_permanent_parameters):
+                self.skew_exponents = nn.Parameter(
+                    torch.randn(self.num_kde, dimension).type(torch.double).unsqueeze(0)
+                )
+
+            else:
+                self.skew_exponents = torch.zeros(self.num_kde, dimension).type(torch.double).unsqueeze(0) 
+
+            ## with 0.1 and 9.0 the function maps 0 to 0 approximately -> 0 -> 1 in normal exponent space, the starting point we want
+            self.exponent_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=0.1, max_val_normal_space=9.0, center_around_zero=False)
             self.total_param_num+=self.num_params_datapoints
 
-    
-
-    def logistic_kernel_log_cdf(self, x, datapoints, log_widths, log_norms):
+    def logistic_kernel_log_cdf(self, x, datapoints, log_widths, log_norms, skew_exponents, skew_signs):
        
         if(self.use_linear_exp_like_function):
             hs = self.exp_like_function_linear(log_widths)
         else:
             log_hs = self.exp_like_function_log(log_widths)
             hs=torch.exp(log_hs)
-        
+
+        ## data comes in ## Batchsize X dimension
+        ## unsqueeze at 1 unsqueezes the dimension along the different KDEs for the data x
+        ## -> Batchsize X KDE index per dim X dimension
         x_unsqueezed=x.unsqueeze(1)
+        
+        ## we sum over the KDE index dimension (1)
+
+        if(self.add_skewness):
+
+            log_cdfs=torch.zeros( (x.shape[0], datapoints.shape[1], datapoints.shape[2]), dtype=torch.double)
+
+            pos_mask=skew_signs[0,:,0]>0
       
-        log_cdfs = - F.softplus(-(x_unsqueezed - datapoints) / hs) + \
-                   log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+            log_cdfs.masked_scatter_(pos_mask[None,:,None], - skew_exponents[:,pos_mask,:]*F.softplus(-(x_unsqueezed - datapoints[:,pos_mask,:]) / hs[:,pos_mask,:]))
+                
+            log_cdfs.masked_scatter_(~pos_mask[None,:,None], extra_functions.log_one_plus_exp_x_to_a_minus_1((x_unsqueezed - datapoints[:,~pos_mask,:]) / hs[:,~pos_mask,:], skew_exponents[:,~pos_mask,:]))
+
+            log_cdfs = log_cdfs+log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+
+        else:
+            log_cdfs = - F.softplus(-(x_unsqueezed - datapoints) / hs) + \
+                       log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
 
         log_cdf = torch.logsumexp(log_cdfs, dim=1)
 
       
         return log_cdf
 
-    def logistic_kernel_log_sf(self, x, datapoints, log_widths,log_norms):
+    def logistic_kernel_log_sf(self, x, datapoints, log_widths,log_norms, skew_exponents, skew_signs):
        
         if(self.use_linear_exp_like_function):
             hs = self.exp_like_function_linear(log_widths)
@@ -236,9 +319,26 @@ class gf_block(euclidean_base.euclidean_base):
     
         x_unsqueezed=x.unsqueeze(1)
 
-        log_sfs = -(x_unsqueezed - datapoints) / hs - \
+        if(self.add_skewness):
+
+            ## essentially the inverse procedure from the CDF ...
+            log_sfs=torch.zeros( (x.shape[0], datapoints.shape[1], datapoints.shape[2]), dtype=torch.double)
+
+            pos_mask=skew_signs[0,:,0]>0
+            log_sfs.masked_scatter_(pos_mask[None,:,None], extra_functions.log_one_plus_exp_x_to_a_minus_1(-(x_unsqueezed - datapoints[:,pos_mask,:]) / hs[:,pos_mask,:], skew_exponents[:,pos_mask,:]))
+
+
+            log_sfs.masked_scatter_(~pos_mask[None,:,None], - skew_exponents[:,~pos_mask,:]*F.softplus((x_unsqueezed - datapoints[:,~pos_mask,:]) / hs[:,~pos_mask,:]))
+            
+           
+            log_sfs = log_sfs+log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+
+        else:
+            log_sfs = -(x_unsqueezed - datapoints) / hs - \
                   F.softplus(-(x_unsqueezed- datapoints) / hs) + \
                   log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
+
+        
 
     
         log_sf = torch.logsumexp(log_sfs, dim=1)
@@ -246,7 +346,7 @@ class gf_block(euclidean_base.euclidean_base):
 
         return log_sf
 
-    def logistic_kernel_log_pdf(self, x, datapoints, log_widths,log_norms):
+    def logistic_kernel_log_pdf(self, x, datapoints, log_widths,log_norms, skew_exponents, skew_signs):
         
         if(self.use_linear_exp_like_function):
             hs = self.exp_like_function_linear(log_widths)
@@ -257,8 +357,8 @@ class gf_block(euclidean_base.euclidean_base):
 
         x_unsqueezed=x.unsqueeze(1)
 
-        log_pdfs = -(x_unsqueezed - datapoints) / hs - log_hs - \
-                   2. * F.softplus(-(x_unsqueezed - datapoints) / hs) + \
+        log_pdfs = -skew_signs*(x_unsqueezed - datapoints) / hs - log_hs + torch.log(skew_exponents) - \
+                    (skew_exponents+1.0) * F.softplus(-skew_signs*(x_unsqueezed - datapoints) / hs) + \
                    log_norms - torch.logsumexp(log_norms, dim=1, keepdim=True)
 
         
@@ -267,19 +367,19 @@ class gf_block(euclidean_base.euclidean_base):
 
         return log_pdf
 
-    def logistic_kernel_pdf(self, x, datapoints, log_widths,log_norms):
+    def logistic_kernel_pdf(self, x, datapoints, log_widths,log_norms, skew_exponents, skew_signs):
         
-        log_pdf=self.logistic_kernel_log_pdf(x,datapoints,log_widths,log_norms)
+        log_pdf=self.logistic_kernel_log_pdf(x,datapoints,log_widths,log_norms, skew_exponents, skew_signs)
         
         pdf = torch.exp(log_pdf)
 
 
         return pdf
 
-    def logistic_kernel_cdf(self, x, datapoints, log_widths,log_norms):
+    def logistic_kernel_cdf(self, x, datapoints, log_widths,log_norms, skew_exponents,skew_signs):
         # Using bandwidth formula
 
-        log_cdf=self.logistic_kernel_log_cdf(x,datapoints,log_widths,log_norms)
+        log_cdf=self.logistic_kernel_log_cdf(x,datapoints,log_widths,log_norms, skew_exponents, skew_signs)
         
         cdf = torch.exp(log_cdf)
 
@@ -303,13 +403,15 @@ class gf_block(euclidean_base.euclidean_base):
         return Q
 
    
-    def sigmoid_inv_error_pass(self, x, datapoints, log_widths, log_norms):
+    def sigmoid_inv_error_pass(self, x, datapoints, log_widths, log_norms, skew_exponents, skew_signs):
 
-      
-        log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms)  # log(CDF)
-        log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms)  # log(1-CDF)
-
-
+       
+        log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(CDF)
+        log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(1-CDF)
+        if(torch.isnan(log_sf_l).sum()>0):
+            print(datapoints, log_widths, log_norms, skew_exponents)
+            sys.exit(-1)
+       
         if(self.inverse_function_type=="isigmoid"):
 
             ## super easy inverse function which can be written in terms of log_cdf and log_sf, which makes it numerically stable!
@@ -388,7 +490,7 @@ class gf_block(euclidean_base.euclidean_base):
 
                 return (-1.0*total_factor)*mask_neg+(1.0-mask_neg)*total_factor
 
-    def sigmoid_inv_error_pass_derivative(self, x, datapoints, log_widths, log_norms):
+    def sigmoid_inv_error_pass_derivative(self, x, datapoints, log_widths, log_norms, skew_exponents, skew_signs):
         
         """
         #datapoints = self.datapoints
@@ -504,17 +606,17 @@ class gf_block(euclidean_base.euclidean_base):
 
         """
 
-        return torch.exp(self.sigmoid_inv_error_pass_log_derivative(x,datapoints, log_widths,log_norms))
+        return torch.exp(self.sigmoid_inv_error_pass_log_derivative(x,datapoints, log_widths,log_norms, skew_exponents, skew_signs))
 
-    def sigmoid_inv_error_pass_log_derivative(self, x, datapoints, log_widths, log_norms):
+    def sigmoid_inv_error_pass_log_derivative(self, x, datapoints, log_widths, log_norms, skew_exponents, skew_signs):
 
         #datapoints = self.datapoints
 
         #cdf_l = self.logistic_kernel_cdf(x, datapoints, log_widths)
-        log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms)  # log(CDF)
+        log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(CDF)
         
-        log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms)  # log(1-CDF)
-        log_pdf = self.logistic_kernel_log_pdf(x, datapoints,log_widths,log_norms)  
+        log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(1-CDF)
+        log_pdf = self.logistic_kernel_log_pdf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  
         
         if(self.inverse_function_type=="isigmoid"):
 
@@ -671,23 +773,40 @@ class gf_block(euclidean_base.euclidean_base):
         this_datapoints=self.datapoints.to(z)
         this_hs=self.log_hs.to(z)
         this_log_norms=self.log_kde_weights.to(z)
+        this_skew_signs=self.skew_signs.to(z)
         
         if(extra_inputs is not None):
             
             this_datapoints=this_datapoints+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0] , self.datapoints.shape[1],  self.datapoints.shape[2]])
             extra_input_counter+=self.num_params_datapoints
 
-            this_hs=this_hs+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.log_hs.shape[1], self.log_hs.shape[2]])
+            this_hs=this_hs+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
             extra_input_counter+=self.num_params_datapoints
 
             if(self.fit_normalization):
-                this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.log_kde_weights.shape[1], self.log_kde_weights.shape[2]])
+                this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
+                extra_input_counter+=self.num_params_datapoints
 
-    
-        res=bn.inverse_bisection_n_newton(self.sigmoid_inv_error_pass, self.sigmoid_inv_error_pass_derivative, z, this_datapoints, this_hs, this_log_norms, min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
+        if(self.fit_normalization and self.regulate_normalization):
+            ## regulate log-normalizations
+
+            this_log_norms=self.normalization_regulator(this_log_norms)
+
+
+        ## skewnewss
+        this_skew_exponent=self.skew_exponents.to(z)
+
+        if(self.add_skewness):
+            if(extra_inputs is not None):
+                this_skew_exponent=this_skew_exponent+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [z.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
+            
+            this_skew_exponent=torch.exp(self.exponent_regulator(this_skew_exponent))
+        ## if we fit normalization ... 
+
+        res=bn.inverse_bisection_n_newton(self.sigmoid_inv_error_pass, self.sigmoid_inv_error_pass_derivative, z, this_datapoints, this_hs, this_log_norms, this_skew_exponent, this_skew_signs, min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
         
      
-        log_deriv=self.sigmoid_inv_error_pass_log_derivative(res, this_datapoints, this_hs,this_log_norms)
+        log_deriv=self.sigmoid_inv_error_pass_log_derivative(res, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs)
 
         log_det=log_det-log_deriv.sum(axis=-1)
 
@@ -717,6 +836,10 @@ class gf_block(euclidean_base.euclidean_base):
         if(self.fit_normalization):
             desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
 
+        ## normalization
+        if(self.add_skewness):
+            desired_param_vec.append(torch.zeros(self.num_kde*self.dimension))
+
         return torch.cat(desired_param_vec)
 
     def _init_params(self, params):
@@ -738,6 +861,10 @@ class gf_block(euclidean_base.euclidean_base):
 
         if(self.fit_normalization):
             self.log_kde_weights.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+            counter+=self.num_params_datapoints
+
+        if(self.add_skewness):
+            self.skew_exponents.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
             counter+=self.num_params_datapoints
 
 
@@ -774,20 +901,35 @@ class gf_block(euclidean_base.euclidean_base):
         this_datapoints=self.datapoints.to(x)
         this_hs=self.log_hs.to(x)
         this_log_norms=self.log_kde_weights.to(x)
+        this_skew_signs=self.skew_signs.to(x)
 
         if(extra_inputs is not None):
           
             this_datapoints=this_datapoints+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.datapoints.shape[1],  self.datapoints.shape[2]])
             extra_input_counter+=self.num_params_datapoints
 
-            this_hs=this_hs+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.log_hs.shape[1], self.log_hs.shape[2]])
+            this_hs=this_hs+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
             extra_input_counter+=self.num_params_datapoints
 
 
             if(self.fit_normalization):
-                this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.log_kde_weights.shape[1], self.log_kde_weights.shape[2]])
-       
-        log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms).sum(axis=-1)
+                this_log_norms=this_log_norms+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
+                extra_input_counter+=self.num_params_datapoints
+
+        if(self.fit_normalization and self.regulate_normalization):
+            ## regulate log-normalizations
+
+            this_log_norms=self.normalization_regulator(this_log_norms)
+
+        this_skew_exponent=self.skew_exponents.to(x)
+
+        if(self.add_skewness):
+            if(extra_inputs is not None):
+                this_skew_exponent=this_skew_exponent+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0], self.datapoints.shape[1], self.datapoints.shape[2]])
+            
+            this_skew_exponent=torch.exp(self.exponent_regulator(this_skew_exponent))
+
+        log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs).sum(axis=-1)
 
     
         if(torch.isnan(log_det).sum()>0):
@@ -798,7 +940,7 @@ class gf_block(euclidean_base.euclidean_base):
             print("this log norms", this_log_norms[80:100])
 
 
-        x=self.sigmoid_inv_error_pass(x, this_datapoints, this_hs,this_log_norms)
+        x=self.sigmoid_inv_error_pass(x, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs)
 
         if(torch.isnan(log_det).sum()>0):
             print("new x ", x)
@@ -823,11 +965,12 @@ class gf_block(euclidean_base.euclidean_base):
             
             param_dict[extra_prefix+"vs"]=this_vs.data
 
-          
+        ## reshape as 2d tensor
         this_datapoints=self.datapoints.reshape(1,-1)
         this_hs=self.log_hs.reshape(1,-1)
         this_log_norms=self.log_kde_weights.reshape(1,-1)
-        
+        this_skew_exponents=self.skew_exponents.reshape(1,-1)
+
         if(extra_inputs is not None):
             
             this_datapoints=this_datapoints+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
@@ -839,11 +982,17 @@ class gf_block(euclidean_base.euclidean_base):
             if(self.fit_normalization):
                 this_log_norms=this_log_norms+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
 
+            if(self.add_skewness):
+                this_log_exponents=this_log_norms+extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+
         param_dict[extra_prefix+"means"]=this_datapoints.data
         param_dict[extra_prefix+"log_widths"]=this_hs.data
 
         if(self.fit_normalization):
             param_dict[extra_prefix+"log_norms"]=this_log_norms.data
+
+        if(self.add_skewness):
+            param_dict[extra_prefix+"exponents"]=this_skew_exponents.data
 
 
 ## transformations
@@ -977,7 +1126,7 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
             param_list.append(percentiles.flatten())
             
 
-            pts=numpy.linspace(-20,20,200)
+            #pts=numpy.linspace(-20,20,200)
             #x, datapoints, log_widths,log_norms
 
          
@@ -1030,12 +1179,23 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
                 param_list.append(torch.ones_like(flattened_bw))
 
+            this_skewness_exponent=1.0
+            this_skewness_signs=1.0
+            if(cur_layer.add_skewness):
+
+
+                ## store zeros (log_exponents) in params
+                param_list.append(torch.zeros_like(flattened_bw))
+
+                this_skewness_exponent=cur_layer.exponent_regulator(torch.zeros_like(bw)).exp()
+                this_skewness_signs=cur_layer.skew_signs
+
             all_layers_params.append(torch.cat(param_list))
 
             ## transform params according to CDF_norm^-1(CDF_KDE)
 
-            gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
-            cur_data=cur_layer.sigmoid_inv_error_pass(cur_data, percentiles[None,:,:], bw, torch.ones_like(bw))
+            #gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
+            cur_data=cur_layer.sigmoid_inv_error_pass(cur_data, percentiles[None,:,:], bw, torch.ones_like(bw), this_skewness_exponent, this_skewness_signs)
 
 
 

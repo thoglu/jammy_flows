@@ -43,8 +43,15 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
 
         correct_part = (close(inverse_mid, target_arg, rtol=1e-6, atol=0)).double()
 
+        #print("inverse result ",inverse_mid)
+        #print("CLOSE",correct_part )
+
         new_lower = (1. - correct_part) * (right_part * mid + left_part * new_lower) + correct_part * mid
         new_upper = (1. - correct_part) * (right_part * new_upper + left_part * mid) + correct_part * mid
+
+        #print("new lower upper ")
+        #print(new_lower)
+        #print(new_upper)
 
         
     prev=mid
@@ -58,15 +65,19 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
         
         prev=inf_mask_good*prev+inf_mask_pos*1e200+inf_mask_neg*(-1e200)
         
-        
-
+        #print("target arg ", target_arg)
+        #print("prev ", prev)
         
         f_eval = func(prev, *args)-target_arg
+
+        #print("feval .. ", f_eval)
 
         
       
         #print(f_eval[(torch.abs(f_eval)>1e-7)])
         f_prime_eval=grad_func(prev, *args)
+
+        #print("prime eval ", f_prime_eval)
         non_finite_sum=(torch.isfinite(prev)==False).sum()
 
         """
@@ -87,6 +98,8 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
         #print("----")
     
         prev=prev-(f_eval/f_prime_eval)
+
+        #print("new prev", prev)
 
         #print("f_eval")
         #print(f_eval[torch.abs(f_eval)>1e-7])
@@ -121,8 +134,11 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
                 print(num_non_converged, " items did not converge in Newton iterations")
                 print("feval (diff) ",f_eval[torch.abs(f_eval)>1e-7])
                 print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
-                
+    
     return prev
+
+
+
 
 
 def inverse_bisection_n_newton_sphere(combined_func, find_orthogonal_vecs_func, basic_exponential_map_func, target_arg, *args, num_newton_iter=50):

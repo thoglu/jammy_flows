@@ -138,7 +138,8 @@ class Test(unittest.TestCase):
                      {"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}},
                      {"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}},
                      {"g":{"kwargs":{"clamp_widths": 1}}},
-                     {"g":{"kwargs":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}}}]
+                     {"g":{"kwargs":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}}},
+                     {"g":{"kwargs":{"add_skewness": 1}}}]
 
         for enc in encoders:
             for mlp_hidden in mlp_hidden_dims:
@@ -342,34 +343,40 @@ class Test(unittest.TestCase):
         extra_flow_defs["g"]["kwargs"]=dict()
 
         extra_flow_defs["g"]["kwargs"]["inverse_function_type"]="inormal_partly_crude"
+        extra_flow_defs["g"]["kwargs"]["add_skewness"]=1
+        
 
         crude_flow=f.pdf("e1", "g", flow_defs_detail=extra_flow_defs)
 
         def fn_crude(x):
             b=crude_flow.layer_list[0][0]
-            return b.sigmoid_inv_error_pass(x, b.datapoints, b.log_hs, b.log_kde_weights)
+            this_skew_exponents=torch.exp(b.exponent_regulator(b.skew_exponents))
+            return b.sigmoid_inv_error_pass(x, b.datapoints, b.log_hs, b.log_kde_weights, this_skew_exponents, b.skew_signs)
 
         for icdf_approx in icdf_approximations:
             #seed_everything(0)
-
+            
             extra_flow_defs=dict()
             extra_flow_defs["g"]=dict()
             extra_flow_defs["g"]["kwargs"]=dict()
 
             extra_flow_defs["g"]["kwargs"]["inverse_function_type"]=icdf_approx
+            extra_flow_defs["g"]["kwargs"]["add_skewness"]=1
 
             this_flow=f.pdf("e1", "g", flow_defs_detail=extra_flow_defs)
 
             for gf_layer in this_flow.layer_list[0]:
 
+                gf_skew_exponents=torch.exp(gf_layer.exponent_regulator(gf_layer.skew_exponents))
+
                 def fn_new(x):
-                    return gf_layer.sigmoid_inv_error_pass(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights)
+                    return gf_layer.sigmoid_inv_error_pass(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, gf_skew_exponents, gf_layer.skew_signs)
 
                 def fn_new_deriv(x):
-                    return gf_layer.sigmoid_inv_error_pass_derivative(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights)
+                    return gf_layer.sigmoid_inv_error_pass_derivative(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, gf_skew_exponents, gf_layer.skew_signs)
 
                 def fn_new_deriv_log(x):
-                    return gf_layer.sigmoid_inv_error_pass_log_derivative(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights)
+                    return gf_layer.sigmoid_inv_error_pass_log_derivative(x, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, gf_skew_exponents, gf_layer.skew_signs)
 
 
                 log_deriv_check, residual_sum_of_derivative_difference, deriv_of_deriv_sums=check_gf_trafo(this_flow, fn_crude, fn_new, fn_new_deriv,fn_new_deriv_log, plot=plotting, name="test_gf_pade_mode_%s.png"%(icdf_approx))

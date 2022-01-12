@@ -176,7 +176,9 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
         self.flow_dict["g"]["kwargs"]["clamp_widths"]=0
         self.flow_dict["g"]["kwargs"]["width_smooth_saturation"]=1 # 
-      
+        self.flow_dict["g"]["kwargs"]["regulate_normalization"]=1
+        self.flow_dict["g"]["kwargs"]["add_skewness"]=0
+
 
         self.flow_dict["p"] = dict()
         self.flow_dict["p"]["module"] = psf_block
@@ -292,6 +294,9 @@ class pdf(nn.Module):
             if "kwargs" in flow_defs_detail[k].keys():
                 
                 for kwarg in flow_defs_detail[k]["kwargs"].keys():
+
+                    if(kwarg not in self.flow_dict[k]["kwargs"].keys()):
+                        raise Exception("%s is an invalid kw argument for flow type %s" % (kwarg, k))
 
                     self.flow_dict[k]["kwargs"][kwarg] = flow_defs_detail[k]["kwargs"][kwarg]
 
