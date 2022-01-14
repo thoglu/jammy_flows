@@ -338,15 +338,15 @@ class Test(unittest.TestCase):
         icdf_approximations=["inormal_full_pade", "inormal_partly_crude", "inormal_partly_precise", "isigmoid"]
         #seed_everything(0)
 
+        ## h = old gf layer
         extra_flow_defs=dict()
-        extra_flow_defs["g"]=dict()
-        extra_flow_defs["g"]["kwargs"]=dict()
+        extra_flow_defs["h"]=dict()
+        extra_flow_defs["h"]["kwargs"]=dict()
 
-        extra_flow_defs["g"]["kwargs"]["inverse_function_type"]="inormal_partly_crude"
-        extra_flow_defs["g"]["kwargs"]["add_skewness"]=1
+        extra_flow_defs["h"]["kwargs"]["inverse_function_type"]="inormal_partly_crude"
+        extra_flow_defs["h"]["kwargs"]["add_skewness"]=1
         
-
-        crude_flow=f.pdf("e1", "g", flow_defs_detail=extra_flow_defs)
+        crude_flow=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
 
         def fn_crude(x):
             b=crude_flow.layer_list[0][0]
@@ -357,13 +357,13 @@ class Test(unittest.TestCase):
             #seed_everything(0)
             
             extra_flow_defs=dict()
-            extra_flow_defs["g"]=dict()
-            extra_flow_defs["g"]["kwargs"]=dict()
+            extra_flow_defs["h"]=dict()
+            extra_flow_defs["h"]["kwargs"]=dict()
 
-            extra_flow_defs["g"]["kwargs"]["inverse_function_type"]=icdf_approx
-            extra_flow_defs["g"]["kwargs"]["add_skewness"]=1
+            extra_flow_defs["h"]["kwargs"]["inverse_function_type"]=icdf_approx
+            extra_flow_defs["h"]["kwargs"]["add_skewness"]=1
 
-            this_flow=f.pdf("e1", "g", flow_defs_detail=extra_flow_defs)
+            this_flow=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
 
             for gf_layer in this_flow.layer_list[0]:
 

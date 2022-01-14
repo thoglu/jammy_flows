@@ -6,8 +6,215 @@ def close(a, b, rtol=1e-5, atol=1e-4):
     return equal
 
 
+def inverse_bisection_n_newton_joint_func_and_grad(func, joint_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30, newton_tolerance=1e-14, verbose=0):
+    """
+    Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
+    Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
+
+    Parameters:
+        func (function): The function to find the inverse of.
+        grad_func (function): The gradient function of the function.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.
+        *args (list): Any extra arguments passed to *func*.
+        min_boundary (float): Minimum boundary for Bisection.
+        max_boundary (float): Maximum boundary for bisection.
+        num_bisection_iter (int): Number of bisection iterations.
+        num_newton_iter (int): Number of Newton iterations.
+    Returns:
+        The (differentiable) inverse of the function *func* in each sub-dimension in each batch item.
+
+    """
+    new_upper = torch.tensor(max_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
+    new_lower = torch.tensor(min_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
+    
+    mid=0
+    for i in range(num_bisection_iter):
+        mid = (new_upper + new_lower) / 2.
+        #print("mid: ", mid)
+        inverse_mid = func(mid, *args)
+
+        #print("MID", mid)
+        
+        right_part = (inverse_mid < target_arg).double()
+        left_part = 1. - right_part
+
+        correct_part = (close(inverse_mid, target_arg, rtol=1e-6, atol=0)).double()
+
+        new_lower = (1. - correct_part) * (right_part * mid + left_part * new_lower) + correct_part * mid
+        new_upper = (1. - correct_part) * (right_part * new_upper + left_part * mid) + correct_part * mid
+
+        
+    prev=mid
+
+    #print("target arg", target_arg.shape)
+
+
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool)
+
+    ## check where we want to broadcast the masking, and wnhere not
+
+    broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
+
+   
+
+    for i in range(num_newton_iter):
+       
+        fn_result, f_prime_eval = joint_func(prev[above_tolerance_mask,:], *[a[above_tolerance_mask] if(broadcasting_bool_args[arg_index] == True) else a for arg_index, a in enumerate(args)])
+        f_eval=fn_result-target_arg[above_tolerance_mask,:]
+
+        update=(f_eval/f_prime_eval)
+
+        newsource=prev[above_tolerance_mask,:]-update
+
+        prev=torch.masked_scatter(input=prev, mask=above_tolerance_mask[:,None], source=newsource)
+
+        non_finite_sum=(torch.isfinite(prev)==False).sum()
+        if(non_finite_sum>0):
+
+
+            print("NONZERO")
+            print((torch.isfinite(prev)==False).nonzero())
+
+
+            print("prev", prev[torch.isfinite(prev)==False])
+            print("feval ", f_eval[torch.isfinite(prev)==False])
+            print("f grad eval ", f_prime_eval[torch.isfinite(prev)==False])
+
+            raise Exception()
+
+        new_tolerance_mask=torch.abs(update)>=newton_tolerance
+
+        above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
+
+        above_tol=above_tolerance_mask.sum()
+
+        if(verbose):
+            print("-- newton iter %d .. %d / %d dims completed" % (i, target_arg.shape[0]-above_tol, target_arg.shape[0]))
+        if(above_tol==0):
+            if(verbose):
+                print("------ done")
+            break
+
+
+    num_non_converged=(torch.abs(f_eval)>1e-7).sum()
+
+    #print(f_eval[torch.abs(f_eval)>1e-5])
+    if( num_non_converged>0):
+        print(num_non_converged, " items did not converge in Newton iterations")
+        print("feval (diff) ",f_eval[torch.abs(f_eval)>1e-7])
+        print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
+    
+    return prev
+
 ## differentiable newton iterations
-def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30):
+def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30, newton_tolerance=1e-14, verbose=0):
+    """
+    Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
+    Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
+
+    Parameters:
+        func (function): The function to find the inverse of.
+        grad_func (function): The gradient function of the function.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.
+        *args (list): Any extra arguments passed to *func*.
+        min_boundary (float): Minimum boundary for Bisection.
+        max_boundary (float): Maximum boundary for bisection.
+        num_bisection_iter (int): Number of bisection iterations.
+        num_newton_iter (int): Number of Newton iterations.
+    Returns:
+        The (differentiable) inverse of the function *func* in each sub-dimension in each batch item.
+
+    """
+    new_upper = torch.tensor(max_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
+    new_lower = torch.tensor(min_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
+    
+    mid=0
+    for i in range(num_bisection_iter):
+        mid = (new_upper + new_lower) / 2.
+        #print("mid: ", mid)
+        inverse_mid = func(mid, *args)
+
+        #print("MID", mid)
+        
+        right_part = (inverse_mid < target_arg).double()
+        left_part = 1. - right_part
+
+        correct_part = (close(inverse_mid, target_arg, rtol=1e-6, atol=0)).double()
+
+        new_lower = (1. - correct_part) * (right_part * mid + left_part * new_lower) + correct_part * mid
+        new_upper = (1. - correct_part) * (right_part * new_upper + left_part * mid) + correct_part * mid
+
+        
+    prev=mid
+
+    #print("target arg", target_arg.shape)
+
+
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool)
+
+    broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
+
+
+    for i in range(num_newton_iter):
+        #print("tol mask")
+        #print(above_tolerance_mask)
+        #print(prev.shape)
+        #print(prev[above_tolerance_mask,:])
+        #print("target_arg[above_tolerance_mask,:]", target_arg[above_tolerance_mask,:])
+
+        masked_args=[a[above_tolerance_mask] if(broadcasting_bool_args[arg_index] == True) else a for arg_index, a in enumerate(args)]
+
+        f_eval = func(prev[above_tolerance_mask,:], *masked_args)-target_arg[above_tolerance_mask,:]
+     
+        f_prime_eval=grad_func(prev[above_tolerance_mask,:], *masked_args) 
+
+        update=(f_eval/f_prime_eval)
+
+        #print("UPDATE", update)
+
+        newsource=prev[above_tolerance_mask,:]-update
+
+        prev=torch.masked_scatter(input=prev, mask=above_tolerance_mask[:,None], source=newsource)
+
+        non_finite_sum=(torch.isfinite(prev)==False).sum()
+        if(non_finite_sum>0):
+
+
+            print("NONZERO")
+            print((torch.isfinite(prev)==False).nonzero())
+
+
+            print("prev", prev[torch.isfinite(prev)==False])
+            print("feval ", f_eval[torch.isfinite(prev)==False])
+            print("f grad eval ", f_prime_eval[torch.isfinite(prev)==False])
+
+            raise Exception()
+
+        new_tolerance_mask=torch.abs(update)>=newton_tolerance
+
+        above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
+
+        above_tol=above_tolerance_mask.sum()
+
+        if(verbose):
+            print("-- newton iter %d .. %d / %d dims completed" % (i, target_arg.shape[0]-above_tol, target_arg.shape[0]))
+        if(above_tol==0):
+            if(verbose):
+                print("------ done")
+            break
+
+
+    num_non_converged=(torch.abs(f_eval)>1e-7).sum()
+
+    #print(f_eval[torch.abs(f_eval)>1e-5])
+    if( num_non_converged>0):
+        print(num_non_converged, " items did not converge in Newton iterations")
+        print("feval (diff) ",f_eval[torch.abs(f_eval)>1e-7])
+        print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
+    
+    return prev
+
+def inverse_bisection_n_newton_slow(func, grad_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30):
     """
     Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
     Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
@@ -45,15 +252,12 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
 
         #print("inverse result ",inverse_mid)
         #print("CLOSE",correct_part )
+      
 
         new_lower = (1. - correct_part) * (right_part * mid + left_part * new_lower) + correct_part * mid
         new_upper = (1. - correct_part) * (right_part * new_upper + left_part * mid) + correct_part * mid
 
-        #print("new lower upper ")
-        #print(new_lower)
-        #print(new_upper)
 
-        
     prev=mid
 
 
@@ -65,54 +269,15 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
         
         prev=inf_mask_good*prev+inf_mask_pos*1e200+inf_mask_neg*(-1e200)
         
-        #print("target arg ", target_arg)
-        #print("prev ", prev)
-        
         f_eval = func(prev, *args)-target_arg
 
-        #print("feval .. ", f_eval)
-
-        
-      
-        #print(f_eval[(torch.abs(f_eval)>1e-7)])
         f_prime_eval=grad_func(prev, *args)
 
         #print("prime eval ", f_prime_eval)
         non_finite_sum=(torch.isfinite(prev)==False).sum()
 
-        """
-        print("non finite -- %d " % non_finite_sum)
-        
-        print("----------------")
-        print(i)
-        if(prev.shape[0]>48000):
-            for kk in [33457]:
-                print("FUNC EVAL", func(prev, *args)[kk])
-                print("target arg", target_arg[kk])
-                print("index ", kk)
-                print(prev[kk])
-                print(f_eval[kk])
-                print(f_prime_eval[kk])
-        print("-------------")
-        """
-        #print("----")
-    
         prev=prev-(f_eval/f_prime_eval)
 
-        #print("new prev", prev)
-
-        #print("f_eval")
-        #print(f_eval[torch.abs(f_eval)>1e-7])
-        # print( (torch.abs(f_eval)>1e-7).nonzero())
-        """
-        for kk in [1876,9554]:
-            print("FUNC EVAL", func(prev, *args)[kk])
-            print("target arg", target_arg[kk])
-            print("index ", kk)
-            print(prev[kk])
-            print(f_eval[kk])
-            print(f_prime_eval[kk])
-        """
         if(non_finite_sum>0):
 
 

@@ -235,7 +235,8 @@ class psf_block(euclidean_base.euclidean_base):
                 x=self.fw_loop(x, means1, means2, widths1, widths2, exponents, tr_iter)
             else:
 
-                x=bn.inverse_bisection_n_newton(self.rw_loop, self.rw_loop_derivative, x, means1, means2, widths1, widths2, exponents, tr_iter, min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
+                ## use older bisection method as it is only for debugging
+                x=bn.inverse_bisection_n_newton_slow(self.rw_loop, self.rw_loop_derivative, x, means1, means2, widths1, widths2, exponents, tr_iter, min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
                 log_deriv=torch.log(self.rw_loop_derivative(x, means1, means2, widths1, widths2, exponents, tr_iter))
 
                 #print("new positions ..", res)

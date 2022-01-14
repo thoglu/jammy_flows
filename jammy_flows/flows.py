@@ -2,6 +2,7 @@ import torch
 from torch import nn
 
 from .layers.euclidean.gaussianization_flow import gf_block, find_init_pars_of_chained_gf_blocks
+from .layers.euclidean.gaussianization_flow_old import gf_block_old, find_init_pars_of_chained_gf_blocks_old
 from .layers.euclidean.polynomial_stretch_flow import psf_block
 
 from .layers.spheres.sphere_base import sphere_base
@@ -178,6 +179,26 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["width_smooth_saturation"]=1 # 
         self.flow_dict["g"]["kwargs"]["regulate_normalization"]=1
         self.flow_dict["g"]["kwargs"]["add_skewness"]=0
+
+
+        self.flow_dict["h"] = dict()
+        self.flow_dict["h"]["module"] = gf_block_old
+        self.flow_dict["h"]["type"] = "e"
+        self.flow_dict["h"]["kwargs"] = dict()
+        self.flow_dict["h"]["kwargs"]["fit_normalization"] = 1
+        self.flow_dict["h"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["h"]["kwargs"]["num_householder_iter"] = -1
+        self.flow_dict["h"]["kwargs"]["num_kde"] = 10
+        self.flow_dict["h"]["kwargs"]["inverse_function_type"] = "isigmoid"
+        self.flow_dict["h"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
+        self.flow_dict["h"]["kwargs"]["skip_model_offset"]=0
+        self.flow_dict["h"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
+        self.flow_dict["h"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
+        self.flow_dict["h"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
+        self.flow_dict["h"]["kwargs"]["clamp_widths"]=0
+        self.flow_dict["h"]["kwargs"]["width_smooth_saturation"]=1 # 
+        self.flow_dict["h"]["kwargs"]["regulate_normalization"]=1
+        self.flow_dict["h"]["kwargs"]["add_skewness"]=0
 
 
         self.flow_dict["p"] = dict()
@@ -547,7 +568,7 @@ class pdf(nn.Module):
                             
                             this_kwargs["model_offset"]=1
                         elif(layer_ind==0):
-                            if(layer_type=="g"):
+                            if(layer_type=="g" or layer_type=="h"):
                                 if(this_kwargs["replace_first_sigmoid_with_icdf"]>0 and this_kwargs["inverse_function_type"]=="isigmoid"):
                                     this_kwargs["inverse_function_type"]="inormal_partly_precise"
 
@@ -555,7 +576,7 @@ class pdf(nn.Module):
                 if("skip_model_offset" in this_kwargs):
                     del this_kwargs["skip_model_offset"]
                 ## we dont want to pass this to layer
-                if(layer_type=="g"):
+                if(layer_type=="g" or layer_type=="h"):
                     del this_kwargs["replace_first_sigmoid_with_icdf"]
                     
                 self.layer_list[subflow_index].append(
@@ -1519,14 +1540,17 @@ class pdf(nn.Module):
                 ## check if all are gaussianization flow
                 gf_init=True
                 for layer_type in self.flow_defs_list[subflow_index]:
-                    if(layer_type!="g"):
+                    if(layer_type!="g" and layer_type !="h"):
                         gf_init=False
                 if(data is None):
                     gf_init=False
 
                 if(gf_init):
-         
-                    params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
+                    if(layer_type=="g"):
+                        params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
+                    elif(layer_type=="h"):
+                        params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
+                    
                     params_list.append(params.type(torch.float64))
 
                 else:

@@ -290,6 +290,12 @@ if __name__ == "__main__":
     extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="g"
     extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
 
+    extra_flow_defs["g"]=dict()
+    extra_flow_defs["g"]["kwargs"]=dict()
+    extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=1
+    extra_flow_defs["g"]["kwargs"]["fit_normalization"]=1
+    extra_flow_defs["g"]["kwargs"]["add_skewness"]=0
+
     word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=None, hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
