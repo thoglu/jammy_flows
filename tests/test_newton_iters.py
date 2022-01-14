@@ -231,9 +231,9 @@ class Test(unittest.TestCase):
 
             return torch.cat( [res.view(-1) for res in grad_res if (res is not None)])
 
-        samplesize=1000
+        samplesize=10
         seed_everything(1)
-        z=torch.rand((samplesize,1), dtype=torch.double)*50
+        z=torch.rand((samplesize,2), dtype=torch.double)*50
 
         for skew in [0,1]:
 
@@ -252,7 +252,7 @@ class Test(unittest.TestCase):
             extra_flow_defs["h"]["kwargs"]["add_skewness"]=skew
 
             seed_everything(1)
-            flow_exact=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "h", flow_defs_detail=extra_flow_defs)
             flow_exact.double()
 
             
@@ -271,7 +271,7 @@ class Test(unittest.TestCase):
             ## old fast
 
             seed_everything(1)
-            flow_exact=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "h", flow_defs_detail=extra_flow_defs)
             flow_exact.double()
 
             
@@ -290,7 +290,7 @@ class Test(unittest.TestCase):
            
         
             seed_everything(1)
-            flow_exact=f.pdf("e1", "g", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "g", flow_defs_detail=extra_flow_defs)
             flow_exact.double()
 
             gf_layer=flow_exact.layer_list[0][0]
@@ -314,7 +314,7 @@ class Test(unittest.TestCase):
                     
                 ### old gaussianization flow
                 seed_everything(1)
-                flow_exact=f.pdf("e1", "h",flow_defs_detail=extra_flow_defs)
+                flow_exact=f.pdf("e2", "h",flow_defs_detail=extra_flow_defs)
                 flow_exact.double()
 
                 gf_layer=flow_exact.layer_list[0][0]
@@ -328,7 +328,7 @@ class Test(unittest.TestCase):
                 
                 tbef=time.time()
                 for i in range(100):
-                    res_old_slow=bn.inverse_bisection_n_newton_slow(gf_layer.sigmoid_inv_error_pass, gf_layer.sigmoid_inv_error_pass_derivative, z, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, skew_for_old,gf_layer.skew_signs, min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=25, num_newton_iter=20)
+                    res_old_slow=bn.inverse_bisection_n_newton_slow(gf_layer.sigmoid_inv_error_pass, gf_layer.sigmoid_inv_error_pass_derivative, z, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, skew_for_old,gf_layer.skew_signs, min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=2, num_newton_iter=20)
                    
                 print("Old flow / old newton iteration took ", time.time()-tbef)
 
@@ -339,7 +339,7 @@ class Test(unittest.TestCase):
                 newton_tolerance=1e-14
                 tbef=time.time()
                 for i in range(100):
-                    res_old_fast=bn.inverse_bisection_n_newton(gf_layer.sigmoid_inv_error_pass, gf_layer.sigmoid_inv_error_pass_derivative, z, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, skew_for_old,gf_layer.skew_signs, min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=25, num_newton_iter=20, newton_tolerance=newton_tolerance, verbose=0)
+                    res_old_fast=bn.inverse_bisection_n_newton(gf_layer.sigmoid_inv_error_pass, gf_layer.sigmoid_inv_error_pass_derivative, z, gf_layer.datapoints, gf_layer.log_hs, gf_layer.log_kde_weights, skew_for_old,gf_layer.skew_signs, min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=2, num_newton_iter=20, newton_tolerance=newton_tolerance, verbose=0)
                 
                 print("Old flow / new newton iteration with tolerance dropout took ", time.time()-tbef)
                 print(torch.abs(res_old_slow-res_old_fast).max())
@@ -348,7 +348,7 @@ class Test(unittest.TestCase):
                 ##### new gaussianization flow
 
                 seed_everything(1)
-                flow_exact=f.pdf("e1", "g",flow_defs_detail=extra_flow_defs)
+                flow_exact=f.pdf("e2", "g",flow_defs_detail=extra_flow_defs)
                 flow_exact.double()
 
                 gf_layer=flow_exact.layer_list[0][0]
@@ -358,7 +358,7 @@ class Test(unittest.TestCase):
                 newton_tolerance=1e-14
                 tbef=time.time()
                 for i in range(100):
-                    res_new_fast=bn.inverse_bisection_n_newton_joint_func_and_grad(gf_layer.sigmoid_inv_error_pass_w_params, gf_layer.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4], min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=25, num_newton_iter=20, newton_tolerance=newton_tolerance, verbose=0)
+                    res_new_fast=bn.inverse_bisection_n_newton_joint_func_and_grad(gf_layer.sigmoid_inv_error_pass_w_params, gf_layer.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4], min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=2, num_newton_iter=20, newton_tolerance=newton_tolerance, verbose=0)
                 
                 print("new flow / new newton iteration with tolerance dropout took ", time.time()-tbef)
                 print(torch.abs(res_old_slow-res_new_fast).max())

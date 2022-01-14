@@ -1036,7 +1036,7 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
                 ## pass exponents as 1.0
                 this_skewness_exponent=cur_layer.exponent_regulator(torch.zeros_like(bw)).exp()
 
-                this_skewness_signs=cur_layer.skew_signs
+                this_skewness_signs=cur_layer.kde_skew_signs
 
             all_layers_params.append(torch.cat(param_list))
 

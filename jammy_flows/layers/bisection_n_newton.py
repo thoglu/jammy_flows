@@ -82,8 +82,8 @@ def inverse_bisection_n_newton_joint_func_and_grad(func, joint_func, target_arg,
 
             raise Exception()
 
-        new_tolerance_mask=torch.abs(update)>=newton_tolerance
-
+        new_tolerance_mask=(torch.abs(update).sum(axis=1))>=newton_tolerance
+    
         above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
 
         above_tol=above_tolerance_mask.sum()
@@ -190,10 +190,10 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
 
             raise Exception()
 
-        new_tolerance_mask=torch.abs(update)>=newton_tolerance
+        new_tolerance_mask=(torch.abs(update).sum(axis=1))>=newton_tolerance
 
         above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
-
+      
         above_tol=above_tolerance_mask.sum()
 
         if(verbose):

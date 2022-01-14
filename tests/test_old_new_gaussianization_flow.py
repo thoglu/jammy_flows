@@ -102,6 +102,7 @@ class Test(unittest.TestCase):
             seed_everything(1)
             flow_old=f.pdf("e1" , "h", flow_defs_detail=extra_flow_defs)
             flow_old.double()
+            
 
             res_old,_,_=flow_old(z)
 
@@ -110,6 +111,7 @@ class Test(unittest.TestCase):
             seed_everything(1)
             flow_new=f.pdf("e1" , "g",flow_defs_detail=extra_flow_defs)
             flow_new.double()
+            
 
             res_new,_,_=flow_new(z)
 
@@ -122,7 +124,11 @@ class Test(unittest.TestCase):
 
             compare_two_arrays(grad_old.detach().numpy(), grad_old.detach().numpy(), "grad old", "grad new")
 
-           
+            ## check that we can init data
+            flow_old.init_params(data=z)
+            
+            ## check that we can init data
+            flow_new.init_params(data=z)
         
 
 
