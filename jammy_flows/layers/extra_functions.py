@@ -96,7 +96,7 @@ def log_one_plus_exp_x_to_a_minus_1(x, a):
     """
     if( (torch.isfinite(res)==False).sum()>0):
         print("LOGPLUS1 RES", res)
-        sys.exit(-1)
+        raise Exception("Non-finite values")
     return res-softplus_result
 
 class Swish(nn.Module):
