@@ -176,9 +176,9 @@ class gf_block(euclidean_base.euclidean_base):
         self.softplus_for_width=softplus_for_width
 
         ## we only want specific settings in the new implementation, but keep the older implementation for now
-        assert(self.softplus_for_width==False)
-        assert(self.width_smooth_saturation>0)
-        assert(self.clamp_widths==0)
+        #assert(self.softplus_for_width==False)
+        #assert(self.width_smooth_saturation>0)
+        #assert(self.clamp_widths==0)
 
         ## setup up width regularization
         if(self.softplus_for_width):
@@ -188,11 +188,11 @@ class gf_block(euclidean_base.euclidean_base):
                 if(self.width_max is not None):
                     # clamp upper bound with exact width_max value
                     upper_clamp=numpy.log(self.width_max)
-                self.exp_like_function_linear=lambda x: torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min
+                self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
             else:
-                self.exp_like_function_linear=lambda x: torch.nn.functional.softplus(x)+self.width_min
+                self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(x)+self.width_min)
             
-            self.use_linear_exp_like_function_for_width=True
+            
 
         else:
             ## exponential-type width relation
@@ -203,11 +203,10 @@ class gf_block(euclidean_base.euclidean_base):
                     upper_clamp=None
                     if(self.width_max is not None):
                         upper_clamp=numpy.log(self.width_max)
-                    self.exp_like_function_linear=lambda x: torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min
+                    self.width_regulator=lambda x: torch.log(torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
                 else:
-                    self.exp_like_function_linear=lambda x: torch.exp(x)+self.width_min
+                    self.width_regulator=lambda x: torch.log(torch.exp(x)+self.width_min)
 
-                self.use_linear_exp_like_function_for_width=True
             else:
                 ## exponential function at beginning but flattens out at width_max -> no infinite growth
                 ## numerically stable via logsumexp .. clamping should not be necessary, but can be done to damp down large gradients
@@ -232,8 +231,7 @@ class gf_block(euclidean_base.euclidean_base):
 
                 self.width_regulator=exp_like_fn
 
-                self.use_linear_exp_like_function_for_width=False
-
+                
         #######################################
 
         # normalization parameters
@@ -281,7 +279,7 @@ class gf_block(euclidean_base.euclidean_base):
                 self.kde_log_skew_exponents = nn.Parameter(
                     torch.randn(self.num_kde, dimension).type(torch.double).unsqueeze(0)
                 )
-            print("initialized skews ....", self.kde_log_skew_exponents)
+            
             #else:
             #    self.skew_exponents = torch.zeros(self.num_kde, dimension).type(torch.double).unsqueeze(0) 
 
@@ -384,9 +382,6 @@ class gf_block(euclidean_base.euclidean_base):
 
     def sigmoid_inv_error_pass_given_cdf_sf(self, log_cdf_l, log_sf_l):
 
-        if(torch.isnan(log_sf_l).sum()>0):
-            print(datapoints, log_widths, log_norms, skew_exponents)
-            sys.exit(-1)
        
         if(self.inverse_function_type=="isigmoid"):
 

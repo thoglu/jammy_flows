@@ -415,9 +415,7 @@ class gf_block_old(euclidean_base.euclidean_base):
        
         log_cdf_l = self.logistic_kernel_log_cdf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(CDF)
         log_sf_l = self.logistic_kernel_log_sf(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs)  # log(1-CDF)
-        if(torch.isnan(log_sf_l).sum()>0):
-            print(datapoints, log_widths, log_norms, skew_exponents)
-            sys.exit(-1)
+        
        
         if(self.inverse_function_type=="isigmoid"):
 
