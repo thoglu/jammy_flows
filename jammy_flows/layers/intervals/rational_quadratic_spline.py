@@ -223,7 +223,7 @@ class rational_quadratic_spline(interval_base.interval_base):
            
             return outputs, logabsdet
 
-    def _flow_mapping(self, inputs, extra_inputs=None,): 
+    def _flow_mapping(self, inputs, extra_inputs=None): 
         
         [x, log_det]=inputs
 
@@ -234,10 +234,13 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         if(extra_inputs is not None):
             
-            widths=widths+extra_inputs[:,:self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
-            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
-            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
-        
+            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
+
+            widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
+            heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
+            derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
+            
+
        
         x, log_det_update=self.rational_quadratic_spline(x, 
                                                          widths, 
@@ -266,10 +269,13 @@ class rational_quadratic_spline(interval_base.interval_base):
         derivatives=self.rel_log_derivatives.to(x)
 
         if(extra_inputs is not None):
-            widths=widths+extra_inputs[:,:self.num_basis_elements].reshape(x.shape[0], self.rel_log_widths.shape[1])
-            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements].reshape(x.shape[0], self.rel_log_heights.shape[1])
-            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:].reshape(x.shape[0], self.rel_log_derivatives.shape[1])
-        
+
+            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
+
+            widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
+            heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
+            derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
+            
         x, log_det_update=self.rational_quadratic_spline(x, 
                                                          widths, 
                                                          heights, 
@@ -283,7 +289,7 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_bin_height=self.min_height,
                                                          min_derivative=self.min_derivative
                                                          )
-        
+
         log_det=log_det+log_det_update.sum(axis=-1)
 
         return x, log_det

@@ -24,7 +24,7 @@ class euclidean_base(layer_base.layer_base):
             self.total_param_num+=dimension
             
 
-    def inv_flow_mapping(self, inputs, extra_inputs=None):
+    def inv_flow_mapping(self, inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
         
         if(self.model_offset):
 
@@ -43,7 +43,7 @@ class euclidean_base(layer_base.layer_base):
 
             return self._inv_flow_mapping(inputs, extra_inputs=extra_inputs)
 
-    def flow_mapping(self, inputs, extra_inputs=None):
+    def flow_mapping(self, inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
 
         if(self.model_offset):
 
@@ -97,6 +97,10 @@ class euclidean_base(layer_base.layer_base):
 
     def _embedding_conditional_return_num(self): 
         return self.dimension
+
+    def _get_layer_base_dimension(self):
+        
+        return self.dimension   
 
     #############################################################################
 

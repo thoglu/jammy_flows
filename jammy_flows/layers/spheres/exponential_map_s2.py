@@ -5,7 +5,8 @@ import numpy
 from . import sphere_base
 from . import moebius_1d
 from ..bisection_n_newton import inverse_bisection_n_newton_sphere
-from ..extra_functions import AmortizableMLP, list_from_str
+from ...amortizable_mlp import AmortizableMLP
+from ...extra_functions import list_from_str
 from ..euclidean.gaussianization_flow import gf_block, find_init_pars_of_chained_gf_blocks
 from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing

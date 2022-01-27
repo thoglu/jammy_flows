@@ -3,136 +3,7 @@ import torch
 import numpy
 import time
 
-def log_one_plus_exp_x_to_a_minus_1(x, a):
-
-    """
-    Calculates the logarithm of ((1+exp(x))**a - 1) / ((1+exp(x))**a)
-    """
-
-    assert(x.dtype==torch.double), "This function requires double precision to work properly"
-    assert(x.shape[1:]==a.shape[1:])
-    #res=torch.zeros_like(x)
-
-    #print("RES", res.shape)
-    #print(x.shape)
-    #print(a.shape)
-    #print("-----------------")
-
-
-
-    ## softplus result must be positive by definition
-    softplus_result=a*nn.functional.softplus(x)
-
-    ## small x values
-    x_small_mask=x<=-20
-
-    res=torch.where(x_small_mask, torch.log(a)+x, 0.0)
-
-    #print(res.shape)
-    
-    #res=torch.masked_scatter(input=res, mask=x_small_mask, source=(torch.log(a)+x)[x_small_mask])
-    
-    ### check the value of softplus
-    soft_plus_large=softplus_result > 20
-
-    ## we can neglect the final -1 since the soft plus term is large
-    mask_2=(~x_small_mask) & soft_plus_large
-
-    #res=torch.masked_scatter(input=res, mask=mask_2, source=softplus_result)
-
-    
-    res=torch.where(mask_2, softplus_result, res)
-    #res=res.masked_scatter(mask_2, softplus_result[mask_2])
-   
-    ### check the value of softplus
-    soft_plus_small=softplus_result < 1e-8
-
-    mask_3=(~x_small_mask) & soft_plus_small
-
-    #print(mask_3)
-    ##print("log sofplus")
-    #print(torch.log(softplus_result))
-    #res.masked_scatter_(mask_3, torch.log(softplus_result[mask_3]))
-    res=torch.masked_scatter(input=res, mask=mask_3, source=torch.log(softplus_result[mask_3]))
-    #res=torch.where(mask_3, torch.log(softplus_result), res)
-
-
-    #print("AFTER 3")
-    #print(res)
-
-   
-    mask_4=(~x_small_mask) & (~soft_plus_large) & (~soft_plus_small)
-    #res.masked_scatter_(mask_4, torch.log(torch.exp(softplus_result[mask_4])-1.0))
-    res=torch.masked_scatter(input=res, mask=mask_4, source=torch.log(torch.exp(softplus_result[mask_4])-1.0))
-
-    #res=torch.where(mask_4,torch.log(torch.exp(softplus_result)-1.0), res)
-
-    #print("after 4")
-    #print(res)
-    """
-    tbef=time.time()
-    for i in range(1000):
-        res=torch.where(mask_4, torch.log(softplus_result), torch.log(torch.exp(softplus_result)-1.0))
-
-    print(time.time()-tbef)
-
-    tbef=time.time()
-    for i in range(1000):
-        res.masked_scatter_(mask_4, torch.log(torch.exp(softplus_result[mask_4])-1.0))
-    print(time.time()-tbef)    
-
-    tbef=time.time()
-    for i in range(1000):
-        res=torch.masked_scatter(input=res, mask=mask_4, source=torch.log(torch.exp(softplus_result[mask_4])-1.0))
-    print(time.time()-tbef)    
-
-    tbef=time.time()
-    for i in range(1000):
-        res[mask_4]=torch.log(torch.exp(softplus_result[mask_4])-1.0)
-        #res.masked_scatter_(mask_4, torch.log(torch.exp(softplus_result[mask_4])-1.0))
-    print(time.time()-tbef)    
-
-    sys.exit(-1)
-    """
-    if( (torch.isfinite(res)==False).sum()>0):
-        print("LOGPLUS1 RES", res)
-        raise Exception("Non-finite values")
-    return res-softplus_result
-
-class Swish(nn.Module):
-    def __init__(self):
-        super(Swish, self).__init__()
-        self.beta = nn.Parameter(torch.tensor(1.0))
-
-    def forward(self, x):
-        return x * torch.sigmoid(self.beta * x)
-
-
-class Lambda(nn.Module):
-    def __init__(self, f):
-        super(Lambda, self).__init__()
-        self.f = f
-
-    def forward(self, x):
-        return self.f(x)
-
-
-NONLINEARITIES = {
-    "tanh": nn.Tanh(),
-    "relu": nn.ReLU(),
-    "softplus": nn.Softplus(),
-    "elu": nn.ELU(),
-    "swish": Swish(),
-    "square": Lambda(lambda x: x ** 2),
-    "identity": Lambda(lambda x: x),
-}
-
-def list_from_str(spec):
-    if(spec==""):
-        return []
-        
-    return list(tuple(map(int, spec.split("-"))))
-
+from .extra_functions import NONLINEARITIES, list_from_str
 
 class AmortizableMLP(nn.Module):
 
@@ -477,67 +348,73 @@ class AmortizableMLP(nn.Module):
           
     def initialize_uvbs(self, init_b=None):
 
-        if(self.use_permanent_parameters):
-          
-            index=0
-            #print("IN INIT ", init_b)
-            for mlp_def in self.sub_mlp_structures["mlp_list"]:
+        init_tensor=torch.randn(self.num_amortization_params, dtype=torch.float64).unsqueeze(0)
+    
+        index=0
+        #print("IN INIT ", init_b)
+        for mlp_def in self.sub_mlp_structures["mlp_list"]:
 
-                for ind in range(len(mlp_def["inputs"])):
+            for ind in range(len(mlp_def["inputs"])):
 
-                    ## this layer is not low-rank aproximated, use kaiming init
-                    if(mlp_def["full_weight_matrix_flags"][ind]==1):
+                ## this layer is not low-rank aproximated, use kaiming init
+                if(mlp_def["full_weight_matrix_flags"][ind]==1):
 
-                        ## init weights
-                        nn.init.kaiming_uniform_(self.u_v_b_pars.data[:,index:index+mlp_def["num_u_s"][ind]], a=numpy.sqrt(5))
-                        fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.u_v_b_pars.data[:,index:index+mlp_def["num_u_s"][ind]])
-                        bound = 1 / numpy.sqrt(fan_in)
-                        
-                        ## init biases
-                        #bs=nn.Parameter(torch.randn(outputs[ind]))
-                        if(mlp_def["num_b_s"][ind]>0):
-                            nn.init.uniform_(self.u_v_b_pars.data[:,index+mlp_def["num_u_s"][ind]:index+mlp_def["num_u_s"][ind]+mlp_def["num_b_s"][ind]], -bound, bound)
+                    ## init weights
+                    nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][ind]], a=numpy.sqrt(5))
+                    fan_in, _ = nn.init._calculate_fan_in_and_fan_out(init_tensor[:,index:index+mlp_def["num_u_s"][ind]])
+                    bound = 1 / numpy.sqrt(fan_in)
+                    
+                    ## init biases
+                    #bs=nn.Parameter(torch.randn(outputs[ind]))
+                    if(mlp_def["num_b_s"][ind]>0):
+                        nn.init.uniform_(init_tensor[:,index+mlp_def["num_u_s"][ind]:index+mlp_def["num_u_s"][ind]+mlp_def["num_b_s"][ind]], -bound, bound)
 
-                    ## increase index, also for layers that are low-rank approximated
-                    index+=mlp_def["num_u_s"][ind]+mlp_def["num_v_s"][ind]+mlp_def["num_b_s"][ind]
+                ## increase index, also for layers that are low-rank approximated
+                index+=mlp_def["num_u_s"][ind]+mlp_def["num_v_s"][ind]+mlp_def["num_b_s"][ind]
 
-            ## the linear function is at the very end if it is there
+        ## the linear function is at the very end if it is there
+        if("linear_highway" in self.sub_mlp_structures.keys()):
+
+            mlp_def=self.sub_mlp_structures["linear_highway"]
+
+            nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][0]], a=numpy.sqrt(5))
+            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(init_tensor[:,index:index+mlp_def["num_u_s"][0]])
+            bound = 1 / numpy.sqrt(fan_in)
+
+            nn.init.uniform_(init_tensor[:,index+mlp_def["num_u_s"][0]:index+mlp_def["num_u_s"][0]+mlp_def["num_b_s"][0]], -bound, bound)
+
+        init_tensor=init_tensor/1000.0
+
+
+        ## initialize last b pars if desired
+        if(init_b is not None):
+
+            relevant_mlp=self.sub_mlp_structures["mlp_list"][-1]
+
             if("linear_highway" in self.sub_mlp_structures.keys()):
 
-                mlp_def=self.sub_mlp_structures["linear_highway"]
+                relevant_mlp=self.sub_mlp_structures["linear_highway"]
 
-                nn.init.kaiming_uniform_(self.u_v_b_pars.data[:,index:index+mlp_def["num_u_s"][0]], a=numpy.sqrt(5))
-                fan_in, _ = nn.init._calculate_fan_in_and_fan_out(self.u_v_b_pars.data[:,index:index+mlp_def["num_u_s"][0]])
-                bound = 1 / numpy.sqrt(fan_in)
+            init_tensor[0,-relevant_mlp["num_b_s"][-1]:]=init_b
 
-                nn.init.uniform_(self.u_v_b_pars.data[:,index+mlp_def["num_u_s"][0]:index+mlp_def["num_u_s"][0]+mlp_def["num_b_s"][0]], -bound, bound)
-
-
-            ##
-
-            self.u_v_b_pars.data/=1000.0
-
-            #print(self.u_v_b_pars)
-
-            ## initialize last b pars if desired
-            if(init_b is not None):
-
-                relevant_mlp=self.sub_mlp_structures["mlp_list"][-1]
-
-                if("linear_highway" in self.sub_mlp_structures.keys()):
-
-                    relevant_mlp=self.sub_mlp_structures["linear_highway"]
-
-                self.u_v_b_pars.data[0,-relevant_mlp["num_b_s"][-1]:]=init_b
-
-
-        #print("first 10 uvb after explicit init .. ", self.u_v_b_pars[0,:10])
+        if(self.use_permanent_parameters):
+            self.u_v_b_pars.data=init_tensor
+        else:
+            ## return desired init for amortization purposes
+            return init_tensor.squeeze(0)
 
 
     def _adaptive_matmul(self, matrix, vec):
 
+
         if(vec.dim()==2):
-            ret=torch.bmm(matrix, vec.unsqueeze(-1)).squeeze(-1)
+
+            #res1=torch.matmul(matrix, vec)
+            ## A_inputs,outputs * v_outputs
+            ## A_i,j * v_j
+            ret=torch.einsum("...ij,...j",matrix,vec)
+            
+            #ret=torch.bmm(matrix, vec.unsqueeze(-1)).squeeze(-1)
         elif(vec.dim()==3):
 
             ret=vec.matmul(matrix.permute(0,2,1))
@@ -571,8 +448,10 @@ class AmortizableMLP(nn.Module):
                 ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product
                 if(mlp_def["full_weight_matrix_flags"][ind]):
                     # no svd decomposition, the whole weight matrix is stored in the "u" vector
-                    A=this_u.view(batch_size, mlp_def["outputs"][ind], mlp_def["inputs"][ind])
-                    #print("A ", A)
+
+                 
+                    A=this_u.view(-1, mlp_def["outputs"][ind], mlp_def["inputs"][ind])
+                    
                   
                     nonlinear=self._adaptive_matmul(A, prev)
 
@@ -627,25 +506,20 @@ class AmortizableMLP(nn.Module):
 
         amortization_params=self.u_v_b_pars.to(i)
 
+        
         if(extra_inputs is not None):
 
             if(self.use_permanent_parameters):
                 raise Exception("MLP uses permanent parameters but extra inputs are given in forward. This is not allowed!")
-            assert(len(extra_inputs[0])==self.num_amortization_params)
 
-            ## amortization only works currently if input is 2 dimensional (batch_dim X emb_dim)
-            assert(i.dim()==2)
+            assert(extra_inputs.shape[1]==self.num_amortization_params), ("Extra inputs dimension (%d) does not match number of amortization params of MLP (%d) " % (extra_inputs.shape[1], self.num_amortization_params))
 
-            amortization_params=amortization_params+torch.reshape(extra_inputs, [i.shape[0], self.num_amortization_params])
-        else:
-            #print(i.shape)
-            #print(amortization_params.shape)
-
-
-            amortization_params=amortization_params.repeat(i.shape[0], 1)
+            amortization_params=extra_inputs
 
         ## we only work with batched inputs
-        assert i.dim() > 1
+        ## currently dim=2
+        #assert i.dim() > 1
+        assert(i.dim()==2)
 
         prev=0.0
 

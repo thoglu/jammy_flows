@@ -51,7 +51,7 @@ class interval_base(layer_base.layer_base):
 
         return res, log_det
 
-    def inv_flow_mapping(self, inputs, extra_inputs=None):
+    def inv_flow_mapping(self, inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
         
         res, log_det=self._inv_flow_mapping(inputs, extra_inputs=extra_inputs)
 
@@ -61,10 +61,11 @@ class interval_base(layer_base.layer_base):
 
         return res, log_det
 
-    def flow_mapping(self, inputs, extra_inputs=None):
+    def flow_mapping(self, inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
 
         new_inputs=inputs
 
+       
         if(self.euclidean_to_interval_as_first):
 
             new_inputs=self.real_line_to_interval(inputs)
@@ -89,6 +90,11 @@ class interval_base(layer_base.layer_base):
     def _embedding_conditional_return_num(self): 
         return self.dimension
 
+    def _get_layer_base_dimension(self):
+       
+        
+        return self.dimension
+
     #############################################################################
 
     ## implement the following by specific interval child layers
@@ -109,7 +115,7 @@ class interval_base(layer_base.layer_base):
 
         self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs, previous_x=None, extra_prefix="")
 
-        return param_dict
+        #return param_dict
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
         """ 

@@ -4,7 +4,7 @@ import numpy
 
 from .. import bisection_n_newton as bn
 from .. import layer_base
-from .. import extra_functions
+from ... import extra_functions
 
 from . import euclidean_base
 

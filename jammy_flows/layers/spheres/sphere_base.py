@@ -362,7 +362,7 @@ class sphere_base(layer_base.layer_base):
         return x, log_det, sf_extra
 
     ## inverse flow mapping
-    def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True):
+    def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
         
         [x, log_det] = inputs
 
@@ -424,7 +424,7 @@ class sphere_base(layer_base.layer_base):
         return x, log_det
 
     ## flow mapping (sampling pass)
-    def flow_mapping(self,inputs, extra_inputs=None):
+    def flow_mapping(self,inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
       
         [x, log_det] = inputs
 
@@ -572,6 +572,17 @@ class sphere_base(layer_base.layer_base):
         return self.spherical_to_eucl_embedding(x)
     def _embedding_conditional_return_num(self): 
         return self.dimension+1
+
+    def _get_layer_base_dimension(self):
+        """ 
+        Usually this is just the dimension .. if we work in embedding space and do not project, base space is actually dim+1
+        """
+
+        if(self.always_parametrize_in_embedding_space==True and self.euclidean_to_sphere_as_first==False):
+            return self.dimension+1
+
+        else:
+            return self.dimension
 
     ##########################################################
     ## Functions to override 

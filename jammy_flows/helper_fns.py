@@ -84,7 +84,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     cinput = None
 
     sin_zen_mask=[]
-
+  
     for pdf in model.pdf_defs_list:
         this_sub_dim = int(pdf[1])
         if (pdf == "s2" and s2_norm=="lambert"):
@@ -121,7 +121,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
                 sin_zen_mask.append(0)
 
         glob_ind += this_sub_dim
-
+   
     eval_positions = numpy.meshgrid(*side_vals)
 
     torch_positions = torch.from_numpy(
@@ -157,7 +157,6 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     if (conditional_input is not None):
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
     
-
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput)
  
     ## no conditional input and only s2 pdf .. mask bad regions
@@ -540,10 +539,15 @@ def plot_joint_pdf(pdf,
 
     mms = get_minmax_values(samples)
 
-    
-
     if (bounds is not None):
+        assert(len(bounds)==len(mms)), "Bounds must be given for every dimension!"
         mms = bounds
+    else:
+        ## make sure intervals are within bounds in automatic mode
+        for dim_index, b in enumerate(mms):
+            print(b)
+
+        #sys.exit(-1)
 
     ## true positions are typically labels
     plotted_true_values=None
@@ -553,7 +557,7 @@ def plot_joint_pdf(pdf,
     ## if bounds contain torch .. change to float
 
     pure_float_mms = []
-    for b in mms:
+    for dim_index, b in enumerate(mms):
         new_b = b
         if (type(b[0]) == torch.Tensor):
             new_b = [
@@ -628,6 +632,7 @@ def plot_joint_pdf(pdf,
         pdf_conditional_input = pdf_conditional_input[0:1]
 
 
+
     evalpositions, log_evals, bin_volumes, sin_zen_mask, unreliable_spherical_regions= get_pdf_on_grid(
         pure_float_mms,
         pts_per_dim,
@@ -697,28 +702,38 @@ def plot_joint_pdf(pdf,
 
             
             if (contour_probs != [] and skip_plotting_samples==False):
-            
-              two_d_bounds_for_better_density = show_sample_contours(ax,
-                                                samples,
-                                                bins=50,
-                                                color=contour_color,
-                                                contour_probs=contour_probs,
-                                                sin_zen_mask=sin_zen_mask)
+              
+              ## adjusting bounds like this only makes sense in euclidean space
 
-              x_width=two_d_bounds_for_better_density[0][1]-two_d_bounds_for_better_density[0][0]
-              y_width=two_d_bounds_for_better_density[1][1]-two_d_bounds_for_better_density[1][0]
+                sample_bounds = show_sample_contours(ax,
+                                                        samples,
+                                                        bins=50,
+                                                        color=contour_color,
+                                                        contour_probs=contour_probs,
+                                                        sin_zen_mask=sin_zen_mask)
+                two_d_bounds_for_better_density=pure_float_mms
 
-              extra_x=x_width*0.2
-              extra_y=y_width*0.2
+                for pdf_def in pdf.pdf_defs_list:
+                    if("e" in pdf_def):
 
-              two_d_bounds_for_better_density[0][0]-=extra_x
-              two_d_bounds_for_better_density[0][1]+=extra_x
+                        two_d_bounds_for_better_density=sample_bounds
 
-              two_d_bounds_for_better_density[1][0]-=extra_y
-              two_d_bounds_for_better_density[1][1]+=extra_y
+                        x_width=two_d_bounds_for_better_density[0][1]-two_d_bounds_for_better_density[0][0]
+                        y_width=two_d_bounds_for_better_density[1][1]-two_d_bounds_for_better_density[1][0]
+
+                        extra_x=x_width*0.2
+                        extra_y=y_width*0.2
+
+                        two_d_bounds_for_better_density[0][0]-=extra_x
+                        two_d_bounds_for_better_density[0][1]+=extra_x
+
+                        two_d_bounds_for_better_density[1][0]-=extra_y
+                        two_d_bounds_for_better_density[1][1]+=extra_y
+
+                        break
 
 
-              evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
+                evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
                 two_d_bounds_for_better_density,
                 pts_per_dim,
                 pdf,
@@ -727,7 +742,7 @@ def plot_joint_pdf(pdf,
                 s2_rotate_to_true_value=s2_rotate_to_true_value,
                 true_values=true_values)
              
-              plot_density_with_contours(ax, log_evals_2d, evalpositions_2d,
+                plot_density_with_contours(ax, log_evals_2d, evalpositions_2d,
                                          bin_volumes_2d, pts_per_dim)
 
             else:

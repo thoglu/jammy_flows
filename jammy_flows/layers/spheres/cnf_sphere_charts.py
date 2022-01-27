@@ -7,7 +7,8 @@ from torchdiffeq import odeint_adjoint as odeint
 from . import sphere_base
 from . import moebius_1d
 
-from ..extra_functions import AmortizableMLP, list_from_str
+from ...amortizable_mlp import AmortizableMLP
+from ...extra_functions import  list_from_str
 from .cnf_specific.cnf_sphere_manifold import Sphere
 import sys
 import os
