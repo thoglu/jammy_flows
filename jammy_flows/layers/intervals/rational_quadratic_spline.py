@@ -66,7 +66,7 @@ def unconstrained_rational_quadratic_spline(inputs,
 
 
 class rational_quadratic_spline(interval_base.interval_base):
-    def __init__(self, dimension, num_basis_elements=10, euclidean_to_interval_as_first=0, use_permanent_parameters=0, low_boundary=0, high_boundary=1.0, min_width=1e-3, min_height=1e-3, min_derivative=1e-3):
+    def __init__(self, dimension, num_basis_elements=10, euclidean_to_interval_as_first=0, use_permanent_parameters=0, low_boundary=0, high_boundary=1.0, min_width=1e-4, min_height=1e-4, min_derivative=1e-4):
     
         super().__init__(dimension=dimension, euclidean_to_interval_as_first=euclidean_to_interval_as_first, use_permanent_parameters=use_permanent_parameters, low_boundary=low_boundary, high_boundary=high_boundary)
         
@@ -117,7 +117,7 @@ class rational_quadratic_spline(interval_base.interval_base):
         
         if torch.min(inputs) < left or torch.max(inputs) > right:
            
-            raise Exception("outside boundaries in rational-spline flow!")
+            raise Exception("outside boundaries in rational-spline flow! (min/max (%.2f/%.2f), allowed: (%.2f/%.2f)" % (torch.min(inputs), torch.max(inputs), left, right))
 
         num_bins = unnormalized_widths.shape[-1]
 
@@ -256,9 +256,10 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_derivative=self.min_derivative
                                                          )
         
-        log_det=log_det+log_det_update.sum(axis=-1)
-
-        return x, log_det
+       
+        log_det_new=log_det+log_det_update.sum(axis=-1)
+        
+        return x, log_det_new
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
 
@@ -289,10 +290,10 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                          min_bin_height=self.min_height,
                                                          min_derivative=self.min_derivative
                                                          )
-
-        log_det=log_det+log_det_update.sum(axis=-1)
-
-        return x, log_det
+       
+        log_det_new=log_det+log_det_update.sum(axis=-1)
+      
+        return x, log_det_new
 
 
     def _get_desired_init_parameters(self):

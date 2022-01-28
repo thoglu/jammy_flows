@@ -51,11 +51,11 @@ class simplex_base(layer_base.layer_base):
 
         ## skew inside box
 
-        ## skew inside box to yield flat distrbution on simplex (only works for 3 simplex)
+        ## skew inside box to yield flat distrbution on simplex (only works exactly for up to 3-simplex)
         if(x.shape[1]>1):
             x=x.clone()
             x[:,:-1]=1.0-(1.0-x[:,:-1])**0.5
-            log_det=log_det-0.5*torch.log(1.0-x[:,:-1])-numpy.log(2)
+            log_det=log_det-0.5*torch.log(1.0-x[:,:-1]).sum(axis=-1)-numpy.log(2)
 
         return x, log_det
 

@@ -580,33 +580,33 @@ class pdf(nn.Module):
 
         total_predicted_parameters = 0
 
-        self.target_dims=[]
+        self.target_dims_intrinsic=[]
         self.target_dims_embedded=[]
-        self.target_dims_mixed=[]
+        self.target_dims=[]
 
         # sub-flow indices for the input dimension to describe target-dim for this sub-flow
 
         # intrinsic coordinates
-        self.target_dim_indices=[]
+        self.target_dim_indices_intrinsic=[]
 
         # embedding coordinates
         self.target_dim_indices_embedded=[]
 
-        # mixed coordinates
-        self.target_dim_indices_mixed=[]
+        # actually used and potentially mixed coordinates
+        self.target_dim_indices=[]
 
         # base dim indices can be different
         self.base_dim_indices=[]
 
         
         ## the total dimension if all manifold layers use intrinsic coordinates
-        total_dim=0
+        total_dim_intrinsic=0
 
         ## the total dimension if all manifold layers embed coordinates
         total_dim_embedded=0
 
         ## the total dimension if we use setting sspecified in the layer ops - some layers can be in embedding coords, others not
-        total_dim_mixed=0
+        total_dim=0
         total_base_dim=0
 
         ## loop through flows and define layers according to flow definitions
@@ -621,7 +621,7 @@ class pdf(nn.Module):
             this_num_layers=len(self.flow_defs_list[subflow_index])
             ## loop thorugh the layers of this particular sub-flow
 
-            cur_target_dims=[]
+            cur_target_dims_intrinsic=[]
             cur_target_dims_embedded=[]
             cur_base_dims=[]
 
@@ -662,9 +662,14 @@ class pdf(nn.Module):
                     interval_boundaries=subflow_description.split("_")[1:]
 
                     ## overwrite the boundary parameters
-                    this_kwargs["low_boundary"]=float(interval_boundaries[0])
-                    this_kwargs["high_boundary"]=float(interval_boundaries[1])
-                 
+                    if(len(interval_boundaries)==0):
+                        this_kwargs["low_boundary"]=0.0
+                        this_kwargs["high_boundary"]=1.0
+                    else:
+
+                        this_kwargs["low_boundary"]=float(interval_boundaries[0])
+                        this_kwargs["high_boundary"]=float(interval_boundaries[1])
+                     
                     if(layer_ind==0 and self.use_as_passthrough_instead_of_pdf==False):
                         
                         this_kwargs["euclidean_to_interval_as_first"]=1
@@ -708,46 +713,48 @@ class pdf(nn.Module):
 
                 # the first layer in this layer list defines the input dimension .. will be crosschecked later against all other layers
                 
-                layer_target_dim=self.layer_list[subflow_index][-1].get_layer_target_dimension()
+                layer_target_dim_intrinsic=self.layer_list[subflow_index][-1].get_layer_target_dimension()
                 layer_target_dim_embedded=self.layer_list[subflow_index][-1].get_layer_embedded_target_dimension()
                 layer_base_dim=self.layer_list[subflow_index][-1].get_layer_base_dimension()
 
-                cur_target_dims.append(layer_target_dim)
+                cur_target_dims_intrinsic.append(layer_target_dim_intrinsic)
                 cur_target_dims_embedded.append(layer_target_dim_embedded)
                 cur_base_dims.append(layer_base_dim)
 
             ## update dimensions of input/output spaces
-            for lind in range(len(cur_target_dims)-1):
-                assert(cur_target_dims[lind]==cur_target_dims[lind+1])
+            for lind in range(len(cur_target_dims_intrinsic)-1):
+                assert(cur_target_dims_intrinsic[lind]==cur_target_dims_intrinsic[lind+1])
 
-            self.target_dims.append(cur_target_dims[-1])
+            self.target_dims_intrinsic.append(cur_target_dims_intrinsic[-1])
             self.target_dims_embedded.append(cur_target_dims_embedded[-1])
+
+            ## adapt the actual used dims accordingly
             if(detected_always_embedding_flag is None):
-                self.target_dims_mixed.append(cur_target_dims[-1])
+                self.target_dims.append(cur_target_dims_intrinsic[-1])
             else:
                 if(detected_always_embedding_flag):
-                    self.target_dims_mixed.append(cur_target_dims_embedded[-1])
+                    self.target_dims.append(cur_target_dims_embedded[-1])
                 else:
-                    self.target_dims_mixed.append(cur_target_dims[-1])
+                    self.target_dims.append(cur_target_dims_intrinsic[-1])
             #self.base_dims_list.append(cur_base_dims)
 
             ## the base dim of the first layer is really the important one for the total base dim of sub-PFDs
             self.base_dim_indices.append((total_base_dim, total_base_dim+cur_base_dims[0]))
             total_base_dim+=cur_base_dims[0]
 
-            self.target_dim_indices.append((total_dim, total_dim+self.target_dims[-1]))
-            total_dim+=self.target_dims[-1]
+            self.target_dim_indices_intrinsic.append((total_dim_intrinsic, total_dim_intrinsic+self.target_dims_intrinsic[-1]))
+            total_dim_intrinsic+=self.target_dims_intrinsic[-1]
 
             self.target_dim_indices_embedded.append((total_dim_embedded, total_dim_embedded+self.target_dims_embedded[-1]))
             total_dim_embedded+=self.target_dims_embedded[-1]
 
-            self.target_dim_indices_mixed.append((total_dim_mixed, total_dim_mixed+self.target_dims_mixed[-1]))
-            total_dim_mixed+=self.target_dims_mixed[-1]
+            self.target_dim_indices.append((total_dim, total_dim+self.target_dims[-1]))
+            total_dim+=self.target_dims[-1]
 
         ## define total target/base dims
-        self.total_target_dim=total_dim
+        self.total_target_dim_intrinsic=total_dim_intrinsic
         self.total_target_dim_embedded=total_dim_embedded
-        self.total_target_dim_mixed=total_dim_mixed
+        self.total_target_dim=total_dim
 
         self.total_base_dim=total_base_dim
 
@@ -1213,9 +1220,9 @@ class pdf(nn.Module):
         if(force_embedding_coordinates):
             assert(x.shape[1]==self.total_target_dim_embedded)
         elif(force_intrinsic_coordinates):
-            assert(x.shape[1]==self.total_target_dim)
+            assert(x.shape[1]==self.total_target_dim_intrinsic)
         else:
-            assert(x.shape[1]==self.total_target_dim_mixed)
+            assert(x.shape[1]==self.total_target_dim), (x.shape[1], self.total_target_dim)
 
         extra_conditional_input=[]
         base_targets=[]
@@ -1290,7 +1297,7 @@ class pdf(nn.Module):
                 if(pdf_index==0 and self.join_poisson_and_pdf_description and extra_params is not None):
                     extra_params=extra_params[:,:-1]
 
-            this_target=x[:,self.target_dim_indices_mixed[pdf_index][0]:self.target_dim_indices_mixed[pdf_index][1]]
+            this_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
 
             ## reverse mapping is required for pdf evaluation
             for l, layer in reversed(list(enumerate(pdf_layers))):
@@ -1662,7 +1669,7 @@ class pdf(nn.Module):
             
             extra_param_counter = 0
             for l, layer in list(enumerate(pdf_layers)):
-
+               
                 this_extra_params = None
                 
                 if extra_params is not None:
@@ -1674,7 +1681,7 @@ class pdf(nn.Module):
                     this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params,force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
                 else:
                     this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
-
+                
                 extra_param_counter += layer.total_param_num
 
             new_targets.append(this_target)
@@ -1779,6 +1786,9 @@ class pdf(nn.Module):
 
         if(len(target.shape)==1):
             new_target=target.unsqueeze(0)
+
+        ## transforming only makes sense if input has correct target shape
+        assert(new_target.shape[1]==self.total_target_dim)
 
         potentially_transformed_vals=[]
 

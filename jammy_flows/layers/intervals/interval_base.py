@@ -33,7 +33,7 @@ class interval_base(layer_base.layer_base):
    
         res=res*self.interval_width+self.low_boundary
      
-        log_det+=-(x[:,0]**2)/2.0-0.5*numpy.log(2*numpy.pi)+numpy.log(self.interval_width)
+        log_det=log_det-(x[:,0]**2)/2.0-0.5*numpy.log(2*numpy.pi)+numpy.log(self.interval_width)
 
         return res, log_det
 
@@ -47,7 +47,7 @@ class interval_base(layer_base.layer_base):
 
      
         ## similar to other log_det, just different sign
-        log_det-=-(res[:,0]**2)/2.0-0.5*numpy.log(2*numpy.pi)+numpy.log(self.interval_width)
+        log_det=log_det-(-(res[:,0]**2)/2.0-0.5*numpy.log(2*numpy.pi)+numpy.log(self.interval_width))
 
         return res, log_det
 
@@ -65,7 +65,6 @@ class interval_base(layer_base.layer_base):
 
         new_inputs=inputs
 
-       
         if(self.euclidean_to_interval_as_first):
 
             new_inputs=self.real_line_to_interval(inputs)

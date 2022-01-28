@@ -36,11 +36,12 @@ class inner_loop_simplex(simplex_base.simplex_base):
         
         flow_dict["r"]["kwargs"] = dict()
         flow_dict["r"]["kwargs"]["use_permanent_parameters"]=0
-        flow_dict["r"]["kwargs"]["num_basis_elements"]=5
+        flow_dict["r"]["kwargs"]["num_basis_elements"]=10
         #flow_dict["r"]["kwargs"]["low_boundary"] = 0.0
         #flow_dict["r"]["kwargs"]["high_boundary"] = 1.0
 
-        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension), "+".join(["r"]*self.dimension) , flow_defs_detail=flow_dict,amortize_everything=True, use_custom_low_rank_mlps=True, use_as_passthrough_instead_of_pdf=True)
+        
+        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension), "+".join(["rr"]*self.dimension) , flow_defs_detail=flow_dict,amortize_everything=True, use_custom_low_rank_mlps=True, use_as_passthrough_instead_of_pdf=True)
         
         self.total_num_inner_flow_params=self.inner_flow.total_number_amortizable_params
         self.total_param_num=self.total_num_inner_flow_params
@@ -123,9 +124,9 @@ class inner_loop_simplex(simplex_base.simplex_base):
         
     def _get_desired_init_parameters(self):
         
-        #init_params=self.inner_flow.init_params()
+        init_params=self.inner_flow.init_params()
         
-        init_params=torch.randn(self.total_num_inner_flow_params, dtype=torch.float64)
+        #init_params=torch.randn(self.total_num_inner_flow_params, dtype=torch.float64)
         return init_params
         #return torch.cat(desired_param_vec)
 

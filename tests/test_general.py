@@ -269,9 +269,36 @@ class Test(unittest.TestCase):
             with torch.no_grad():
                 samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput)
                 
-             
+                samples_bef=samples.clone()
                 ## evaluate the samples and see if the reverse direction is compatible
                 evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput)
+
+                ## make sure there is no in place operation that changes things
+                compare_two_arrays(samples.detach().numpy(), samples_bef.detach().numpy(), "samples_before_pass", "samples_after_pass", diff_value=tolerance)
+
+
+                ## make sure log-det is not overwritten in forward/backward passes
+                test_sample=torch.rand(10,this_flow.total_target_dim, dtype=torch.float64)
+                log_det=torch.zeros(test_sample.shape[0]).to(test_sample)
+                
+                inp=None
+                if(cinput is not None):
+                    inp=cinput[:10,:]
+                res, log_det_new=this_flow.all_layer_forward(test_sample, log_det, inp)
+
+             
+                assert( (log_det==0).sum()==10)
+
+                #####
+
+                inp=None
+                if(cinput is not None):
+                    inp=cinput[:10,:]
+                res, log_det_new=this_flow.all_layer_inverse(test_sample, log_det, inp)
+
+            
+                assert( (log_det==0).sum()==10)
+
 
             #this_flow.count_parameters()
 

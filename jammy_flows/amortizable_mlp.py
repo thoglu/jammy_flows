@@ -408,7 +408,6 @@ class AmortizableMLP(nn.Module):
 
 
         if(vec.dim()==2):
-
             #res1=torch.matmul(matrix, vec)
             ## A_inputs,outputs * v_outputs
             ## A_i,j * v_j
@@ -458,8 +457,10 @@ class AmortizableMLP(nn.Module):
                 else:
                     #print("ADVANCED MAT")
                     ## we do the standard svd decomposition (without proper normalization) .. normalization is implicit in the u/v definition
-                    this_u=this_u.view(batch_size,  int(this_u.shape[1]/this_rank), this_rank) # U
-                    this_v=this_v.view(batch_size, this_rank, int(this_v.shape[1]/this_rank)) # V^T
+
+
+                    this_u=this_u.view(this_u.shape[0],  int(this_u.shape[1]/this_rank), this_rank) # U
+                    this_v=this_v.view(this_v.shape[0], this_rank, int(this_v.shape[1]/this_rank)) # V^T
 
                     res_intermediate=self._adaptive_matmul(this_v, prev)
                     nonlinear=self._adaptive_matmul(this_u, res_intermediate)

@@ -85,7 +85,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     sin_zen_mask=[]
   
-    for pdf in model.pdf_defs_list:
+    for pdf_index,pdf in enumerate(model.pdf_defs_list):
         this_sub_dim = int(pdf[1])
         if (pdf == "s2" and s2_norm=="lambert"):
             #has_high_dim_spheres = True
@@ -110,6 +110,12 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
         elif(pdf=="s2"):
           raise Exception("s2_norm ", s2_norm, " unknown .")
+        elif("i1" in pdf):
+            
+            side_vals.append(numpy.linspace(model.layer_list[pdf_index][-1].low_boundary+1e-5, model.layer_list[pdf_index][-1].high_boundary-1e-5, npts))
+
+            bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
+            sin_zen_mask.append(0)
         else:
             
             for ind, mm in enumerate(mins_maxs[glob_ind:glob_ind +
@@ -129,7 +135,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             numpy.array(eval_positions).T,
             (npts**len(mins_maxs), len(mins_maxs))))
     eval_positions = torch_positions.clone()
-
+  
     mask_inner = torch.ones(len(torch_positions)) == 1
 
     for ind, pdf_def in enumerate(model.pdf_defs_list):
@@ -139,25 +145,29 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             fix_point=None
 
             if(s2_rotate_to_true_value and true_values is not None):
-              fix_point=true_values[model.target_dim_indices[ind][0]:model.target_dim_indices[ind][1]]
+              fix_point=true_values[model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1]]
            
             mask_inner = mask_inner & (torch.sqrt(
-                (eval_positions[:, model.target_dim_indices[ind][0]:model.
-                                target_dim_indices[ind][1]]**2).sum(axis=1)) <
+                (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.
+                                target_dim_indices_intrinsic[ind][1]]**2).sum(axis=1)) <
                                        2)
             ## transform s2 subdimensions from equal-area lambert dimension to real spherical dimensiosn the model can use
 
-            eval_positions[:, model.target_dim_indices[ind][0]:model.
-                           target_dim_indices[ind]
+            eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.
+                           target_dim_indices_intrinsic[ind]
                            [1]] = cartesian_lambert_to_spherical(
                                eval_positions[:, model.
-                                              target_dim_indices[ind][0]:model.
-                                              target_dim_indices[ind][1]], fix_point=fix_point)
+                                              target_dim_indices_intrinsic[ind][0]:model.
+                                              target_dim_indices_intrinsic[ind][1]], fix_point=fix_point)
+        elif("c" in pdf_def):
+            ## simplex .. mask everything outside allowed region
+            mask_inner=mask_inner & (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1] ].sum(axis=1) < 1.0)
 
     if (conditional_input is not None):
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
     
-    log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput)
+    ## require intrinsic coordinates
+    log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
  
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])
@@ -631,8 +641,6 @@ def plot_joint_pdf(pdf,
     if (pdf_conditional_input is not None):
         pdf_conditional_input = pdf_conditional_input[0:1]
 
-
-
     evalpositions, log_evals, bin_volumes, sin_zen_mask, unreliable_spherical_regions= get_pdf_on_grid(
         pure_float_mms,
         pts_per_dim,
@@ -644,8 +652,7 @@ def plot_joint_pdf(pdf,
 
    
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
-    
-  
+    print("total pdf ", total_pdf_integral)
     if (dim == 1):
 
         if (subgridspec is None):
@@ -702,8 +709,8 @@ def plot_joint_pdf(pdf,
 
             
             if (contour_probs != [] and skip_plotting_samples==False):
-              
-              ## adjusting bounds like this only makes sense in euclidean space
+             
+                ## adjusting bounds like this only makes sense in euclidean space
 
                 sample_bounds = show_sample_contours(ax,
                                                         samples,
@@ -732,7 +739,7 @@ def plot_joint_pdf(pdf,
 
                         break
 
-
+               
                 evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
                 two_d_bounds_for_better_density,
                 pts_per_dim,
@@ -749,10 +756,11 @@ def plot_joint_pdf(pdf,
               
               plot_density_with_contours(ax, log_evals, evalpositions,
                                          bin_volumes, pts_per_dim)
-     
+        
         ## plot a histogram density from samples
 
-        
+
+       
         if ( (plot_only_contours == False) and (plot_density == False) and (skip_plotting_samples==False)):
            
             ax.hist2d(samples[:, 0],
@@ -776,7 +784,7 @@ def plot_joint_pdf(pdf,
         if (bounds is not None):
             new_bounds = bounds
             
-       
+        
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
           
@@ -813,6 +821,7 @@ def plot_joint_pdf(pdf,
           else:
             ax.set_xlim(-2.0,2.0)
             ax.set_ylim(-2.0,2.0) 
+        
             
         if (hide_labels):
             ax.set_yticklabels([])
@@ -917,6 +926,8 @@ def plot_joint_pdf(pdf,
                     if (bounds is not None):
                         hist_bounds = numpy.linspace(bounds[ind2][0],
                                                      bounds[ind2][1], 50)
+
+                    
                     ax.hist(samples[:, ind1], bins=hist_bounds, density=True)
 
                     if (true_values is not None):

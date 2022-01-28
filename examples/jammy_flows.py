@@ -29,7 +29,7 @@ def seed_everything(seed_no):
 ## Generate data that follows letter shapes using some TTF template
 ###################################################################
 
-def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell=0.5, num_samples=1000, center_coords=(0,0), manifold_type="e"):
+def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell=(0.5,0.5), num_samples=1000, center_coords=(0,0), manifold_type="e"):
 
     """
     Based on https://stackoverflow.com/a/27753869/190597 (jsheperd)
@@ -63,8 +63,10 @@ def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell
     xvals+=np.random.normal(size=xvals.shape)
     yvals+=np.random.normal(size=yvals.shape)
 
-    xvals*=width_per_cell
-    yvals*=width_per_cell*(-1.0) ## have to flip y 
+    xvals*=width_per_cell[0]
+    yvals*=width_per_cell[1]*(-1.0) ## have to flip y 
+
+    print(xvals, yvals)
 
     one_coords=np.hstack([xvals[one_mask][:,None], yvals[one_mask][:,None]])
     
@@ -82,6 +84,28 @@ def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell
 
     return samples
 
+
+def get_center_and_stretch(manifold_str, c_index):
+
+    
+
+    ## if sphere, center character at equator
+    if(manifold_str[c_index]=="e"):
+        center=0.0
+        stretch=0.5
+    elif(manifold_str[c_index]=="s"):
+        center=np.pi/2.0
+        stretch=0.05
+    elif(manifold_str[c_index]=="i"):
+        center = 0.5
+        stretch = 0.015
+    elif(manifold_str[c_index]=="c"): 
+        center=0.25
+        stretch=0.005
+    else:
+        raise Exception("Unsupported manifold", manifold_str[c_index])
+
+    return center, stretch
 
 ## this function generates train and test data
 def sample_data(pdf_def, sentence, num_samples=10000):
@@ -102,17 +126,27 @@ def sample_data(pdf_def, sentence, num_samples=10000):
 
     for pdf in pdf_def.split("+"):
         
-        if(int(pdf[1:])%2!=0):
-            raise Exception("Characters take 2 dimensions, so string is visualized with 2*len(str) dims. Every PDF must have a dimension divisible by 2 for simplicity.")
+        #if(int(pdf[1:])%2!=0):
+        #    raise Exception("Characters take 2 dimensions, so string is visualized with 2*len(str) dims. Every PDF must have a dimension divisible by 2 for simplicity.")
 
-        len_per_word=int(pdf[1:])//2
+        #len_per_word=int(pdf[1:])//2
+
         pdf_dim+=int(pdf[1:])
 
         if("e" in pdf):
-            manifold_str+=len_per_word*"e"
+            manifold_str+=pdf_dim*"e"
         elif("s" in pdf):
-            manifold_str+=len_per_word*"s"
+            manifold_str+=pdf_dim*"s"
+        elif("i" in pdf):
+            manifold_str+="i"
+        elif("c" in pdf):
+            manifold_str+="c"*pdf_dim
+        else:
+            raise Exception("Unsupported manifold ", pdf)
 
+    assert(len(manifold_str)%2==0)
+
+    
     word_indices=np.random.choice(num_words, num_samples)
   
     _, class_occurences = np.unique(word_indices, return_counts=True)
@@ -125,15 +159,11 @@ def sample_data(pdf_def, sentence, num_samples=10000):
         this_w_sample=[]
         ## loop char per word
         for c_index, c in enumerate(w):
-           
-            center=(0,0)
-            stretch=0.5
-
-            ## if sphere, center character at equator
-            if(manifold_str[c_index]=="s"):
-                center=(np.pi/2.0, np.pi)
-                stretch=0.05
-            res=sample_character(c, num_samples=class_occurences[w_index], width_per_cell=stretch, center_coords=center, manifold_type=manifold_str[c_index])
+            
+            first_center, first_stretch=get_center_and_stretch(manifold_str, c_index*2)
+            sec_center, sec_stretch=get_center_and_stretch(manifold_str, c_index*2+1)
+            
+            res=sample_character(c, num_samples=class_occurences[w_index], width_per_cell=(first_stretch, sec_stretch), center_coords=(first_center, sec_center), manifold_type=manifold_str[c_index])
             
             if(manifold_str[c_index]=="s"):
                 assert( ((res[:,0]<0) | (res[:,0]>np.pi)).sum()==0)
@@ -165,7 +195,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     word_ids=torch.nn.functional.one_hot(torch.arange(num_words), num_words).type(torch.float64)
 
     ## 2 * log_pdf differences
-    pdf_res, base_pdf_res, _=model(test_labels)#, conditional_input=test_data)
+    pdf_res, base_pdf_res, _=model(test_labels, conditional_input=test_data)
 
     dim=test_labels.shape[1]
 
@@ -212,6 +242,11 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
             glob_dim_index+=2
 
+        elif(this_type=="i"):
+            bounds.append([0.0,1.0])
+        elif(this_type=="c"):
+            for ind in range(this_dim):
+                bounds.append([0.0001,0.9999])
         else:
 
             for ind in range(this_dim):
@@ -230,7 +265,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=None, total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -296,7 +331,7 @@ if __name__ == "__main__":
     extra_flow_defs["g"]["kwargs"]["fit_normalization"]=1
     extra_flow_defs["g"]["kwargs"]["add_skewness"]=0
 
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=None, hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=len(args.sentence.split(" ")), hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
     word_pdf.count_parameters(verbose=True)
@@ -323,7 +358,8 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             ## evaluate PDF
-            log_pdf, _,_=word_pdf(batch_labels)#, conditional_input=batch_data)
+           
+            log_pdf, _,_=word_pdf(batch_labels, conditional_input=batch_data)
            
             ## neg log-loss
             loss=-log_pdf.mean()
@@ -342,7 +378,7 @@ if __name__ == "__main__":
 
                 with torch.no_grad():
                     print("VALIDATION EVAL")    
-                    val_log_pdf, _, _=word_pdf(test_labels)#, conditional_input=test_data)
+                    val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_data)
                     val_loss=-val_log_pdf.mean()
                     print("ep: %d / batch_id: %d / val-loss %.3f" % (ep_id, batch_id, val_loss))
                     print("before plotting")
