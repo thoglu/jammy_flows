@@ -14,7 +14,7 @@ import jammy_flows.flows as f
 
 import jammy_flows.helper_fns as helper_fns
 
-import jammy_flows.layers.extra_functions as extra_functions
+import jammy_flows.extra_functions as extra_functions
 
 def seed_everything(seed_no):
     random.seed(seed_no)

@@ -374,8 +374,6 @@ class gumbel_softmax(simplex_base.simplex_base):
 
         return new_coords_log.exp(), log_det
 
- 
-        return torch.cat(par_list)
 
     def init_params(self, params):
 

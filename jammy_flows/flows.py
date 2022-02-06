@@ -1392,7 +1392,8 @@ class pdf(nn.Module):
         ).log_prob(base_pos)
 
         if(debug):
-            return log_pdf + tot_log_det, log_pdf, base_pos, individual_logps
+            raise NotImplementedError("Debug mode must be activated manually")
+            #return log_pdf + tot_log_det, log_pdf, base_pos, individual_logps
         else:
             return log_pdf + tot_log_det, log_pdf, base_pos
 
