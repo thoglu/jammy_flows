@@ -115,6 +115,10 @@ class Test(unittest.TestCase):
     def setUp(self):
 
         self.flow_inits=[]
+
+        self.flow_inits.append([ ["e1", "p"], dict()])
+        self.flow_inits.append([ ["e1", "g"], dict()])
+        self.flow_inits.append([ ["s1", "m"], dict()])
         
         pdf_def="e1+e1+e1+s1"
         flow_def="pp+pp+gg+m"
@@ -141,6 +145,7 @@ class Test(unittest.TestCase):
                      {"g":{"kwargs":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}}},
                      {"g":{"kwargs":{"add_skewness": 1}}}]
 
+        
         for enc in encoders:
             for mlp_hidden in mlp_hidden_dims:
                 for use_rank in use_low_rank_option:
@@ -173,6 +178,21 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
         extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=1
         self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
+        
+        #### mvn 
+
+        for cov_type in ["full", "diagonal_symmetric", "diagonal", "unit_gaussian"]:
+
+            extra_flow_defs=dict()
+            extra_flow_defs["flow_defs_detail"]=dict()
+            extra_flow_defs["flow_defs_detail"]["t"]=dict()
+            extra_flow_defs["flow_defs_detail"]["t"]["kwargs"]=dict()
+            extra_flow_defs["flow_defs_detail"]["t"]["kwargs"]["cov_type"]=cov_type
+            extra_flow_defs["conditional_input_dim"]=2
+        
+            self.flow_inits.append([ ["e10", "t"], extra_flow_defs])
+
+
 
         #######
 
@@ -309,25 +329,28 @@ class Test(unittest.TestCase):
             """
             Check self consistency in flow structure.
             """
-            if(cinput is None):
-                flow_param_structure=this_flow.obtain_flow_param_structure()
-            else:
-                flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=cinput[:1,:])
-            
-            fps_num=0
 
-            for k in flow_param_structure.keys():
-                for k2 in flow_param_structure[k].keys():
-                  
-                    fps_num+=flow_param_structure[k][k2].numel()
-            
-            explicit_param_num=0
-            for pdf_index, pdf_layers in enumerate(this_flow.layer_list):
+            ## exclude gausianization flows from param structure test because we manually add determinant in params, so difference would be detectable
+            if(not "g" in init[0][1]):
+                if(cinput is None):
+                    flow_param_structure=this_flow.obtain_flow_param_structure()
+                else:
+                    flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=cinput[:1,:])
+                
+                fps_num=0
 
-                for l in pdf_layers:
-                    explicit_param_num+=l.total_param_num
+                for k in flow_param_structure.keys():
+                    for k2 in flow_param_structure[k].keys():
+                      
+                        fps_num+=flow_param_structure[k][k2].numel()
+                
+                explicit_param_num=0
+                for pdf_index, pdf_layers in enumerate(this_flow.layer_list):
 
-            assert(explicit_param_num==fps_num), ("explicit: ", explicit_param_num, "flow params num ", fps_num)
+                    for l in pdf_layers:
+                        explicit_param_num+=l.total_param_num
+
+                assert(explicit_param_num==fps_num), ("explicit: ", explicit_param_num, "flow params num ", fps_num)
 
             if("c" in init[0][1]):
                 sys.exit(-1)

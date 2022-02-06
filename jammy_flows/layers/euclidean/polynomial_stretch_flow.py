@@ -79,11 +79,14 @@ class psf_block(euclidean_base.euclidean_base):
         else:
             self.log_widths2 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)
 
+        #self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
+      
         if use_permanent_parameters:
             self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
         else:
             self.means1 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
-
+        
+        
         if use_permanent_parameters:
             self.means2 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
         else:
@@ -432,11 +435,14 @@ class psf_block(euclidean_base.euclidean_base):
 
             ##########
 
-            param_dict[extra_prefix+"log_widths1"]=log_widths1.data
-            param_dict[extra_prefix+"log_widths2"]=log_widths2.data
+        param_dict[extra_prefix+"log_widths1"]=log_widths1.data
+        param_dict[extra_prefix+"log_widths2"]=log_widths2.data
 
-            param_dict[extra_prefix+"means1"]=means1.data
-            param_dict[extra_prefix+"means2"]=means2.data
+        param_dict[extra_prefix+"means1"]=means1.data
+        param_dict[extra_prefix+"means2"]=means2.data
 
-            param_dict[extra_prefix+"log_exponent"]=log_exponent.data
+        param_dict[extra_prefix+"log_exponent"]=log_exponent.data
+    
+
+
 

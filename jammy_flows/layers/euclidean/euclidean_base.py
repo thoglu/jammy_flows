@@ -55,6 +55,7 @@ class euclidean_base(layer_base.layer_base):
 
                 this_offset=this_offset+extra_inputs[:,:self.dimension]
 
+               
                 x, logdet=self._flow_mapping([x, logdet], extra_inputs=extra_inputs[:,self.dimension:])
 
                 return [x+this_offset, logdet]
@@ -82,6 +83,9 @@ class euclidean_base(layer_base.layer_base):
     def init_params(self, params):
 
         assert(len(params)==self.total_param_num)
+
+        ## this function should only be called when the pdf has permanent parameters
+        assert(self.use_permanent_parameters==1)
 
         if(self.model_offset):
 

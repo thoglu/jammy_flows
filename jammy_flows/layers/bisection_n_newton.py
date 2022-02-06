@@ -102,7 +102,7 @@ def inverse_bisection_n_newton_joint_func_and_grad(func, joint_func, target_arg,
     if( num_non_converged>0):
         print(num_non_converged, " items did not converge in Newton iterations")
         print("feval (diff) ",f_eval[torch.abs(f_eval)>1e-7])
-        print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
+        #print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
     
     return prev
 
@@ -210,7 +210,7 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
     if( num_non_converged>0):
         print(num_non_converged, " items did not converge in Newton iterations")
         print("feval (diff) ",f_eval[torch.abs(f_eval)>1e-7])
-        print("PREV VALUE:", prev[torch.abs(f_eval)>1e-7])
+        print("PREV VALUE:", prev[above_tolerance_mask,:][torch.abs(f_eval)>1e-7])
     
     return prev
 

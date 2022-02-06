@@ -4,6 +4,7 @@ from torch import nn
 from .layers.euclidean.gaussianization_flow import gf_block, find_init_pars_of_chained_gf_blocks
 from .layers.euclidean.gaussianization_flow_old import gf_block_old, find_init_pars_of_chained_gf_blocks_old
 from .layers.euclidean.polynomial_stretch_flow import psf_block
+from .layers.euclidean.multivariate_normal import mvn_block
 
 from .layers.spheres.sphere_base import sphere_base
 from .layers.spheres.moebius_1d import moebius
@@ -226,6 +227,21 @@ class pdf(nn.Module):
         self.flow_dict["p"]["kwargs"]["num_transforms"] = 1
         self.flow_dict["p"]["kwargs"]["exact_mode"] = True
         self.flow_dict["p"]["kwargs"]["skip_model_offset"]=0
+
+        self.flow_dict["t"] = dict()
+        self.flow_dict["t"]["module"] = mvn_block
+        self.flow_dict["t"]["type"] = "e"
+        self.flow_dict["t"]["kwargs"] = dict()
+        self.flow_dict["t"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["t"]["kwargs"]["skip_model_offset"]=0
+        self.flow_dict["t"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
+        self.flow_dict["t"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
+        self.flow_dict["t"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
+        self.flow_dict["t"]["kwargs"]["clamp_widths"]=0
+        self.flow_dict["t"]["kwargs"]["width_smooth_saturation"]=1 # 
+        self.flow_dict["t"]["kwargs"]["cov_type"]="diagonal"
+        
+
 
         """
         S1 flows
@@ -878,6 +894,10 @@ class pdf(nn.Module):
                 if(pdf_index==0 and self.join_poisson_and_pdf_description):
                     num_predicted_pars+=1
 
+            if(num_predicted_pars==0):
+                self.mlp_predictors.append(None)
+                continue
+
             ## take previous dimensions as input
             this_summary_dim=prev_extra_input_num
 
@@ -1209,8 +1229,11 @@ class pdf(nn.Module):
 
                     extra_mlp_inputs=amortization_parameters[:,:num_mlp_params]
 
-                ## the last parameter of the first MLP is predicting log-lambda (convention)
-                return self.mlp_predictors[0](data_summary, extra_inputs=extra_mlp_inputs)[:,-1:]
+                    return self.mlp_predictors[0](data_summary, extra_inputs=extra_mlp_inputs)[:,-1:]
+
+                else:
+                    ## the last parameter of the first MLP is predicting log-lambda (convention)
+                    return self.mlp_predictors[0](data_summary)[:,-1:]
             else:
                 raise NotImplementedError("This way of independenly predicting the normalization (from all other parameters) is outdated!")
                 return self.log_normalization_mlp(data_summary)
@@ -1242,7 +1265,8 @@ class pdf(nn.Module):
             extra_param_counter = 0
             this_pdf_type=self.pdf_defs_list[pdf_index]
 
-            if(data_summary is not None):
+            ## mlp preditors can be None for unresponsive layers like x/y
+            if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
                 
                 this_data_summary=data_summary
                 if(len(extra_conditional_input)>0):
@@ -1455,7 +1479,7 @@ class pdf(nn.Module):
             this_flow_def=self.flow_defs_list[pdf_index]
 
             extra_params = None
-            if(data_summary is not None):
+            if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
                
                 this_data_summary=data_summary
                 if(len(extra_conditional_input)>0):
@@ -1475,7 +1499,7 @@ class pdf(nn.Module):
      
             if(self.predict_log_normalization):
 
-                if(pdf_index==0 and self.join_poisson_and_pdf_description):
+                if(pdf_index==0 and self.join_poisson_and_pdf_description and extra_params is not None):
                     extra_params=extra_params[:,:-1]
 
             this_target=x[:,self.base_dim_indices[pdf_index][0]:self.base_dim_indices[pdf_index][1]]
@@ -1605,7 +1629,7 @@ class pdf(nn.Module):
             this_pdf_type=self.pdf_defs_list[pdf_index]
 
             extra_params = None
-            if(data_summary is not None):
+            if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
                
                 this_data_summary=data_summary
                 if(len(extra_conditional_input)>0):
@@ -1830,7 +1854,8 @@ class pdf(nn.Module):
             this_dim_index=0
 
             for subflow_index, subflow_description in enumerate(self.pdf_defs_list):
-                
+                    
+              
                 this_layer_list=self.layer_list[subflow_index]
 
                 this_dim=self.target_dims[subflow_index]
@@ -1863,6 +1888,7 @@ class pdf(nn.Module):
 
                 this_dim_index+=this_dim
 
+
             ## 2) Depending on encoding structure, use the init params at appropriate places
             if(self.encoder_mlp_predictors is not None):
 
@@ -1883,6 +1909,7 @@ class pdf(nn.Module):
                     
                     # these are the desired params at initialization for the MLP -> set bias of last MLP layer to these values
                     # and make the weights and bias in previous layers very small
+                   
                     these_params=params_list[ind]
 
                     if(len(these_params)>0):
@@ -1924,7 +1951,7 @@ class pdf(nn.Module):
                                     
                                 # finally overwrite bias to be equivalent to desired parameters at initialization
                                 
-                                mlp_predictor[-1].bias.data=these_params
+                                mlp_predictor[-1].bias.data=these_params.data#torch.ones_like(these_params.data)*0.44  # .copy_(torch.randn(these_params.shape))
 
                         else:
                             ## threre is no MLP - initialize parameters of flows directly
@@ -1934,7 +1961,7 @@ class pdf(nn.Module):
                                 
                                 this_layer_num_params=self.layer_list[ind][layer_ind].get_total_param_num()
 
-                               
+                              
                                 self.layer_list[ind][layer_ind].init_params(these_params[tot_param_index:tot_param_index+this_layer_num_params])
 
                                 if(ind==0 and self.amortize_everything):

@@ -614,7 +614,10 @@ class gf_block(euclidean_base.euclidean_base):
 
             kde_means=self.kde_means.to(x)
             kde_log_widths=self.kde_log_widths.to(x)
-            kde_log_weights=self.kde_log_weights.to(x)
+            if(self.fit_normalization):
+                kde_log_weights=self.kde_log_weights.to(x)
+            else:
+                kde_log_weights=torch.zeros_like(kde_log_widths)
             
         else:
             ## skipping householder params
@@ -629,6 +632,8 @@ class gf_block(euclidean_base.euclidean_base):
             if(self.fit_normalization):
                 kde_log_weights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
                 extra_input_counter+=self.num_params_datapoints
+            else:
+                kde_log_weights=torch.zeros(x.shape[0], self.num_kde, self.dimension).to(x)
 
             if(self.add_skewness):
 
@@ -643,7 +648,7 @@ class gf_block(euclidean_base.euclidean_base):
 
             ## regulate log-normalizations if desired
             kde_log_weights=self.normalization_regulator(kde_log_weights)
-
+      
         ## transform skewness if necessary
         if(self.add_skewness):
     
@@ -803,6 +808,12 @@ class gf_block(euclidean_base.euclidean_base):
                 extra_input_counter+=self.num_householder_params
             
             param_dict[extra_prefix+"vs"]=this_vs.data
+
+            this_vs=torch.reshape(this_vs, [1, self.dimension, self.dimension])
+
+            this_vs_determinant=torch.det(self.compute_householder_matrix(this_vs))
+
+            param_dict[extra_prefix+"hh_det"]=this_vs_determinant
 
         kde_log_skew_exponents=self.kde_log_skew_exponents
 

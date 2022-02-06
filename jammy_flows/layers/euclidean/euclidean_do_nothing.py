@@ -41,3 +41,10 @@ class euclidean_do_nothing(euclidean_base.euclidean_base):
     def _get_desired_init_parameters(self):
         
         return torch.Tensor([])
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        """ 
+        Do nothing
+        """
+     
+        return
