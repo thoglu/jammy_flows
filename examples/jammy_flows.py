@@ -66,7 +66,6 @@ def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell
     xvals*=width_per_cell[0]
     yvals*=width_per_cell[1]*(-1.0) ## have to flip y 
 
-    print(xvals, yvals)
 
     one_coords=np.hstack([xvals[one_mask][:,None], yvals[one_mask][:,None]])
     
@@ -78,8 +77,12 @@ def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell
 
     ## scale azimuth to make it similar to zenith
     if(manifold_type=="s"):
+        print("shift s")
         azi_diff=(samples[:,1]-numpy.pi)
+        print(samples[:,1].min(), samples[:,1].max())
         samples[:,1]=numpy.pi+azi_diff*2
+
+        print(samples[:,1].min(), samples[:,1].max())
       
 
     return samples
@@ -145,7 +148,6 @@ def sample_data(pdf_def, sentence, num_samples=10000):
             raise Exception("Unsupported manifold ", pdf)
 
     assert(len(manifold_str)%2==0)
-
     
     word_indices=np.random.choice(num_words, num_samples)
   
@@ -162,12 +164,16 @@ def sample_data(pdf_def, sentence, num_samples=10000):
             
             first_center, first_stretch=get_center_and_stretch(manifold_str, c_index*2)
             sec_center, sec_stretch=get_center_and_stretch(manifold_str, c_index*2+1)
+
+            ## fix second coordinate on sphere (azimuth) to be centered around pi instead of pi/2
+            if(manifold_str[c_index*2+1]=="s"):
+                sec_center+=numpy.pi/2.0
             
             res=sample_character(c, num_samples=class_occurences[w_index], width_per_cell=(first_stretch, sec_stretch), center_coords=(first_center, sec_center), manifold_type=manifold_str[c_index])
             
             if(manifold_str[c_index]=="s"):
-                assert( ((res[:,0]<0) | (res[:,0]>np.pi)).sum()==0)
-                assert( ((res[:,1]<0) | (res[:,1]>2*np.pi)).sum()==0)
+                assert( ((res[:,0]<0) | (res[:,0]>np.pi)).sum()==0), res
+                assert( ((res[:,1]<0) | (res[:,1]>2*np.pi)).sum()==0), ("min ", res[:,1].min(), "max ", res[:,1].max())
             this_w_sample.append(torch.from_numpy(res))
 
         tot_sample=torch.cat(this_w_sample, dim=1)
@@ -265,7 +271,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=2000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=20000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
@@ -297,11 +303,14 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
 if __name__ == "__main__":
 
+    ###
+    ### Disclaimer: The script currently does not corretly support spherical flows (S2) until they are reworked
+    ###
     parser = argparse.ArgumentParser('train_example')
 
     parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
-    parser.add_argument("-pdf_def", type=str, default="e4+s2+e4")
-    parser.add_argument("-layer_def", type=str, default="gggg+n+gggg") 
+    parser.add_argument("-pdf_def", type=str, default="e10")
+    parser.add_argument("-layer_def", type=str, default="ggggg") 
     parser.add_argument("-train_size", type=int, default=200000)
     parser.add_argument("-batch_size", type=int, default=20)
     parser.add_argument("-test_size", type=int, default=1000)
@@ -330,6 +339,10 @@ if __name__ == "__main__":
     extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=1
     extra_flow_defs["g"]["kwargs"]["fit_normalization"]=1
     extra_flow_defs["g"]["kwargs"]["add_skewness"]=0
+
+    extra_flow_defs["t"]=dict()
+    extra_flow_defs["t"]["kwargs"]=dict()
+    extra_flow_defs["t"]["kwargs"]["cov_type"]="full"
 
     word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=len(args.sentence.split(" ")), hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
