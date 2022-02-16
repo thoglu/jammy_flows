@@ -204,7 +204,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
       print((numpy.isfinite(res)==False).sum())
       print(numpy_positions[(numpy.isfinite(res)==False)])
 
-      r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:1], conditional_input=cinput)
+      r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:], conditional_input=cinput[torch.isfinite(log_res)==False])
       print(r)
       raise Exception()
 

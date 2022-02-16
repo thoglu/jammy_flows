@@ -119,9 +119,30 @@ class Test(unittest.TestCase):
         self.flow_inits.append([ ["e1", "p"], dict()])
         self.flow_inits.append([ ["e1", "g"], dict()])
         self.flow_inits.append([ ["s1", "m"], dict()])
-        
-        pdf_def="e1+e1+e1+s1"
+
+        ### s1 with splines
+
+        extra_flow_defs=dict()
+        extra_flow_defs["flow_defs_detail"]=dict()
+        extra_flow_defs["flow_defs_detail"]["m"]=dict()
+        extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]=dict()
+        extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]["use_splines"]=1
+
+        self.flow_inits.append([ ["s1", "m"], extra_flow_defs])
+
+        pdf_def="e1+e2+e2+s1"
         flow_def="pp+pp+gg+m"
+
+        ## 3d rotation
+
+        extra_flow_defs=dict()
+        extra_flow_defs["flow_defs_detail"]=dict()
+        extra_flow_defs["flow_defs_detail"]["g"]=dict()
+        extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]=dict()
+        extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["rotation_mode"]="angles"
+
+        self.flow_inits.append([ ["e3", "gg"], extra_flow_defs])
+
 
   
         #self.flow_inits.append( [ [pdf_def, flow_def], {"flow_defs_detail":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}}}] )
@@ -143,7 +164,13 @@ class Test(unittest.TestCase):
                      {"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}},
                      {"g":{"kwargs":{"clamp_widths": 1}}},
                      {"g":{"kwargs":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}}},
-                     {"g":{"kwargs":{"add_skewness": 1}}}]
+                     {"g":{"kwargs":{"add_skewness": 1}}},
+                     {"g":{"kwargs":{"rotation_mode": "householder"}}},
+                     {"g":{"kwargs":{"rotation_mode": "angles"}}},
+                     {"g":{"kwargs":{"rotation_mode": "triangular_combination"}}},
+                     {"g":{"kwargs":{"rotation_mode": "cayley"}}}
+
+                     ]
 
         
         for enc in encoders:

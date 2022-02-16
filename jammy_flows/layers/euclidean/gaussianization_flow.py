@@ -5,7 +5,7 @@ import numpy
 from .. import bisection_n_newton as bn
 from .. import layer_base
 from ... import extra_functions
-
+from .. import matrix_fns
 from . import euclidean_base
 
 import math
@@ -15,6 +15,7 @@ import scipy.linalg
 from scipy.optimize import minimize
 import time
 normal_dist=tdist.Normal(0, 1)
+import itertools
 
 import pylab
 
@@ -46,8 +47,9 @@ def generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_no
 
 
 class gf_block(euclidean_base.euclidean_base):
-    def __init__(self, 
+    def __init__(self,
                  dimension, 
+                 nonlinear_stretch_type="classic",
                  num_kde=5, 
                  num_householder_iter=-1, 
                  use_permanent_parameters=False, 
@@ -60,7 +62,8 @@ class gf_block(euclidean_base.euclidean_base):
                  upper_bound_for_widths=100,
                  clamp_widths=0,
                  regulate_normalization=0,
-                 add_skewness=0):
+                 add_skewness=0,
+                 rotation_mode="householder"):
         """
         Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
         to use reparametrization trick for VAEs due to Newton iterations.
@@ -74,6 +77,8 @@ class gf_block(euclidean_base.euclidean_base):
         """
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
         self.init = False
+
+        self.nonlinear_stretch_type=nonlinear_stretch_type
 
         assert(lower_bound_for_widths>0.0)
         self.width_min=lower_bound_for_widths
@@ -125,31 +130,75 @@ class gf_block(euclidean_base.euclidean_base):
         #######################################
 
         ## Householder rotations
+        self.rotation_mode=rotation_mode
+        if(self.rotation_mode=="triangular_combination"):
 
-        if num_householder_iter == -1:
-            self.householder_iter = dimension #min(dimension, 10)
-        else:
-            self.householder_iter = num_householder_iter
+            ## diagonal + lower/upper (uni) triangular matrices
+            num_triangle_params=int(self.dimension-1+ (self.dimension*(self.dimension-1)))
+            self.num_triangle_params=num_triangle_params
 
-        self.use_householder=True
-        if(self.householder_iter==0):
-           
-            self.use_householder=False
-
-
-        self.num_householder_params=0
-
-        if self.use_householder:
+            self.total_param_num+=num_triangle_params
             if(use_permanent_parameters):
-                self.vs = nn.Parameter(
-                    torch.randn(self.householder_iter, dimension).type(torch.double).unsqueeze(0)
-                )
+
+                if(self.dimension>1):
+                    self.triangle_trafo_pars = nn.Parameter(
+                        torch.randn(num_triangle_params).type(torch.double).unsqueeze(0)
+                    )
+           
+        elif(self.rotation_mode=="householder"):
+            if num_householder_iter == -1:
+                self.householder_iter = dimension #min(dimension, 10)
             else:
-                self.vs = torch.zeros(self.householder_iter, dimension).type(torch.double).unsqueeze(0) 
+                self.householder_iter = num_householder_iter
 
-            self.num_householder_params=self.householder_iter*self.dimension
+            self.use_householder=True
+            if(self.householder_iter==0):
+               
+                self.use_householder=False
 
-        self.total_param_num+=self.num_householder_params
+
+            self.num_householder_params=0
+
+            if self.use_householder:
+                if(use_permanent_parameters):
+                    self.vs = nn.Parameter(
+                        torch.randn(self.householder_iter, dimension).type(torch.double).unsqueeze(0)
+                    )
+                else:
+                    self.vs = torch.zeros(self.householder_iter, dimension).type(torch.double).unsqueeze(0) 
+
+                self.num_householder_params=self.householder_iter*self.dimension
+
+            self.total_param_num+=self.num_householder_params
+
+        elif(self.rotation_mode=="angles"):
+            self.num_angle_pars=0
+
+            if(self.dimension>1):
+                self.num_angle_pars=int((self.dimension*(self.dimension-1)/2))
+
+                self.total_param_num+=self.num_angle_pars
+
+                #assert(self.dimension==2), "requires 2 dims at the moment"
+
+                if(use_permanent_parameters):
+                    self.angle_pars=nn.Parameter(torch.randn((1, self.num_angle_pars)).type(torch.double))
+
+        elif(self.rotation_mode=="cayley"):
+            self.num_cayley_pars=0
+
+            if(self.dimension>1):
+                self.num_cayley_pars=1
+                self.num_cayley_pars=self.num_cayley_pars
+
+                self.total_param_num+=self.num_cayley_pars
+
+                assert(self.dimension==2), "Cayley requires 2 dims at the moment"
+
+                if(use_permanent_parameters):
+                    self.cayley_pars=nn.Parameter(torch.randn((1, 1)).type(torch.double))
+
+
 
         #######################################
 
@@ -607,6 +656,97 @@ class gf_block(euclidean_base.euclidean_base):
         x: batch of data -> x.shape[0] = batch_size
         """
 
+        extra_input_counter=0
+
+        rotation_params=None
+
+        if(self.rotation_mode=="triangular_combination"):
+
+            if(self.dimension>1):
+
+                num_params_per_mat=int(self.dimension*(self.dimension-1)/2)
+
+                if(extra_inputs is None):
+                    left_triangular_pars=self.triangle_trafo_pars[:,:num_params_per_mat].to(x)
+                    diagonal_pars=self.triangle_trafo_pars[:,num_params_per_mat:num_params_per_mat+self.dimension-1].to(x)
+                    right_triangular_pars=self.triangle_trafo_pars[:,num_params_per_mat+self.dimension-1:2*num_params_per_mat+self.dimension-1].to(x)
+
+                else:
+                    left_triangular_pars=extra_inputs[:,:num_params_per_mat]
+                    diagonal_pars=extra_inputs[:,num_params_per_mat:num_params_per_mat+self.dimension-1]
+                    right_triangular_pars=extra_inputs[:,num_params_per_mat+self.dimension-1:2*num_params_per_mat+self.dimension-1]
+                        
+                    extra_input_counter+=self.num_triangle_params
+
+                rotation_params=(left_triangular_pars, diagonal_pars, right_triangular_pars)
+
+        elif(self.rotation_mode=="householder"):
+           
+            if self.use_householder:
+                this_vs=self.vs.to(x)
+                if(extra_inputs is not None):
+                    
+                    this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.vs.shape[1], self.vs.shape[2]])
+
+                    
+                    extra_input_counter+=self.num_householder_params
+
+                ## rotation_params is actually a matrix
+                rotation_params = self.compute_householder_matrix(this_vs, device=x.device)
+
+        elif(self.rotation_mode=="angles"):
+            # implemented as givens rotations
+            if(self.dimension>1):
+
+                if(extra_inputs is None):
+
+                    rotation_params=self.angle_pars.to(x)
+
+                else:
+                    rotation_params=extra_inputs[:, :self.num_angle_pars]
+                extra_input_counter+=self.num_angle_pars
+
+                combi_list=[]
+
+                for a, b in itertools.combinations(numpy.arange(self.dimension), 2):
+                    combi_list.append( (a,b) )
+
+                base_matrix=torch.eye(self.dimension).to(rotation_params).unsqueeze(0).repeat(rotation_params.shape[0],1,1)
+
+                prev_matrix=base_matrix
+                
+                for ind, combi in enumerate(combi_list):
+
+                    new_matrix=base_matrix.clone()
+
+                    new_matrix[:, combi[0], combi[0]]=torch.cos(rotation_params[:, ind])
+                    new_matrix[:, combi[1], combi[1]]=new_matrix[:, combi[0], combi[0]]
+                    new_matrix[:, combi[0], combi[1]]=torch.sin(rotation_params[:, ind])
+                    new_matrix[:, combi[1], combi[0]]=-new_matrix[:, combi[0], combi[1]]
+
+                    prev_matrix=torch.bmm(new_matrix, prev_matrix)
+               
+                rotation_params=prev_matrix
+
+        elif(self.rotation_mode=="cayley"):
+
+            if(self.dimension>1):
+                if(extra_inputs is None):
+
+                    rotation_params=self.cayley_pars.to(x)
+
+                else:
+                    rotation_params=extra_inputs[:, :self.num_cayley_pars]
+
+                extra_input_counter+=self.num_cayley_pars
+                mult_fac=1.0/(1+rotation_params**2)
+                rot_matrix=torch.diag_embed( ((1-rotation_params**2)*mult_fac).repeat(1,2))
+                rot_matrix[:,0:1,1:2]=(-2*rotation_params*mult_fac).unsqueeze(-1)
+                rot_matrix[:,1:2,0:1]=(2*rotation_params*mult_fac).unsqueeze(-1)
+
+                rotation_params=rot_matrix
+
+
         kde_log_skew_exponents=self.kde_log_skew_exponents.to(x)
         kde_skew_signs=self.kde_skew_signs.to(x)
 
@@ -621,7 +761,7 @@ class gf_block(euclidean_base.euclidean_base):
             
         else:
             ## skipping householder params
-            extra_input_counter=self.num_householder_params
+            #extra_input_counter=self.num_householder_params
 
             kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
             extra_input_counter+=self.num_params_datapoints
@@ -654,7 +794,7 @@ class gf_block(euclidean_base.euclidean_base):
     
             kde_log_skew_exponents=self.exponent_regulator(kde_log_skew_exponents)
 
-        return kde_means, kde_log_widths, kde_log_weights, kde_log_skew_exponents, kde_skew_signs
+        return (kde_means, kde_log_widths, kde_log_weights, kde_log_skew_exponents, kde_skew_signs), rotation_params
         ## if we fit normalization ... 
 
 
@@ -663,91 +803,94 @@ class gf_block(euclidean_base.euclidean_base):
         [z, log_det]=inputs
 
         device=z.device
-
+        """
         extra_input_counter=0
 
-        if self.use_householder:
-            this_vs=self.vs.to(z)
+        if(self.use_hh_replacement):
 
             if(extra_inputs is not None):
 
-              
-                this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [z.shape[0], self.vs.shape[1], self.vs.shape[2]])
+                extra_input_counter
 
-                extra_input_counter+=self.num_householder_params
-        
-            rotation_matrix = self.compute_householder_matrix(this_vs, device=z.device)
+            else:
 
-            if(rotation_matrix.shape[0]<z.shape[0]):
-                if(rotation_matrix.shape[0]==1):
-                    rotation_matrix=rotation_matrix.repeat(z.shape[0], 1,1)
-                else:
-                    raise Exception("something went wrong with first dim of rot matrix!")
+        else:
+            if self.use_householder:
+                this_vs=self.vs.to(z)
 
+                if(extra_inputs is not None):
 
-        flow_params=self._obtain_usable_flow_params(z, extra_inputs=extra_inputs)
+                  
+                    this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [z.shape[0], self.vs.shape[1], self.vs.shape[2]])
+
+                    extra_input_counter+=self.num_householder_params
+            
+                rotation_matrix = self.compute_householder_matrix(this_vs, device=z.device)
+
+                if(rotation_matrix.shape[0]<z.shape[0]):
+                    if(rotation_matrix.shape[0]==1):
+                        rotation_matrix=rotation_matrix.repeat(z.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+        """
+
+        flow_params, rotation_params=self._obtain_usable_flow_params(z, extra_inputs=extra_inputs)
         
         res=bn.inverse_bisection_n_newton_joint_func_and_grad(self.sigmoid_inv_error_pass_w_params, self.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1],flow_params[2],flow_params[3],flow_params[4], min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
         log_deriv=self.sigmoid_inv_error_pass_log_derivative_w_params(res, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4])
 
         log_det=log_det-log_deriv.sum(axis=-1)
 
-        if self.use_householder:
-         
-            res = torch.bmm(rotation_matrix, res.unsqueeze(-1)).squeeze(-1)
-       
+        if(self.rotation_mode=="triangular_combination"):
+          
+            if(self.dimension>1):
+                left,middle,right=rotation_params
+
+                zero_entries=torch.zeros(self.dimension).to(res).unsqueeze(0)
+
+                trafo_matrix_right, _=matrix_fns.obtain_lower_triangular_matrix_and_logdet(self.dimension, log_diagonal_entries=zero_entries, lower_triangular_entries=right, upper_triangular=True)
+                trafo_matrix_left, _=matrix_fns.obtain_lower_triangular_matrix_and_logdet(self.dimension, log_diagonal_entries=zero_entries, lower_triangular_entries=left)
+                diag=torch.cat([middle, -middle.sum(axis=1, keepdims=True)], dim=1)
+
+                if(trafo_matrix_right.shape[0]<z.shape[0]):
+                    if(trafo_matrix_right.shape[0]==1):
+                        trafo_matrix_right=trafo_matrix_right.repeat(z.shape[0], 1,1)
+                        trafo_matrix_left=trafo_matrix_left.repeat(z.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+                
+                res = torch.bmm(trafo_matrix_right, res.unsqueeze(-1)).squeeze(-1)
+                
+                res=res*torch.exp(diag)
+               
+                res = torch.bmm(trafo_matrix_left, res.unsqueeze(-1)).squeeze(-1)
+               
+        elif(self.rotation_mode=="householder"):
+            if self.use_householder:
+
+                if(rotation_params.shape[0]<z.shape[0]):
+                    if(rotation_params.shape[0]==1):
+                        rotation_params=rotation_params.repeat(z.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+
+                res = torch.bmm(rotation_params, res.unsqueeze(-1)).squeeze(-1)
+        
+        elif(self.rotation_mode=="angles" or self.rotation_mode=="cayley"):
+
+            if(self.dimension>1):
+                if(rotation_params is not None):
+                    if(rotation_params.shape[0]<z.shape[0]):
+                        if(rotation_params.shape[0]==1):
+                            rotation_params=rotation_params.repeat(z.shape[0], 1,1)
+                        else:
+                            raise Exception("something went wrong with first dim of rot matrix!")
+
+                res = torch.bmm(rotation_params, res.unsqueeze(-1)).squeeze(-1)
+
         return res, log_det
 
-    def _get_desired_init_parameters(self):
-
-        ## householder params / means of kdes / log_widths of kdes / normalizations (if fit normalization)
-
-        desired_param_vec=[]
-
-        ## householder
-        if(self.num_householder_params > 0):
-            desired_param_vec.append(torch.randn(self.householder_iter*self.dimension))
-
-        ## means
-        desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
-
-        ## widths
-        desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)
-
-        ## normalization
-        if(self.fit_normalization):
-            desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
-
-        ## normalization
-        if(self.add_skewness):
-            desired_param_vec.append(torch.zeros(self.num_kde*self.dimension))
-
-        return torch.cat(desired_param_vec)
-
-    def _init_params(self, params):
-
-        counter=0
-        if self.use_householder:
-           
-              
-            self.vs.data=torch.reshape(params[:self.num_householder_params], [1, self.householder_iter,self.dimension])
-
-            counter+=self.num_householder_params
-
-        
-        self.kde_means.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-        counter+=self.num_params_datapoints
-
-        self.kde_log_widths.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-        counter+=self.num_params_datapoints
-
-        if(self.fit_normalization):
-            self.kde_log_weights.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-            counter+=self.num_params_datapoints
-
-        if(self.add_skewness):
-            self.kde_log_skew_exponents.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-            counter+=self.num_params_datapoints
+    
 
 
 
@@ -755,7 +898,10 @@ class gf_block(euclidean_base.euclidean_base):
 
         [x, log_det] = inputs
 
+        """
         extra_input_counter=0
+
+
         if self.use_householder:
             this_vs=self.vs.to(x)
             if(extra_inputs is not None):
@@ -776,21 +922,152 @@ class gf_block(euclidean_base.euclidean_base):
                     raise Exception("something went wrong with first dim of rot matrix!")
 
             x = torch.bmm(rotation_matrix.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)  # uncomment
+        """
+
 
         #############################################################################################
         # Compute inverse CDF
         #############################################################################################
+        flow_params, rotation_params=self._obtain_usable_flow_params(x, extra_inputs=extra_inputs)
 
-        flow_params=self._obtain_usable_flow_params(x, extra_inputs=extra_inputs)
+        if(self.rotation_mode=="triangular_combination"):
 
-       
-        #log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs).sum(axis=-1)
+            if(self.dimension>1):
+                left,middle,right=rotation_params
 
-        x, log_deriv=self.sigmoid_inv_error_pass_combined_val_n_log_derivative(x, *flow_params)
+                zero_entries=torch.zeros(self.dimension).to(x).unsqueeze(0)
 
-        log_det=log_det+log_deriv.sum(axis=-1)
+                inverse_trafo_matrix_right, _=matrix_fns.obtain_inverse_lower_triangular_matrix_and_logdet(self.dimension, log_diagonal_entries=zero_entries, lower_triangular_entries=right, upper_triangular=True)
+                inverse_trafo_matrix_left, _=matrix_fns.obtain_inverse_lower_triangular_matrix_and_logdet(self.dimension, log_diagonal_entries=zero_entries, lower_triangular_entries=left)
+                diag=torch.cat([middle, -middle.sum(axis=1, keepdims=True)], dim=1)
+
+                if(inverse_trafo_matrix_right.shape[0]<x.shape[0]):
+                    if(inverse_trafo_matrix_right.shape[0]==1):
+                        inverse_trafo_matrix_right=inverse_trafo_matrix_right.repeat(x.shape[0], 1,1)
+                        inverse_trafo_matrix_left=inverse_trafo_matrix_left.repeat(x.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+
+               
+                x = torch.bmm(inverse_trafo_matrix_left, x.unsqueeze(-1)).squeeze(-1)
+              
+                x=x/torch.exp(diag)
+
+                x = torch.bmm(inverse_trafo_matrix_right, x.unsqueeze(-1)).squeeze(-1)
+            
+        elif(self.rotation_mode=="householder"):
+            if self.use_householder:
+
+                if(rotation_params.shape[0]<x.shape[0]):
+                    if(rotation_params.shape[0]==1):
+                        rotation_params=rotation_params.repeat(x.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+
+                x = torch.bmm(rotation_params.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
+
+        elif(self.rotation_mode=="angles" or self.rotation_mode=="cayley"):
+
+            if(self.dimension>1):
+                if(rotation_params.shape[0]<x.shape[0]):
+                    if(rotation_params.shape[0]==1):
+                        rotation_params=rotation_params.repeat(x.shape[0], 1,1)
+                    else:
+                        raise Exception("something went wrong with first dim of rot matrix!")
+
+                x = torch.bmm(rotation_params.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
+
+        ###############################
+
+        if(self.nonlinear_stretch_type=="classic"):
+        
+            #log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs).sum(axis=-1)
+
+            x, log_deriv=self.sigmoid_inv_error_pass_combined_val_n_log_derivative(x, *flow_params)
+
+            log_det=log_det+log_deriv.sum(axis=-1)
+
+        elif(self.nonlinear_stretch_type=="spline"):
+            raise Exception()
+            print("None")
+            #x, log_det_update=spline_fns.
 
         return x, log_det
+
+    def _get_desired_init_parameters(self):
+
+        ## householder params / means of kdes / log_widths of kdes / normalizations (if fit normalization)
+
+        desired_param_vec=[]
+
+        ## householder
+        if(self.rotation_mode=="triangular_combination"):
+            desired_param_vec.append(torch.zeros(self.num_triangle_params))
+        elif(self.rotation_mode=="householder"):
+            if(self.num_householder_params > 0):
+                desired_param_vec.append(torch.randn(self.householder_iter*self.dimension))
+
+        elif(self.rotation_mode=="angles"):
+
+            desired_param_vec.append(torch.zeros(self.num_angle_pars))
+
+        elif(self.rotation_mode=="cayley"):
+            desired_param_vec.append(torch.zeros(self.num_cayley_pars))
+
+        ## means
+        desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
+
+        ## widths
+        desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)
+
+        ## normalization
+        if(self.fit_normalization):
+            desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
+
+        ## normalization
+        if(self.add_skewness):
+            desired_param_vec.append(torch.zeros(self.num_kde*self.dimension))
+
+        return torch.cat(desired_param_vec)
+
+    def _init_params(self, params):
+
+        counter=0
+
+        if(self.rotation_mode=="triangular_combination"):
+            self.triangle_trafo_pars.data=torch.reshape(params[:self.num_triangle_params], [1, self.num_triangle_params])
+
+            counter+=self.num_triangle_params
+        elif(self.rotation_mode=="householder"):
+            if self.use_householder:
+               
+                self.vs.data=torch.reshape(params[:self.num_householder_params], [1, self.householder_iter,self.dimension])
+
+                counter+=self.num_householder_params
+
+        elif(self.rotation_mode=="angles"):
+
+            if(self.dimension>1):
+                self.angle_pars.data=torch.reshape(params[:self.num_angle_pars], [1,self.num_angle_pars])
+                counter+=self.num_angle_pars
+
+        elif(self.rotation_mode=="cayley"):
+            if(self.dimension>1):
+                self.cayley_pars.data=torch.reshape(params[:, self.num_cayley_pars], [1, self.num_cayley_pars])
+        
+        self.kde_means.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+        counter+=self.num_params_datapoints
+
+        self.kde_log_widths.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+        counter+=self.num_params_datapoints
+
+        if(self.fit_normalization):
+            self.kde_log_weights.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+            counter+=self.num_params_datapoints
+
+        if(self.add_skewness):
+            self.kde_log_skew_exponents.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+            counter+=self.num_params_datapoints
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
         """ 
@@ -799,22 +1076,51 @@ class gf_block(euclidean_base.euclidean_base):
 
         extra_input_counter=0
 
-        if self.use_householder:
-            this_vs=self.vs.reshape(1,-1)
-          
-            if(extra_inputs is not None):
-                this_vs=this_vs+extra_inputs[:,:self.num_householder_params]
+        ### rotation stuff
+        if(self.rotation_mode=="triangular_combination"):
+            if(self.dimension>1):
+                if(extra_inputs is None):
+                    param_dict[extra_prefix+"trianglepars"]=self.triangle_trafo_pars.data
+                else:
+                    param_dict[extra_prefix+"trianglepars"]=extra_inputs[:,:self.num_triangle_params]
 
-                extra_input_counter+=self.num_householder_params
-            
-            param_dict[extra_prefix+"vs"]=this_vs.data
+                    extra_input_counter+=self.num_triangle_params
+        elif(self.rotation_mode=="householder"):
+            if self.use_householder:
+                this_vs=self.vs.reshape(1, -1)
+              
+                if(extra_inputs is not None):
+                    this_vs=this_vs+extra_inputs[:,:self.num_householder_params]
 
-            this_vs=torch.reshape(this_vs, [1, self.dimension, self.dimension])
+                    extra_input_counter+=self.num_householder_params
+                
+                param_dict[extra_prefix+"vs"]=this_vs.data
 
-            this_vs_determinant=torch.det(self.compute_householder_matrix(this_vs))
+                this_vs=torch.reshape(this_vs, [-1, self.dimension, self.dimension])
 
-            param_dict[extra_prefix+"hh_det"]=this_vs_determinant
+                this_vs_determinant=torch.det(self.compute_householder_matrix(this_vs))
 
+                param_dict[extra_prefix+"hh_det"]=this_vs_determinant
+
+        elif(self.rotation_mode=="angles"):
+            if(self.dimension>1):
+                if(extra_inputs is None):
+                    param_dict[extra_prefix+"anglears"]=self.angle_pars.data
+                else:
+                    param_dict[extra_prefix+"anglepars"]=extra_inputs[:,:self.num_angle_pars]
+
+                    extra_input_counter+=self.num_angle_pars
+        elif(self.rotation_mode=="cayley"):
+            if(self.dimension>1):
+                if(extra_inputs is None):
+                    param_dict[extra_prefix+"cayleypars"]=self.cayley_pars.data
+                else:
+                    param_dict[extra_prefix+"cayleypars"]=extra_inputs[:,:self.num_cayley_pars]
+
+                    extra_input_counter+=self.num_cayley_pars
+
+
+        ### non rotation stuff
         kde_log_skew_exponents=self.kde_log_skew_exponents
 
         if(extra_inputs is None):
@@ -825,21 +1131,21 @@ class gf_block(euclidean_base.euclidean_base):
             
         else:
             ## skipping householder params
-            extra_input_counter=self.num_householder_params
+            
 
-            kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+            kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
             extra_input_counter+=self.num_params_datapoints
 
-            kde_log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+            kde_log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
             extra_input_counter+=self.num_params_datapoints
 
             if(self.fit_normalization):
-                kde_log_weights=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+                kde_log_weights=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
                 extra_input_counter+=self.num_params_datapoints
 
             if(self.add_skewness):
 
-                kde_log_skew_exponents=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints]
+                kde_log_skew_exponents=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
         
 
         param_dict[extra_prefix+"means"]=kde_means.data
@@ -932,44 +1238,54 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
                 cur_data=cur_data-means
 
-            if(cur_layer.use_householder):
+            if(cur_layer.rotation_mode=="triangular_combination"):
+                cur_data=cur_data
+                param_list.append(torch.zeros(cur_layer.num_triangle_params))
+            elif(cur_layer.rotation_mode=="householder"):
+                if(cur_layer.use_householder):
 
-                ## find householder params that correspond to orthogonal transformation of svd of X^T*X (PCA data matrix) if low dimensionality
-                this_vs=0
+                    ## find householder params that correspond to orthogonal transformation of svd of X^T*X (PCA data matrix) if low dimensionality
+                    this_vs=0
 
-                ## USE PCA for first layer to get major correlation out of the way
-                if(cur_layer.dimension<30 and layer_ind==0):
+                    ## USE PCA for first layer to get major correlation out of the way
+                    if(cur_layer.dimension<30 and layer_ind==0):
 
-                    data_matrix=torch.matmul(cur_data.T, cur_data)
+                        data_matrix=torch.matmul(cur_data.T, cur_data)
 
-                    evalues, evecs=scipy.linalg.eig(data_matrix)
+                        evalues, evecs=scipy.linalg.eig(data_matrix)
 
-                    l, sigma, r=scipy.linalg.svd(data_matrix)
-                    
-                    loss_fn=get_loss_fn(r, num_householder_iter=cur_layer.householder_iter)
+                        l, sigma, r=scipy.linalg.svd(data_matrix)
+                        
+                        loss_fn=get_loss_fn(r, num_householder_iter=cur_layer.householder_iter)
 
-                    start_vec=numpy.random.normal(size=dim*dim)
+                        start_vec=numpy.random.normal(size=dim*dim)
 
-                    ## fit a matrix via householder parametrization such that it fits the target orthogonal matrix V^* from SVD of X^T*X (PCA data Matrix)
-                    res=minimize(loss_fn, start_vec)
+                        ## fit a matrix via householder parametrization such that it fits the target orthogonal matrix V^* from SVD of X^T*X (PCA data Matrix)
+                        res=minimize(loss_fn, start_vec)
 
-                    param_list.append(torch.from_numpy(res["x"]))
-                    this_vs=torch.from_numpy(res["x"])
-                    
-                else:
+                        param_list.append(torch.from_numpy(res["x"]))
+                        this_vs=torch.from_numpy(res["x"])
+                        
+                    else:
 
-                    this_vs=torch.randn(cur_layer.dimension*cur_layer.householder_iter)
-                    param_list.append(this_vs)
+                        this_vs=torch.randn(cur_layer.dimension*cur_layer.householder_iter)
+                        param_list.append(this_vs)
 
-                gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
+                    gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
 
-                hh_pars=this_vs.reshape(gblock.vs.shape)
-                rotation_matrix=gblock.compute_householder_matrix(hh_pars)
-                rotation_matrix=rotation_matrix.repeat(cur_data.shape[0], 1,1)
-                ## inverted matrix
-                cur_data = torch.bmm(rotation_matrix.permute(0,2,1), cur_data.unsqueeze(-1)).squeeze(-1)
+                    hh_pars=this_vs.reshape(gblock.vs.shape)
+                    rotation_matrix=gblock.compute_householder_matrix(hh_pars)
+                    rotation_matrix=rotation_matrix.repeat(cur_data.shape[0], 1,1)
+                    ## inverted matrix
+                    cur_data = torch.bmm(rotation_matrix.permute(0,2,1), cur_data.unsqueeze(-1)).squeeze(-1)
+            elif(cur_layer.rotation_mode=="angles"):
+                cur_data=cur_data
+                param_list.append(torch.zeros(cur_layer.num_angle_pars))
+            elif(cur_layer.rotation_mode=="cayley"):
+                cur_data=cur_data
+                param_list.append(torch.zeros(cur_layer.num_cayley_pars))
 
-     
+         
             num_kde=cur_layer.num_kde
 
             assert(num_kde<100)

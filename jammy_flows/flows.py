@@ -196,7 +196,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["width_smooth_saturation"]=1 # 
         self.flow_dict["g"]["kwargs"]["regulate_normalization"]=1
         self.flow_dict["g"]["kwargs"]["add_skewness"]=0
-
+        self.flow_dict["g"]["kwargs"]["rotation_mode"]="householder"
 
         self.flow_dict["h"] = dict()
         self.flow_dict["h"]["module"] = gf_block_old
@@ -253,8 +253,9 @@ class pdf(nn.Module):
         self.flow_dict["m"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["m"]["kwargs"]["use_extra_householder"] = 0
         self.flow_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["m"]["kwargs"]["num_moebius"] = 5
+        self.flow_dict["m"]["kwargs"]["num_basis_functions"] = 5
         self.flow_dict["m"]["kwargs"]["natural_direction"] = 0
+        self.flow_dict["m"]["kwargs"]["use_splines"] = 0
 
         """
         S2 flows
@@ -266,7 +267,7 @@ class pdf(nn.Module):
         self.flow_dict["n"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["n"]["kwargs"]["use_extra_householder"] = 1
         self.flow_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["n"]["kwargs"]["num_moebius"] = 10
+        self.flow_dict["n"]["kwargs"]["num_basis_functions"] = 10
         self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = True
         self.flow_dict["n"]["kwargs"]["zenith_type_layers"] = "r"
         self.flow_dict["n"]["kwargs"]["max_rank"] = -1
@@ -1417,8 +1418,8 @@ class pdf(nn.Module):
             data_type = data_summary.dtype
             used_device = data_summary.device
 
-            assert(data_summary.dim()==2)
-            assert(data_summary.shape[0]==1), ("Requiring batćh size of 1! .. having .. ", data_summary.shape[0])
+            assert(data_summary.dim()==2), data_summary
+            #assert(data_summary.shape[0]==1), ("Requiring batćh size of 1! .. having .. ", data_summary.shape[0])
 
         x=None
         log_gauss_evals=0.0

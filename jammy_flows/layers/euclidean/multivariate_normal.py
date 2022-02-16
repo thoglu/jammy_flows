@@ -5,7 +5,7 @@ import numpy
 from .. import bisection_n_newton as bn
 from .. import layer_base
 from ... import extra_functions
-
+from .. import matrix_fns
 from . import euclidean_base
 
 import math
@@ -182,150 +182,6 @@ class mvn_block(euclidean_base.euclidean_base):
 
         #######################################
 
-    def obtain_transformation_matrix_and_logdet(self, single_log_diagonal_entry=None, log_diagonal_entries=None, lower_triangular_entries=None, cov_type="full", upper_triangular=False):
-        """
-        Obtain lower trinagular (cholesky) matrix. Diagonal entries have to be positive
-        """
-        ## all variances are the same
-        if(cov_type=="unit_gaussian"):
-
-            return torch.eye(self.dimension, dtype=torch.float64).unsqueeze(0), 0.0
-
-        elif(cov_type=="diagonal_symmetric"):
-            assert(single_log_diagonal_entry is not None)
-            assert(single_log_diagonal_entry.shape[1]==1)
-
-            full_diagonal=single_log_diagonal_entry.repeat(1, self.dimension)
-
-            return torch.diag_embed(full_diagonal.exp()), self.dimension*single_log_diagonal_entry.sum(axis=-1)
-
-        elif(cov_type=="diagonal"):
-            assert(log_diagonal_entries is not None)
-            assert(log_diagonal_entries.shape[1]==self.dimension)
-
-            return torch.diag_embed(torch.exp(log_diagonal_entries)), log_diagonal_entries.sum(axis=-1)
-
-        elif(cov_type=="full"):
-
-            assert(log_diagonal_entries is not None)
-
-            assert(lower_triangular_entries.shape[1]==int(self.dimension*(self.dimension-1)/2) )
-
-            cum_indices=numpy.cumsum(numpy.arange(self.dimension)+1)
-            tot_output=0.0
-
-            for ind in range(self.dimension):
-
-                offset=-self.dimension+ind+1
-
-                if(ind==(self.dimension-1)):
-                    ## diagonal
-                    tot_output=tot_output+torch.diag_embed(torch.exp(log_diagonal_entries))
-                else:
-
-                    if(ind==0):
-                        ## add 
-                        tot_output=tot_output+torch.diag_embed(lower_triangular_entries[:,:cum_indices[ind]], offset=offset)
-                    else:   
-                        tot_output=tot_output+torch.diag_embed(lower_triangular_entries[:, cum_indices[ind-1]:cum_indices[ind]], offset=offset)
-
-            if(upper_triangular):
-                # upper triangular matrix is just transpose of lower triangular
-                tot_output=tot_output.permute(0, 2,1)
-
-            return tot_output, log_diagonal_entries.sum(axis=-1)
-
-        else:
-            raise Exception("Unknown cov type", cov_type)
-
-    def obtain_inverse_transformation_matrix_and_logdet(self, single_log_diagonal_entry=None, log_diagonal_entries=None, lower_triangular_entries=None, cov_type="full", upper_triangular=False):
-
-        if(cov_type=="unit_gaussian"):
-
-            return torch.eye(self.dimension, dtype=torch.float64).unsqueeze(0), 0.0
-
-        elif(cov_type=="diagonal_symmetric"):
-            assert(single_log_diagonal_entry is not None)
-            assert(single_log_diagonal_entry.shape[1]==1)
-
-            full_diagonal=(torch.exp(-single_log_diagonal_entry)).repeat(1, self.dimension)
-
-            return torch.diag_embed(full_diagonal), -self.dimension*single_log_diagonal_entry.sum(axis=-1)
-
-        elif(cov_type=="diagonal"):
-            assert(log_diagonal_entries is not None)
-            assert(log_diagonal_entries.shape[1]==self.dimension)
-
-            return torch.diag_embed(torch.exp(-log_diagonal_entries)), -log_diagonal_entries.sum(axis=-1)
-
-        elif(cov_type=="full"):
-
-            assert(log_diagonal_entries is not None)
-            assert(lower_triangular_entries is not None)
-
-            cum_indices=numpy.cumsum(numpy.arange(self.dimension)+1)
-            tot_output=0.0
-
-            ## obtain regular matrix .. determinantes of sub matrices are used for inverse
-            regular_matrix,_=self.obtain_transformation_matrix_and_logdet(log_diagonal_entries=log_diagonal_entries, lower_triangular_entries=lower_triangular_entries, cov_type="full")
-            
-
-            largest_submatrix=regular_matrix[:, 1:,:-1]
-
-            for ind in range(self.dimension):
-
-                # ind= 0 -> offset = dim-1
-                # ind =1 -> offset = dim-2 ...
-                # ind = dim-1 -> offset = 0
-
-                offset=-self.dimension+ind+1
-
-                if(ind==(self.dimension-1)):
-                    ## diagonal
-                    tot_output=tot_output+torch.diag_embed(torch.exp(-log_diagonal_entries))
-                else:
-
-                    use_sign_flip=int(numpy.fabs(offset))%2
-
-                    sign_factor=1.0
-                    if(use_sign_flip==1):
-                        sign_factor=-1.0
-
-                    ## inverse off diagonal entries are sub-determinants divided by comibnations of diagonal
-                    if(ind==0):
-                        ## the first 
-                        #print("IND 0")
-                       
-                        
-                        entry=(torch.det(largest_submatrix).unsqueeze(-1))/torch.exp(torch.sum(log_diagonal_entries, dim=1, keepdims=True))
-
-                        tot_output=tot_output+torch.diag_embed(entry*sign_factor, offset=offset)
-
-                    else:   
-
-                        off_diagonals=[]
-                        num_off_diagonals=ind+1
-                        largest_submatrix_subdim=self.dimension-1
-
-                        individual_matrices_subdim=largest_submatrix_subdim-ind
-
-                        for sub_ind in range(num_off_diagonals):
-                            
-                            off_diagonals.append(sign_factor*(torch.det(largest_submatrix[:, sub_ind:sub_ind+individual_matrices_subdim, sub_ind:sub_ind+individual_matrices_subdim]).unsqueeze(-1))/torch.exp(torch.sum(log_diagonal_entries[:, sub_ind:sub_ind+individual_matrices_subdim+1], dim=1, keepdims=True) ) )
-                            
-                        off_diagonals=torch.cat(off_diagonals, dim=1)
-                        tot_output=tot_output+torch.diag_embed(off_diagonals, offset=offset)
-
-
-            if(upper_triangular):
-                tot_output=tot_output.permute(0,2,1)
-
-         
-            return tot_output, -log_diagonal_entries.sum(axis=-1)
-
-        else:
-            raise Exception("Unknown cov type", cov_type)
-
 
     def _obtain_usable_flow_params(self, x, cov_type, extra_inputs=None):
 
@@ -379,7 +235,7 @@ class mvn_block(euclidean_base.euclidean_base):
         single_log_diagonal, full_log_diagonal, lower_triangular_entries=self._obtain_usable_flow_params(z, self.cov_type, extra_inputs=extra_inputs)
 
         # use inverse of lower transformation matrix
-        trafo_matrix, extra_logdet=self.obtain_inverse_transformation_matrix_and_logdet(single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
+        trafo_matrix, extra_logdet=matrix_fns.obtain_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
 
         res=torch.einsum("...ij, ...j", trafo_matrix, z)
         log_det=log_det+extra_logdet
@@ -397,7 +253,7 @@ class mvn_block(euclidean_base.euclidean_base):
         single_log_diagonal, full_log_diagonal, lower_triangular_entries=self._obtain_usable_flow_params(x, self.cov_type, extra_inputs=extra_inputs)
 
         ## normally the inverse mapping involves the Upper trinagular matrix .. but we can just a well work with the lower triangular one, which just perumtes the dimensions
-        trafo_matrix, extra_logdet=self.obtain_transformation_matrix_and_logdet(single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
+        trafo_matrix, extra_logdet=matrix_fns.obtain_inverse_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
 
         #res=torch.bmm(trafo_matrix, x)
         res=torch.einsum("...ij, ...j", trafo_matrix, x)
