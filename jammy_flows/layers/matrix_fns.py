@@ -61,7 +61,7 @@ def obtain_inverse_lower_triangular_matrix_and_logdet(dimension, single_log_diag
 
     if(cov_type=="unit_gaussian"):
 
-        return torch.eye(self.dimension, dtype=torch.float64).unsqueeze(0), 0.0
+        return torch.eye(dimension, dtype=torch.float64).unsqueeze(0), 0.0
 
     elif(cov_type=="diagonal_symmetric"):
         assert(single_log_diagonal_entry is not None)
