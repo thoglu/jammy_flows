@@ -13,7 +13,7 @@ import jammy_flows.flows as f
 
 import jammy_flows.helper_fns as helper_fns
 
-import jammy_flows.layers.extra_functions as extra
+import jammy_flows.amortizable_mlp as amortizable_mlp
 
 class Test(unittest.TestCase):
     def setUp(self):
@@ -25,7 +25,7 @@ class Test(unittest.TestCase):
     def test_mlp(self):
 
         ## input dim = 40, 50-50 hidden, 30 output dim
-        mlp_single=extra.AmortizableMLP(15, "",30)
+        mlp_single=amortizable_mlp.AmortizableMLP(15, "",30)
         mlp_single.double()
         flattened_single=self.single_matrix.flatten()
         len_flattened=len(flattened_single)

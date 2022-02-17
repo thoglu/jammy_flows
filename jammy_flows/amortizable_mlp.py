@@ -406,7 +406,8 @@ class AmortizableMLP(nn.Module):
 
     def _adaptive_matmul(self, matrix, vec):
 
-
+        ret=torch.einsum("...ij,...j",matrix,vec)
+        """
         if(vec.dim()==2):
             #res1=torch.matmul(matrix, vec)
             ## A_inputs,outputs * v_outputs
@@ -423,6 +424,7 @@ class AmortizableMLP(nn.Module):
             slices=[slice(None,None)]+[None]*extra_broadcast+[slice(None,None),slice(None,None)]
            
             ret=vec.matmul( (matrix.permute(0,2,1))[slices])
+        """
         return ret
 
     def apply_amortized_mlp(self, mlp_def, prev_argument, params):
@@ -520,7 +522,7 @@ class AmortizableMLP(nn.Module):
         ## we only work with batched inputs
         ## currently dim=2
         #assert i.dim() > 1
-        assert(i.dim()==2)
+        #assert(i.dim()==2)
 
         prev=0.0
 
