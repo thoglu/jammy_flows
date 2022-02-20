@@ -8,6 +8,7 @@ from .layers.euclidean.multivariate_normal import mvn_block
 
 from .layers.spheres.sphere_base import sphere_base
 from .layers.spheres.moebius_1d import moebius
+from .layers.spheres.splines_1d import spline_1d as sphere_spline_1d
 from .layers.spheres.segmented_sphere_nd import segmented_sphere_nd
 from .layers.spheres.exponential_map_s2 import exponential_map_s2
 from .layers.spheres.spherical_do_nothing import spherical_do_nothing
@@ -32,6 +33,8 @@ import collections
 import numpy
 import copy
 import sys
+
+from typing import Union
 
 class pdf(nn.Module):
 
@@ -255,7 +258,17 @@ class pdf(nn.Module):
         self.flow_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["m"]["kwargs"]["num_basis_functions"] = 5
         self.flow_dict["m"]["kwargs"]["natural_direction"] = 0
-        self.flow_dict["m"]["kwargs"]["use_splines"] = 0
+
+        self.flow_dict["o"] = dict()
+        self.flow_dict["o"]["module"] = sphere_spline_1d
+        self.flow_dict["o"]["type"] = "s"
+        self.flow_dict["o"]["kwargs"] = dict()
+        self.flow_dict["o"]["kwargs"]["use_permanent_parameters"]=0
+        self.flow_dict["o"]["kwargs"]["use_extra_householder"] = 0
+        self.flow_dict["o"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
+        self.flow_dict["o"]["kwargs"]["num_basis_functions"] = 5
+        self.flow_dict["o"]["kwargs"]["natural_direction"] = 0
+        
 
         """
         S2 flows
@@ -320,7 +333,7 @@ class pdf(nn.Module):
         self.flow_dict["u"]["kwargs"] = dict()
       
         self.flow_dict["u"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["u"]["kwargs"]["always_parametrize_in_embedding_space"]=0
+        #self.flow_dict["u"]["kwargs"]["always_parametrize_in_embedding_space"]=0
         self.flow_dict["u"]["kwargs"]["project_from_gauss_to_simplex"]=0
 
         self.flow_dict["w"] = dict()
@@ -330,7 +343,7 @@ class pdf(nn.Module):
 
       
         self.flow_dict["w"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["w"]["kwargs"]["always_parametrize_in_embedding_space"]=0
+        #self.flow_dict["w"]["kwargs"]["always_parametrize_in_embedding_space"]=0
         self.flow_dict["w"]["kwargs"]["project_from_gauss_to_simplex"]=0
         """
         Spherical/Euclidean/Interval flows that do nothing
@@ -349,7 +362,8 @@ class pdf(nn.Module):
         self.flow_dict["z"]["module"] = interval_do_nothing
         self.flow_dict["z"]["type"] = "i"
         self.flow_dict["z"]["kwargs"] = dict()
-  
+    
+
 
         for k in flow_defs_detail:
             if k not in self.flow_dict.keys():
@@ -424,7 +438,7 @@ class pdf(nn.Module):
 
 
             for l in self.flow_defs_list[subflow_index][0]:
-                layer_target_dim=self.flow_defs_list[subflow_index][0].get_layer_target_dimension()
+                layer_target_dim=self.flow_defs_list[subflow_index][0].get_layer_intrinsic_target_dimension()
                 layer_base_dim=self.flow_defs_list[subflow_index][0].get_layer_base_dimension()
 
                 cur_target_dims.append(layer_target_dim)
@@ -590,6 +604,33 @@ class pdf(nn.Module):
                     
             self.input_encoder=encoders
 
+    def set_use_embedding_parameters_flag(self, usement_flag, sub_pdf_index=None):
+        """
+        usement_Flag (bool): True/False - 
+        sub_pdf_index (int/None): The index in the layer_list that indices all flows in a certain sub-dimension.
+        Sets a flag in all layers (or the layer column indexed by "column index") that determines if the target dimension is parametrized in intrinsic or embedding coordinates.
+        This has the effect that all manifold-based layers are either 
+        This has
+        """
+        assert( (usement_flag==True or usement_flag==False) )
+
+        for ind, ll in enumerate(self.layer_list):
+
+            check_col=False
+            if(sub_pdf_index==None):
+               
+                check_col=True
+            else:
+                if(ind==sub_pdf_index):
+                    check_col=True
+
+            if(check_col):
+                for l in ll:
+                   
+                    l.always_parametrize_in_embedding_space=usement_flag
+
+        ## update the embedding structure with the new information
+        self.update_embedding_structure()
     
     def init_flow_structure(self):
 
@@ -597,6 +638,7 @@ class pdf(nn.Module):
 
         total_predicted_parameters = 0
 
+        """
         self.target_dims_intrinsic=[]
         self.target_dims_embedded=[]
         self.target_dims=[]
@@ -625,6 +667,7 @@ class pdf(nn.Module):
         ## the total dimension if we use setting sspecified in the layer ops - some layers can be in embedding coords, others not
         total_dim=0
         total_base_dim=0
+        """
 
         ## loop through flows and define layers according to flow definitions
         ## also count number of parameters of each layer
@@ -637,12 +680,12 @@ class pdf(nn.Module):
 
             this_num_layers=len(self.flow_defs_list[subflow_index])
             ## loop thorugh the layers of this particular sub-flow
-
+            """
             cur_target_dims_intrinsic=[]
             cur_target_dims_embedded=[]
             cur_base_dims=[]
-
-            detected_always_embedding_flag=None
+            """
+            #detected_always_embedding_flag=None
 
             for layer_ind, layer_type in enumerate(self.flow_defs_list[subflow_index]):
                 if(self.flow_dict[layer_type]["type"]!=subflow_description[0]):
@@ -650,13 +693,14 @@ class pdf(nn.Module):
                   
                 this_kwargs = copy.deepcopy(self.flow_dict[layer_type]["kwargs"])
 
+                """
                 if("always_parametrize_in_embedding_space" in this_kwargs.keys()):
                     ## make sure all layers in this column share the embedding parametrization
                     if(detected_always_embedding_flag is not None):
                         assert(detected_always_embedding_flag==this_kwargs["always_parametrize_in_embedding_space"])
                     else:
                         detected_always_embedding_flag=this_kwargs["always_parametrize_in_embedding_space"]
-                    
+                """
 
 
                 ## overwrite permanent parameters if desired or necessary
@@ -729,15 +773,17 @@ class pdf(nn.Module):
                 #main_def=p.split("_")[0]
 
                 # the first layer in this layer list defines the input dimension .. will be crosschecked later against all other layers
-                
-                layer_target_dim_intrinsic=self.layer_list[subflow_index][-1].get_layer_target_dimension()
+                """
+                layer_target_dim_intrinsic=self.layer_list[subflow_index][-1].get_layer_intrinsic_target_dimension()
                 layer_target_dim_embedded=self.layer_list[subflow_index][-1].get_layer_embedded_target_dimension()
                 layer_base_dim=self.layer_list[subflow_index][-1].get_layer_base_dimension()
 
                 cur_target_dims_intrinsic.append(layer_target_dim_intrinsic)
                 cur_target_dims_embedded.append(layer_target_dim_embedded)
                 cur_base_dims.append(layer_base_dim)
+                """
 
+            """
             ## update dimensions of input/output spaces
             for lind in range(len(cur_target_dims_intrinsic)-1):
                 assert(cur_target_dims_intrinsic[lind]==cur_target_dims_intrinsic[lind+1])
@@ -767,13 +813,16 @@ class pdf(nn.Module):
 
             self.target_dim_indices.append((total_dim, total_dim+self.target_dims[-1]))
             total_dim+=self.target_dims[-1]
+            """
 
         ## define total target/base dims
+        """
         self.total_target_dim_intrinsic=total_dim_intrinsic
         self.total_target_dim_embedded=total_dim_embedded
         self.total_target_dim=total_dim
 
         self.total_base_dim=total_base_dim
+        """
 
 
         ## add log-normalization prediction
@@ -788,6 +837,102 @@ class pdf(nn.Module):
                 self.log_normalization=torch.zeros(1).type(torch.double).unsqueeze(0)
 
         #self.total_predicted_parameters=total_predicted_parameters
+
+        self.update_embedding_structure()
+
+    def update_embedding_structure(self):
+        """ 
+        Updates the intrinsic dimensions of all layers inside each layer list. All layers of a sub pdf are defined on the same manifold and must share the same embedding setting, which 
+        can be changed by "use_embedding_parameters".
+        """
+
+        self.target_dims_intrinsic=[]
+        self.target_dims_embedded=[]
+        self.target_dims=[]
+
+        # sub-flow indices for the input dimension to describe target-dim for this sub-flow
+
+        # intrinsic coordinates
+        self.target_dim_indices_intrinsic=[]
+
+        # embedding coordinates
+        self.target_dim_indices_embedded=[]
+
+        # actually used and potentially mixed coordinates
+        self.target_dim_indices=[]
+
+        # base dim indices can be different
+        self.base_dim_indices=[]
+
+        
+        ## the total dimension if all manifold layers use intrinsic coordinates
+        total_dim_intrinsic=0
+
+        ## the total dimension if all manifold layers embed coordinates
+        total_dim_embedded=0
+
+        ## the total dimension if we use setting sspecified in the layer ops - some layers can be in embedding coords, others not
+        total_dim=0
+        total_base_dim=0
+
+        for ll in self.layer_list:
+
+            cur_target_dims_intrinsic=[]
+            cur_target_dims_embedded=[]
+            cur_base_dims=[]
+
+            use_embedding_dim=False
+
+            for layer in ll:
+
+                layer_target_dim_intrinsic=layer.get_layer_intrinsic_target_dimension()
+                layer_target_dim_embedded=layer.get_layer_embedded_target_dimension()
+                layer_base_dim=layer.get_layer_base_dimension()
+
+                cur_target_dims_intrinsic.append(layer_target_dim_intrinsic)
+                cur_target_dims_embedded.append(layer_target_dim_embedded)
+                cur_base_dims.append(layer_base_dim)
+                
+                if(layer.always_parametrize_in_embedding_space == True):
+                    use_embedding_dim=True
+
+
+            ## target dimensions of all layers of a given subspace must match 
+            for lind in range(len(cur_target_dims_intrinsic)-1):
+                assert(cur_target_dims_intrinsic[lind]==cur_target_dims_intrinsic[lind+1])
+
+            self.target_dims_intrinsic.append(cur_target_dims_intrinsic[-1])
+            self.target_dims_embedded.append(cur_target_dims_embedded[-1])
+
+            if(use_embedding_dim):
+                self.target_dims.append(cur_target_dims_embedded[-1])
+            else:
+                self.target_dims.append(cur_target_dims_intrinsic[-1])
+
+            #self.base_dims_list.append(cur_base_dims)
+
+            ## the base dim of the first layer is really the important one for the total base dim of sub-PFDs
+            self.base_dim_indices.append((total_base_dim, total_base_dim+cur_base_dims[0]))
+            total_base_dim+=cur_base_dims[0]
+
+            self.target_dim_indices_intrinsic.append((total_dim_intrinsic, total_dim_intrinsic+self.target_dims_intrinsic[-1]))
+            total_dim_intrinsic+=self.target_dims_intrinsic[-1]
+
+            self.target_dim_indices_embedded.append((total_dim_embedded, total_dim_embedded+self.target_dims_embedded[-1]))
+            total_dim_embedded+=self.target_dims_embedded[-1]
+
+            self.target_dim_indices.append((total_dim, total_dim+self.target_dims[-1]))
+            total_dim+=self.target_dims[-1]
+
+        #####
+
+        self.total_target_dim_intrinsic=total_dim_intrinsic
+        self.total_target_dim_embedded=total_dim_embedded
+        self.total_target_dim=total_dim
+
+        self.total_base_dim=total_base_dim
+      
+
 
     def init_encoding_structure(self):
 
@@ -1241,12 +1386,18 @@ class pdf(nn.Module):
         
     def all_layer_inverse(self, x, log_det, data_summary, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
 
+        ## make sure we transform to default settings (potentially mixed) if we force embedding/intrinsic coordinates
         if(force_embedding_coordinates):
-            assert(x.shape[1]==self.total_target_dim_embedded)
+            assert(x.shape[1]==self.total_target_dim_embedded), (x.shape[1], self.total_target_dim_embedded)
+
+            x, log_det=self.transform_target_space(x, log_det, transform_from="embedding", transform_to="default")
         elif(force_intrinsic_coordinates):
             assert(x.shape[1]==self.total_target_dim_intrinsic)
+
+            x, log_det=self.transform_target_space(x, log_det, transform_from="intrinsic", transform_to="default")
         else:
             assert(x.shape[1]==self.total_target_dim), (x.shape[1], self.total_target_dim)
+
 
         extra_conditional_input=[]
         base_targets=[]
@@ -1344,7 +1495,7 @@ class pdf(nn.Module):
  
                 if(l==(len(pdf_layers)-1)):
                     # force embedding or intrinsic coordinates in the layer that defines the target dimension
-                    this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                    this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
                 else:
 
                     this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
@@ -1380,7 +1531,7 @@ class pdf(nn.Module):
     def forward(self, x, conditional_input=None, debug=False, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
 
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf!"
-        
+
         tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
         data_summary=self._conditional_input_to_summary(conditional_input=conditional_input)
@@ -1702,9 +1853,8 @@ class pdf(nn.Module):
                     
                     this_extra_params = extra_params[:, extra_param_counter : extra_param_counter + layer.total_param_num]
               
-               
                 if(l==(len(pdf_layers)-1)):
-                    this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params,force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                    this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
                 else:
                     this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
                 
@@ -1721,7 +1871,18 @@ class pdf(nn.Module):
         if (torch.isfinite(x) == 0).sum() > 0:
             raise Exception("nonfinite samples generated .. this should never happen!")
 
-        return torch.cat(new_targets, dim=1), log_det
+        x=torch.cat(new_targets, dim=1)
+
+        ## transform to desired output space 
+        if(force_embedding_coordinates):
+
+            x, log_det=self.transform_target_space(x, log_det, transform_from="default", transform_to="embedding")
+        elif(force_intrinsic_coordinates):
+            assert(x.shape[1]==self.total_target_dim_intrinsic)
+
+            x, log_det=self.transform_target_space(x, log_det, transform_from="default", transform_to="intrinsic")
+        
+        return x, log_det
 
     def _obtain_sample(self, conditional_input=None, predefined_target_input=None, samplesize=1, seed=None, device=torch.device("cpu"), amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
         
@@ -1791,7 +1952,7 @@ class pdf(nn.Module):
         ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
         return new_targets, unit_gauss_samples, -log_det + log_gauss_evals, log_gauss_evals
 
-    def get_returnable_target_dim(self):
+    def get_total_embedding_dim(self):
         """
         This function is used in the autoregressive structure and returns the total dimension of all sub PDFs. Embedded Manifold PDFs add dimensions
         to return the embedding space dimension.
@@ -1803,7 +1964,7 @@ class pdf(nn.Module):
         
         return tot_dim
 
-    def transform_target_into_returnable_params(self, target):
+    def transform_target_space(self, target, log_det=0, transform_from="default", transform_to="embedding"):
         """
         Transform the destimation space of the PDF into a returnable param list (i.e. transform spherical angles into x/y/z pairs, so increase the dimensionality of spherical dimensions by 1)
         """
@@ -1814,24 +1975,45 @@ class pdf(nn.Module):
             new_target=target.unsqueeze(0)
 
         ## transforming only makes sense if input has correct target shape
-        assert(new_target.shape[1]==self.total_target_dim)
+        if(transform_from=="default"):
+            assert(new_target.shape[1]==self.total_target_dim)
+        elif(transform_from=="intrinsic"):
+            assert(new_target.shape[1]==self.total_target_dim_intrinsic)
+        elif(transform_from=="embedding"):
+            assert(new_target.shape[1]==self.total_target_dim_embedded) 
 
         potentially_transformed_vals=[]
 
         index=0
         for pdf_index, pdf_type in enumerate(self.pdf_defs_list):
-            this_dim=self.target_dims[pdf_index]
-           
-            this_target=self.layer_list[pdf_index][-1]._embedding_conditional_return(new_target[:,index:index+this_dim])
 
+            if(transform_from=="default"):
+                this_dim=self.target_dims[pdf_index]
+            elif(transform_from=="intrinsic"):
+                this_dim=self.target_dims_intrinsic[pdf_index]
+            elif(transform_from=="embedding"):
+                this_dim=self.target_dims_embedded[pdf_index]
+            
+            this_target, log_det=self.layer_list[pdf_index][-1].transform_target_space(new_target[:,index:index+this_dim], log_det=log_det, transform_from=transform_from, transform_to=transform_to)
+            
             potentially_transformed_vals.append(this_target)
 
+            index+=this_dim
+
         potentially_transformed_vals=torch.cat(potentially_transformed_vals, dim=1)
+
+        if(transform_to=="default"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim)
+        elif(transform_to=="intrinsic"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim_intrinsic), (potentially_transformed_vals.shape, self.total_target_dim_intrinsic)
+        elif(transform_to=="embedding"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim_embedded), (new_target.shape[1], self.total_target_dim_embedded)  
+
 
         if(len(target.shape)==1):
             potentially_transformed_vals=potentially_transformed_vals.squeeze(0)
 
-        return potentially_transformed_vals
+        return potentially_transformed_vals, log_det
 
     ########
 

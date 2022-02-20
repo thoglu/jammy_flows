@@ -161,10 +161,10 @@ class simplex_base(layer_base.layer_base):
 
     #def canonical_simplex_to_base_simplex(self, inputs):
 
-    def inv_flow_mapping(self, inputs, extra_inputs=None,use_gauss_projection=True, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
+    def inv_flow_mapping(self, inputs, extra_inputs=None,use_gauss_projection=True):
         
         [res, log_det] = inputs
-
+        """
         if(force_embedding_coordinates):
 
             assert(force_intrinsic_coordinates==False)
@@ -185,7 +185,7 @@ class simplex_base(layer_base.layer_base):
                 assert(res.shape[1]==(self.dimension+1))
             else:
                 assert(res.shape[1]==self.dimension)
-
+        """
 
         res, log_det=self._inv_flow_mapping([res, log_det], extra_inputs=extra_inputs)
         
@@ -218,6 +218,7 @@ class simplex_base(layer_base.layer_base):
         ### all flow mappings happen at the base simplex
         res, log_det= self._flow_mapping([res, log_det], extra_inputs=extra_inputs)
 
+        """
         if(force_embedding_coordinates):
 
             assert(force_intrinsic_coordinates==False)
@@ -231,7 +232,7 @@ class simplex_base(layer_base.layer_base):
             ## check if we are in canonical simplex, if so project to base simplex because it is forced
             if(res.shape[1]==(self.dimension+1)):
                 res, log_det=self.canonical_simplex_to_base_simplex([res, log_det])
-
+        """
 
         return res, log_det
 
@@ -263,6 +264,53 @@ class simplex_base(layer_base.layer_base):
 
     def _embedding_conditional_return_num(self): 
         return self.dimension+1
+
+    def transform_target_space(self, x, log_det=0.0, transform_from="default", transform_to="embedding"):
+        
+        currently_intrinsic=True
+        if(transform_from=="default"):
+            if(self.always_parametrize_in_embedding_space):
+                assert(x.shape[1]==(self.dimension+1))
+                currently_intrinsic=False
+            else:
+                assert(x.shape[1]==self.dimension)
+
+        elif(transform_from=="intrinsic"):
+            assert(x.shape[1]==self.dimension)
+
+        elif(transform_from=="embedding"):
+            assert(x.shape[1]==(self.dimension+1))
+            currently_intrinsic=False
+
+
+        if(transform_to=="default"):
+            if(self.always_parametrize_in_embedding_space):
+                if(currently_intrinsic):
+                    new_x, new_ld=self.base_simplex_to_canonical_simplex([x,log_det])
+
+                    return new_x, new_ld
+                else:
+                    return x, log_det
+            else:
+                if(currently_intrinsic):
+                    return x, log_det
+                else:
+                    new_x, new_ld=self.canonical_simplex_to_base_simplex([x,log_det])
+                    return new_x, new_ld
+
+        elif(transform_to=="intrinsic"):
+            if(currently_intrinsic):
+                return x, log_det
+            else:
+                new_x, new_ld=self.canonical_simplex_to_base_simplex([x,log_det])
+                return new_x, log_det
+        elif(transform_to=="embedding"):
+            if(currently_intrinsic):
+                new_x, new_ld=self.base_simplex_to_canonical_simplex([x,log_det])
+
+                return new_x, new_ld
+            else:
+                return x, log_det
 
     def _get_layer_base_dimension(self):
         """ 

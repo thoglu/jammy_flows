@@ -30,18 +30,27 @@ def seed_everything(seed_no):
 ############################
 
 if __name__ == "__main__":
-    seed_everything(0)
+
+    parser = argparse.ArgumentParser('train_example')
+
+    parser.add_argument("-layer_def", type=str, default="n")
+    parser.add_argument("-num_samples", type=int, default=100000)
+    #parser.add_argument("-projection", type=str, default="lambert", choices=["lambert", "standard"]) 
+
+    args=parser.parse_args()
+
+    seed_everything(1)
     ## define PDF
 
     extra_flow_defs=dict()
     extra_flow_defs["n"]=dict()
     extra_flow_defs["n"]["kwargs"]=dict()
     extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
-    extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=1
-    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="r"
+    extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=0
+    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="rr"
     
 
-    word_pdf=jammy_flows.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
+    word_pdf=jammy_flows.pdf("s2", args.layer_def, flow_defs_detail=extra_flow_defs)
 
     #res,_,_,_=word_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
 
@@ -63,13 +72,25 @@ if __name__ == "__main__":
         true_azi=min_azi+ind*azi_step
 
         ## visualize PDF for different "true positions", i.e. from different vantage points
-        bounds=[ [-2.0,2.0], [-2.0,2.0]]
+       
+    
       
-        fig=pylab.figure()
+        fig=pylab.figure(figsize=(9,4))
 
-        helper_fns.visualize_pdf(word_pdf, fig, s2_norm="lambert", nsamples=500000, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=False, bounds=bounds, s2_rotate_to_true_value=True)
+        gs=fig.add_gridspec(1, 2)
 
+        lambert_gridspec = gs[0, 0]
+        lambert_bounds=[ [-2.0,2.0], [-2.0,2.0]]
+        _,_,total_integral=helper_fns.visualize_pdf(word_pdf, fig, gridspec=lambert_gridspec, s2_norm="lambert", nsamples=args.num_samples, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=False, bounds=lambert_bounds, s2_rotate_to_true_value=True)
 
+        pylab.gca().set_title("PDF integral: %.3f" % total_integral)
+        normal_gridspec = gs[0, 1]
+        standard_bounds=None
+        _,_,total_integral=helper_fns.visualize_pdf(word_pdf, fig, gridspec=normal_gridspec, s2_norm="standard", nsamples=args.num_samples, true_values=torch.Tensor([true_zen,true_azi]),skip_plotting_density=False, skip_plotting_samples=False, bounds=standard_bounds, s2_rotate_to_true_value=True)
+
+        pylab.gca().set_title("PDF integral: %.3f" % total_integral)
+
+        fig.tight_layout()
         if(not os.path.exists("figs")):
             os.makedirs("figs")
         pylab.savefig("figs/zen_%.3f_azi_%.3f.png" % (true_zen, true_azi))

@@ -16,7 +16,12 @@ class spherical_do_nothing(sphere_base.sphere_base):
 
         sf_extra=None
 
-        ret_x=x
+        if(self.always_parametrize_in_embedding_space==True):
+            # s2 flow is defined in embedding space,
+            #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+
+            x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+       
         if(self.higher_order_cylinder_parametrization):
 
             cos_coords=0.5-0.5*torch.cos(x[:, :self.dimension-1])
@@ -33,16 +38,26 @@ class spherical_do_nothing(sphere_base.sphere_base):
             ## ddx = sin(x)/2
             log_det+=0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
-            ret_x[:,:self.dimension-1]=ln_cyl
+            x[:,:self.dimension-1]=ln_cyl
 
-        return ret_x, log_det, sf_extra
+        if(self.always_parametrize_in_embedding_space==True):
+            # s2 flow is defined in embedding space,
+            #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
+
+        return x, log_det, sf_extra
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         
        
         [x,log_det]=inputs
 
-        ret_x=x
+        if(self.always_parametrize_in_embedding_space==True):
+            # s2 flow is defined in embedding space,
+            #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+
+            x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
         if(self.higher_order_cylinder_parametrization):
 
@@ -51,10 +66,15 @@ class spherical_do_nothing(sphere_base.sphere_base):
             ## ddx = sin(x)/2
             log_det+=-0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
-            ret_x[:,:self.dimension-1]=torch.acos(1.0-2.0*ln_cyl.exp())
+            x[:,:self.dimension-1]=torch.acos(1.0-2.0*ln_cyl.exp())
 
+        if(self.always_parametrize_in_embedding_space==True):
+            # s2 flow is defined in embedding space,
+            #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
     
-        return ret_x, log_det
+        return x, log_det
 
     def _init_params(self, params):
 
@@ -63,3 +83,7 @@ class spherical_do_nothing(sphere_base.sphere_base):
     def _get_desired_init_parameters(self):
         
         return torch.Tensor([])
+
+    def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
+        # do nothing
+        return

@@ -119,6 +119,7 @@ class Test(unittest.TestCase):
         self.flow_inits.append([ ["e1", "p"], dict()])
         self.flow_inits.append([ ["e1", "g"], dict()])
         self.flow_inits.append([ ["s1", "m"], dict()])
+        self.flow_inits.append([ ["s1", "o"], dict()])
 
         ### s1 with splines
 
@@ -126,7 +127,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]=dict()
         extra_flow_defs["flow_defs_detail"]["m"]=dict()
         extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]["use_splines"]=1
+        #extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]["use_splines"]=1
 
         self.flow_inits.append([ ["s1", "m"], extra_flow_defs])
 

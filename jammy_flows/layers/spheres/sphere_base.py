@@ -37,18 +37,24 @@ class sphere_base(layer_base.layer_base):
 
                 self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
 
-    def return_safe_angle(self, x):
-
+    def return_safe_angle_within_pi(self, x):
+        """
+        Restricts the angle to not hit 0 or pi exactly.
+        """
         angle_diff=1e-10
 
         small_mask=x<angle_diff
-
         large_mask=x>(numpy.pi-angle_diff)
 
+        ret=torch.where(small_mask, angle_diff, x)
+        ret=torch.where(large_mask, numpy.pi-angle_diff, x)
+
+        """
         ret=torch.ones_like(x)
         ret[small_mask]=angle_diff
         ret[large_mask]=numpy.pi-angle_diff
         ret[(~small_mask) & (~large_mask)]=x[(~small_mask) & (~large_mask)]
+        """
 
         return ret
 
@@ -68,34 +74,44 @@ class sphere_base(layer_base.layer_base):
 
         return Q
 
-    def eucl_to_spherical_embedding(self, x):
+    def eucl_to_spherical_embedding(self, x, log_det):
         
         ## Follows convention in DOI: 10.2307/2308932
-        
+        #####
+        ### X = f(theta) -> det(dX/dtheta) = sin(theta)
+        ### theta=f^-1(X) -> det(df^-1/dX) = 1/sin(theta) (used here)
+
         angles=[]
         for ind in range(x.shape[1]-1):
             if(ind< (x.shape[1]-2)):
+                # 0 to pi angle
                 angles.append(torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt()))
+
+                if(self.dimension>1):
+                    assert(self.dimension == 2), "This direction is currently only implemented for d=2"
+                    log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
             else:
 
+                # last one is 0 to 2pi
                 new_angle=torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt())
-                mask_smaller=(x[:,ind+1:ind+2]<0).double()
-                
-                new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
+                #mask_smaller=(x[:,ind+1:ind+2]<0).double()
+                new_angle=torch.where(x[:,ind+1:ind+2]<0, 2*numpy.pi-new_angle, new_angle)
+
+                #new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
                 angles.append(new_angle)
 
-        return torch.cat(angles, dim=1)
+        return torch.cat(angles, dim=1), log_det
 
-    def spherical_to_eucl_embedding(self, x):
-
+    def spherical_to_eucl_embedding(self, x, log_det):
+       
         ## Follows convention in DOI: 10.2307/2308932
         ## 2d is flipped, and 3d is permuted twice from usual x=rcosphi sin theta, y=r sinphi sintheta, z= r cos theta
-
+        ## TODO: change to standard convention for more convenience 
         if(self.dimension==1):
 
-            eucl=torch.cat( [torch.cos(x), torch.sin(x)], dim=1)
+            eucl=torch.cat( [torch.sin(x), torch.cos(x)], dim=1)
 
-            return eucl
+            return eucl, log_det
 
         elif(self.dimension==2):
             # theta / phi
@@ -108,7 +124,9 @@ class sphere_base(layer_base.layer_base):
 
             eucl=torch.cat( [x,y,z], dim=1)
 
-            return eucl
+            log_det=log_det+torch.log(torch.sin(theta)).sum(axis=-1)
+
+            return eucl, log_det
         else:
 
             eucl_list=[]
@@ -146,8 +164,9 @@ class sphere_base(layer_base.layer_base):
             if(ind==0):
                 radius=(x**2).sum(dim=1, keepdims=True).sqrt()
 
-                ## we dont want radii of exactly 0
-                radius[radius==0]=1e-10
+                ## we dont want radii of exactly 0 normally
+                ## but we can allow it because we drop the usual log_det(radius) below aswell
+                #radius[radius==0]=1e-10
 
                 transformed_coords.append(radius)
                 keep_sign=(x>=0)*1.0
@@ -168,8 +187,9 @@ class sphere_base(layer_base.layer_base):
                
                 if(ind==self.dimension-1):
                     ## last one, check sign flip
-                    mask_smaller=(x[:,ind:ind+1]<0).double()
-                    new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
+                    mask_smaller=(x[:,ind:ind+1]<0)#.double()
+                    new_angle=torch.where(mask_smaller, 2*numpy.pi-new_angle, new_angle)
+                    #new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
                 else:
                     raise NotImplementedError("D>2 not implemented for D-spheres currently")
                     log_det=log_det+torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
@@ -233,6 +253,9 @@ class sphere_base(layer_base.layer_base):
             sign=(x>numpy.pi)*-1.0+(x<=numpy.pi)*1.0
             new_x=(sign>0)*x+(sign<0)*(2*numpy.pi-x)
 
+            ## make sure we dont get any infs
+            new_x=torch.where(new_x==0.0, 1e-8, new_x)
+            new_x=torch.where(new_x==2*numpy.pi, 2*numpy.pi-1e-8, new_x)
 
             ## based on -pi-pi
             #sign=(x<0)*-1.0+(x>=0)*1.0
@@ -257,24 +280,26 @@ class sphere_base(layer_base.layer_base):
 
                 x[:,0:1]=torch.exp(lnr)#
 
-                #print("logdet sphere_to_plane ", (-x[:,0:1]).sum(axis=-1))
+                #print("log_det sphere_to_plane ", (-x[:,0:1]).sum(axis=-1))
                 
             else:
                 cos_x=torch.cos(x[:,0:1])
               
                 good_cos_x=(cos_x!=1.0) & (cos_x!=-1.0)
-               
-                cos_x=(cos_x==1.0)*(cos_x-1e-5)+(cos_x==-1.0)*(cos_x+1e-5)+good_cos_x*cos_x
+                
+                cos_x=torch.where(cos_x==1.0, cos_x-1e-5, cos_x)
+                cos_x=torch.where(cos_x==-1.0, cos_x+1e-5, cos_x)
 
+                #cos_x=(cos_x==1.0)*(cos_x-1e-5)+(cos_x==-1.0)*(cos_x+1e-5)+good_cos_x*cos_x
                 r_g=torch.sqrt(-torch.log( (1.0-cos_x)/2.0 )*2.0)
  
                 inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
 
-                ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
+                ## the normal log_det .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ### FULL TERM:
                 ### log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
-                log_det=log_det-torch.log(1.0-cos_x[:,0])#+torch.log(torch.sin(x[:,0]))
+                log_det=log_det-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
         
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
 
@@ -297,6 +322,8 @@ class sphere_base(layer_base.layer_base):
             log_det=log_det+numpy.log(numpy.sqrt(2.0*numpy.pi))-(x[:,0]**2)/2.0
             
             x=numpy.pi*(1.0-torch.erf(x/numpy.sqrt(2.0)))
+
+            
             
             ## go from 0/pi and +1/-1 binary sign to a full 2pi range and get rid of the binary sign
             #x=keep_sign*x+(1.0-keep_sign)*(-x)
@@ -330,7 +357,7 @@ class sphere_base(layer_base.layer_base):
                 sf_extra=sfcyl
                 x[:,0:1]=lncyl
 
-                #print("logdet planetosphere ", (lncyl).sum(axis=-1))
+                #print("log_det planetosphere ", (lncyl).sum(axis=-1))
                
             else:
 
@@ -346,11 +373,13 @@ class sphere_base(layer_base.layer_base):
                 # |dr/dtheta| = (1/r)/(1-cos(theta)) * sin(theta)
                 ## sin(theta) is the area element factor
 
-                ## the normal logdet .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
+                ## the normal log_det .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ## FULL TERM:
                 ## log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
-                log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
+
+               
+                log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))+torch.log(torch.sin(new_theta[:,0]))
               
                
                 x=torch.cat([new_theta, x[:,1:2]],dim=1)
@@ -365,12 +394,36 @@ class sphere_base(layer_base.layer_base):
     def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
         
         [x, log_det] = inputs
+        """
+        ## check if we force embedding coordinates
+        if(force_embedding_coordinates):
 
+            assert(force_intrinsic_coordinates==False)
+            assert(x.shape[1]==(self.dimension+1))
+            ## check if we are in base simplex, if so embed in canonical simplex because it is forced
+            if(self.always_parametrize_in_embedding_space==False):
+                # typically this flow takes intrinsic coordinates, but we overwrite this here...
+                x, log_det=self.eucl_to_spherical_embedding([x, log_det])
+
+        elif(force_intrinsic_coordinates):
+            assert(x.shape[1]==self.dimension)
+            ## check if we are in canonical simplex, if so project to base simplex because it is forced
+            if(self.always_parametrize_in_embedding_space):
+                x, log_det=self.spherical_to_eucl_embedding([x, log_det])
+        else:
+
+            if(self.always_parametrize_in_embedding_space):
+                assert(x.shape[1]==(self.dimension+1))
+            else:
+                assert(x.shape[1]==self.dimension)
+        """
         ## (1) apply inverse householder rotation if desired
 
         if(self.use_extra_householder):
-           
-            eucl=self.spherical_to_eucl_embedding(x)
+            
+
+            if(self.always_parametrize_in_embedding_space==False):
+                x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
             ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
             hh_dim=self.dimension+1
@@ -388,19 +441,21 @@ class sphere_base(layer_base.layer_base):
             mat=self.compute_householder_matrix(mat_pars, hh_dim, device=x.device)
 
             ## permute because we do inverse rotation
-            eucl = torch.bmm(mat.permute(0,2,1), eucl.unsqueeze(-1)).squeeze(-1)
+            x = torch.bmm(mat.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
 
-            x=self.eucl_to_spherical_embedding(eucl)
+            #x=self.eucl_to_spherical_embedding(eucl)
+            if(self.always_parametrize_in_embedding_space==False):
+                x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
-
-        
-        ## correction required due to sphere
-        if(x.shape[1]==2):
+            
+        ## correction required on 2-sphere
+        """
+        if(self.dimension==2):
             #print("inv 1) x ", x[:,0:1])
-            safe_angles=self.return_safe_angle(x[:,0:1])
+            safe_angles=self.return_safe_angle_within_pi(x[:,0:1])
             x=torch.cat( [safe_angles, x[:,1:]], dim=1)
             #log_det+=-torch.log(torch.sin(x[:,0]))
-          
+        """
             #print("inv 1) ld ", -torch.log(torch.sin(x[:,0])))
         ## (2) apply sphere intrinsic inverse flow function
         ## in 1 d case, _inv_flow_mapping should take as input values between 0 and 2pi, and outputs values between -pi and pi for easier further processing
@@ -412,15 +467,22 @@ class sphere_base(layer_base.layer_base):
             inv_flow_results = self._inv_flow_mapping([x, log_det], extra_inputs=extra_inputs[:, self.num_householder_params:])
         
         x, log_det = inv_flow_results[:2]
-
+     
         if(self.higher_order_cylinder_parametrization):
             sf_extra=inv_flow_results[2]
-
+        
         ## (3) apply sphere to euclidean space stereographic projection if this is the first flow in the chain
         if(self.euclidean_to_sphere_as_first):
 
-            x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
+            ## only if sf_extra is None we want to transform
+         
+            if(self.always_parametrize_in_embedding_space and sf_extra is None):
+                x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
+       
+            #sys.exit(-1)
+            x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
+            
         return x, log_det
 
     ## flow mapping (sampling pass)
@@ -433,26 +495,32 @@ class sphere_base(layer_base.layer_base):
         if(self.euclidean_to_sphere_as_first):
             x, log_det, sf_extra=self.plane_to_sphere(x, log_det)
 
+            if(self.always_parametrize_in_embedding_space and sf_extra is None):
+                x, log_det=self.spherical_to_eucl_embedding(x, log_det)
+      
         ## (2) apply sphere-intrinsic flow
         if(extra_inputs is None):
             x,log_det = self._flow_mapping([x, log_det], sf_extra=sf_extra)
         else:   
             x,log_det = self._flow_mapping([x, log_det], extra_inputs=extra_inputs[:, self.num_householder_params:], sf_extra=sf_extra)
 
-        ## correction due to sphere            
-        if(x.shape[1]==2):
+        ## safety check on 2-sphere  
+        """         
+        if(self.dimension==2):
 
-            safe_angles=self.return_safe_angle(x[:,0:1])
+            safe_angles=self.return_safe_angle_within_pi(x[:,0:1])
 
             x=torch.cat( [safe_angles, x[:,1:]], dim=1)
 
             #log_det+=torch.log(torch.sin(x[:,0]))
+        """
     
         ## (3) apply householder rotation in embedding space if wanted
         #extra_input_counter=0
         if(self.use_extra_householder):
 
-            eucl=self.spherical_to_eucl_embedding(x)
+            if(self.always_parametrize_in_embedding_space==False):
+                x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
             #xy=torch.cat((x, y), dim=1)
 
@@ -474,9 +542,27 @@ class sphere_base(layer_base.layer_base):
 
             mat=self.compute_householder_matrix(mat_pars, hh_dim, device=x.device)
 
-            eucl = torch.bmm(mat, eucl.unsqueeze(-1)).squeeze(-1)  # uncomment
+            x = torch.bmm(mat, x.unsqueeze(-1)).squeeze(-1)  # uncomment
            
-            x=self.eucl_to_spherical_embedding(eucl)
+            if(self.always_parametrize_in_embedding_space==False):
+                x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+
+        """
+        if(force_embedding_coordinates):
+
+            assert(force_intrinsic_coordinates==False)
+
+            ## check if we are in intrinsic .. if so embedd
+            if(x.shape[1]==self.dimension):
+                x, log_det=self.spherical_to_eucl_embedding(x, log_det)
+
+        elif(force_intrinsic_coordinates):
+
+            ## check if we are embedded, if so go to instrinsic
+            if(res.shape[1]==(self.dimension+1)):
+                x, log_det=self.eucl_to_spherical_embedding(x, log_det)
+            
+        """
 
         return x,log_det
 
@@ -516,7 +602,7 @@ class sphere_base(layer_base.layer_base):
         if(self.use_extra_householder==False):
             return torch.Tensor([])
         
-        eucl=self.spherical_to_eucl_embedding(x)
+        eucl, _=self.spherical_to_eucl_embedding(x,0.0)
 
         ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
         hh_dim=self.dimension+1
@@ -536,7 +622,7 @@ class sphere_base(layer_base.layer_base):
         ## permute because we do inverse rotation
         eucl = torch.bmm(mat.permute(0,2,1), eucl.unsqueeze(-1)).squeeze(-1)
 
-        new_pts=self.eucl_to_spherical_embedding(eucl)
+        new_pts,_=self.eucl_to_spherical_embedding(eucl,0.0)
 
         mask=(new_pts[:,0]<flag_pole_distance) | (new_pts[:,0] >(numpy.pi-flag_pole_distance))
         #mask=(new_pts[:,1]<flag_pole_distance) | (new_pts[:,1] >(2*numpy.pi-flag_pole_distance))
@@ -564,14 +650,73 @@ class sphere_base(layer_base.layer_base):
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
         """ 
-        Implemented by Euclidean sublayers.
+        Implemented by sublayers.
         """
         raise NotImplementedError
 
     def _embedding_conditional_return(self, x):
-        return self.spherical_to_eucl_embedding(x)
+
+        if(x.shape[1]==self.dimension):
+            x,_=self.spherical_to_eucl_embedding(x,0.0)
+
+        return x
+
+    def _embedding_conditional_return(self, x):
+
+        if(x.shape[1]==self.dimension):
+            x,_=self.spherical_to_eucl_embedding(x,0.0)
+
+        return x
+
     def _embedding_conditional_return_num(self): 
         return self.dimension+1
+
+    def transform_target_space(self, x, log_det=0.0, transform_from="default", transform_to="embedding"):
+        
+        currently_intrinsic=True
+        if(transform_from=="default"):
+            if(self.always_parametrize_in_embedding_space):
+                assert(x.shape[1]==(self.dimension+1))
+                currently_intrinsic=False
+            else:
+                assert(x.shape[1]==self.dimension)
+
+        elif(transform_from=="intrinsic"):
+            assert(x.shape[1]==self.dimension)
+
+        elif(transform_from=="embedding"):
+            assert(x.shape[1]==(self.dimension+1))
+            currently_intrinsic=False
+
+
+        if(transform_to=="default"):
+            if(self.always_parametrize_in_embedding_space):
+                if(currently_intrinsic):
+                    new_x, new_ld=self.spherical_to_eucl_embedding(x,log_det)
+
+                    return new_x, new_ld
+                else:
+                    return x, log_det
+            else:
+                if(currently_intrinsic):
+                    return x, log_det
+                else:
+                    new_x, new_ld=self.eucl_to_spherical_embedding(x, log_det)
+                    return new_x, new_ld
+
+        elif(transform_to=="intrinsic"):
+            if(currently_intrinsic):
+                return x, log_det
+            else:
+                new_x, new_ld=self.eucl_to_spherical_embedding(x,log_det)
+                return new_x, new_ld
+        elif(transform_to=="embedding"):
+            if(currently_intrinsic):
+                new_x, new_ld=self.spherical_to_eucl_embedding(x,log_det)
+
+                return new_x, new_ld
+            else:
+                return x, log_det
 
     def _get_layer_base_dimension(self):
         """ 

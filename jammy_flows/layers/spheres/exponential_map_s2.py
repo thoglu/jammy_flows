@@ -443,8 +443,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
         [x,log_det]=inputs
         
-        x_eucl=self.spherical_to_eucl_embedding(x)
-
+       
         potential_pars=self.potential_pars.to(x)
         if(extra_inputs is not None):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
@@ -454,33 +453,47 @@ class exponential_map_s2(sphere_base.sphere_base):
             return inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, tt, potential_pars[1:2] )
         """
 
+        if(self.always_parametrize_in_embedding_space==False):
+            # embedding to intrinsic
+           
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
+           
+
         if(self.natural_direction):
 
 
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x_eucl, potential_pars )
+            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x, potential_pars )
 
             _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
             log_det=log_det-0.5*slog_det
         else:
-            result, jac_squared, _=self.get_exp_map_and_jacobian(x_eucl, potential_pars)
+            result, jac_squared, _=self.get_exp_map_and_jacobian(x, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
-
+            
+            
             log_det=log_det+0.5*slog_det
 
         ## sqrt of det(jacobian^T * jacobian)
         
-        res=self.eucl_to_spherical_embedding(result)
+        #res=self.eucl_to_spherical_embedding(result)
 
-        return res, log_det, None
+        if(self.always_parametrize_in_embedding_space==False):
+            # embedding to intrinsic
+            result, log_det=self.eucl_to_spherical_embedding(result, log_det)
+
+        return result, log_det, None
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         
         [x,log_det]=inputs
         
+        if(self.always_parametrize_in_embedding_space==False):
+            # s2 flow is defined in embedding space,
+            #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
-        x_eucl=self.spherical_to_eucl_embedding(x)
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
         potential_pars=self.potential_pars.to(x)
 
@@ -488,22 +501,23 @@ class exponential_map_s2(sphere_base.sphere_base):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
 
         if(self.natural_direction):
-            result, jac_squared, _=self.get_exp_map_and_jacobian(x_eucl, potential_pars)
+            result, jac_squared, _=self.get_exp_map_and_jacobian(x, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
 
             log_det=log_det+0.5*slog_det
+
         else:
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x_eucl, potential_pars )
+            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x, potential_pars )
 
             _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
             log_det=log_det-0.5*slog_det
 
-        
-        res=self.eucl_to_spherical_embedding(result)
+        if(self.always_parametrize_in_embedding_space==False):
+            result, log_det=self.eucl_to_spherical_embedding(result, log_det)
 
-        return res, log_det
+        return result, log_det
 
     def _init_params(self, params):
 

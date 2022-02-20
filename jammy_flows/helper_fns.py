@@ -99,7 +99,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
         elif(pdf=="s2" and s2_norm=="standard"):
 
-          sin_zen_mask.extend([1,0])
+          sin_zen_mask.extend([0,0])
           
           zen_vals=numpy.linspace(mins_maxs[glob_ind][0]+1e-4, mins_maxs[glob_ind][1]-1e-4, npts)
           side_vals.append(zen_vals)
@@ -160,6 +160,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
                                               target_dim_indices_intrinsic[ind][0]:model.
                                               target_dim_indices_intrinsic[ind][1]], fix_point=fix_point)
         elif("c" in pdf_def):
+           
             ## simplex .. mask everything outside allowed region
             mask_inner=mask_inner & (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1] ].sum(axis=1) < 1.0)
 
@@ -168,7 +169,18 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     
     ## require intrinsic coordinates
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
- 
+
+    print("log res ", log_res)
+    ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
+    for ind, pdf_def in enumerate(model.pdf_defs_list):
+        if (pdf_def == "s2" and s2_norm=="lambert"):
+            ## first coordinate is theta currently
+            print(log_res.shape)
+            upd=torch.log(torch.sin(eval_positions[mask_inner][:,model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][0]+1])).sum(axis=-1)
+            print(upd.shape)
+            ## angle -> cartesian -> subtract
+            log_res-=upd
+            
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])
     if(conditional_input is None and model.pdf_defs_list[0]=="s2"):
@@ -218,7 +230,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     ## add in sin(theta) factors into density
 
-    
+    """
 
     for ind, sz in enumerate(sin_zen_mask):
       if(sz==1):
@@ -228,7 +240,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
         ## log val, adding zenith factors where needed
         res+=numpy.log(zen_vals[slice_mask])
-
+    """
 
     return resized_torch_positions, res, bin_volumes, sin_zen_mask, flagged_coords
 
@@ -652,7 +664,7 @@ def plot_joint_pdf(pdf,
 
    
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
-    print("total pdf ", total_pdf_integral)
+   
     if (dim == 1):
 
         if (subgridspec is None):
@@ -941,7 +953,7 @@ def plot_joint_pdf(pdf,
                         ax.set_xticklabels([])
 
     
-    return subgridspec
+    return subgridspec, total_pdf_integral
 
 
 def visualize_pdf(pdf,
@@ -987,7 +999,7 @@ def visualize_pdf(pdf,
 
       higher_dim_spheres = False
 
-      new_subgridspec = plot_joint_pdf(
+      new_subgridspec, total_pdf_integral = plot_joint_pdf(
           pdf,
           fig,
           gridspec,
@@ -1011,4 +1023,4 @@ def visualize_pdf(pdf,
           skip_plotting_samples=skip_plotting_samples)
         
     
-    return samples, new_subgridspec
+    return samples, new_subgridspec, total_pdf_integral

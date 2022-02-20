@@ -27,7 +27,7 @@ class layer_base(nn.Module):
     def get_layer_embedded_target_dimension(self):
         return self._embedding_conditional_return_num()
 
-    def get_layer_target_dimension(self):
+    def get_layer_intrinsic_target_dimension(self):
         return self.dimension
 
     def get_layer_base_dimension(self):
@@ -48,11 +48,15 @@ class layer_base(nn.Module):
     def inv_flow_mapping(self, input, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False): 
         raise NotImplementedError
     ## every layer must implement this to define how other sub-pdfs (defined by other layers) take this layer dimension as an input. If this is a 1-sphere, for example, the input is potentially better given as x,y pair instead of 0-2pi angle due to the 0/2pi discontinuity of the mapping.
+    
     def _embedding_conditional_return(self, x):
         raise NotImplementedError
 
     def _embedding_conditional_return_num(self): 
         raise NotImplementedError
+
+    def transform_target_space(self, x, log_det=0.0, trafo_from="default", trafo_to="embedding"):
+        raise NotImplementedError()
 
     def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""):
         """

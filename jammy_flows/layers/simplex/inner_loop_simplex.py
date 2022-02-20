@@ -50,7 +50,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
             self.inner_flow_params = nn.Parameter(torch.randn(1, self.total_num_inner_flow_params).type(torch.double))
     
 
-    def _inv_flow_mapping(self, inputs, extra_inputs=None, force_embedding_dimension=None):
+    def _inv_flow_mapping(self, inputs, extra_inputs=None):
 
         """
         From target to base. We only transform the d-dimensional simplex coordinates, not the last d+1 th embedding cooridnate. It is used

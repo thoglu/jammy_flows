@@ -175,9 +175,12 @@ class cnf_sphere_charts(sphere_base.sphere_base):
 
         #print("integration times ", integration_times)
         # initial values
+
+        print(z)
         loc = z.detach()
         tangval = self.man.log(loc, z)
-
+        print("tangval")
+        print(tangval)
         logpz_t = 0
         
         scale = -1 if reverse else 1
@@ -206,6 +209,8 @@ class cnf_sphere_charts(sphere_base.sphere_base):
             y_t, logpy_t = state_t[:2]
             y_t = self.man.proju(loc, y_t)
 
+            print(y_t)
+            
            
             #print("final dy.dt for exp : ", (y_t**2).sum(axis=1).sqrt())
 
@@ -221,6 +226,8 @@ class cnf_sphere_charts(sphere_base.sphere_base):
             #print("num evals .. ", chartfunc.num_evals())
 
         #print("Zn %.20f" % z_n[0][0])
+
+
         return z_n, logpz_t
     """    
     def get_regularization_states(self):
@@ -236,18 +243,20 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
         [x,log_det]=inputs
 
-        x_eucl=self.spherical_to_eucl_embedding(x)
-        
+        if(self.always_parametrize_in_embedding_space==False):
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
      
         if(self.natural_direction):
-
-            res, logdet_fac=self._forward(x_eucl, reverse=True, extra_inputs=extra_inputs)
-            log_det+=logdet_fac
+            print("bef ", x)
+            res, log_det_fac=self._forward(x, reverse=True, extra_inputs=extra_inputs)
+            print("after", res)
+            log_det=log_det+log_det_fac
         else:
-            res, logdet_fac=self._forward(x_eucl, extra_inputs=extra_inputs)
-            log_det+=logdet_fac
+            res, log_det_fac=self._forward(x, extra_inputs=extra_inputs)
+            log_det=log_det+log_det_fac
 
-        res=self.eucl_to_spherical_embedding(res)
+        if(self.always_parametrize_in_embedding_space==False):
+            res, log_det=self.eucl_to_spherical_embedding(res, log_det)
 
         return res, log_det, None
 
@@ -255,18 +264,19 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         
         [x,log_det]=inputs
 
-        x_eucl=self.spherical_to_eucl_embedding(x)
-        
+        if(self.always_parametrize_in_embedding_space==False):
+            x, log_det=self.spherical_to_eucl_embedding(x, log_det)
+
         
         if(self.natural_direction):
-            res, logdet_fac=self._forward(x_eucl, extra_inputs=extra_inputs)
-            log_det+=logdet_fac
+            res, log_det_fac=self._forward(x, extra_inputs=extra_inputs)
+            log_det=log_det+log_det_fac
         else:
-            res, logdet_fac=self._forward(x_eucl, reverse=True, extra_inputs=extra_inputs)
-            log_det+=logdet_fac
+            res, log_det_fac=self._forward(x, reverse=True, extra_inputs=extra_inputs)
+            log_det=log_det+log_det_fac
 
-       
-        res=self.eucl_to_spherical_embedding(res)
+        if(self.always_parametrize_in_embedding_space==False):
+            res, log_det=self.eucl_to_spherical_embedding(res, log_det)
 
         return res, log_det
 
@@ -274,9 +284,9 @@ class cnf_sphere_charts(sphere_base.sphere_base):
 
         assert(len(params)== (self.num_nn_pars))
 
-        #self.cnf_network.initialize_uvbs()
+        self.cnf_network.initialize_uvbs()
         print("multiplying init_params")
-        self.cnf_network.u_v_b_pars.data*=0.1#000.0
+        self.cnf_network.u_v_b_pars.data*=1000.0
 
     def _get_desired_init_parameters(self):
 

@@ -20,20 +20,34 @@ import copy
 #sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
 
 class segmented_sphere_nd(sphere_base.sphere_base):
-    def __init__(self, dimension, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, use_moebius_xyz_parametrization=True, num_moebius=5, zenith_type_layers="g", max_rank=20, hidden_dims="64", subspace_mapping="logistic", higher_order_cylinder_parametrization=False):
+    def __init__(self, 
+                 dimension, 
+                 euclidean_to_sphere_as_first=True, 
+                 use_extra_householder=True, 
+                 use_permanent_parameters=False, 
+                 use_moebius_xyz_parametrization=True, 
+                 num_basis_functions=5, 
+                 zenith_type_layers="g", 
+                 max_rank=20, 
+                 hidden_dims="64", 
+                 subspace_mapping="logistic", 
+                 higher_order_cylinder_parametrization=False):
 
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
         
         if(dimension==1):
             raise Exception("The moebius flow should be used for dimension 1!")
         
-        if(higher_order_cylinder_parametrization==False):
-            raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
+        ## If this is not the only s2-flow, and not the first in the column, switch off shortcut via cylinder for coverage
+        if(self.euclidean_to_sphere_as_first==False):
+            self.higher_order_cylinder_parametrization=False
+        #if(higher_order_cylinder_parametrization==False):
+       #     raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
 
         ## a moebius layer
-        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=0, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_moebius=num_moebius)
-        self.num_moebius_pars=self.moebius_trafo.total_param_num
-        self.total_param_num+=self.num_moebius_pars
+        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=0, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_basis_functions=num_basis_functions)
+        self.num_s1_pars=self.moebius_trafo.total_param_num
+        self.total_param_num+=self.num_s1_pars
 
         self.subspace_mapping=subspace_mapping
 
@@ -166,6 +180,9 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                     return res, log_det
                 else:
 
+                    ### we go to the subspace .. x is the encoded log-cdf values, sf_extra is the encoded log(sf) value
+                    ### no log-det change needed, just taking exponential to be in proper [0,1] range
+
                     return torch.exp(x), log_det
 
 
@@ -182,13 +199,19 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 ##########
 
                 good_scaled=(scaled>0) & (scaled < 1.0)
-                scaled=good_scaled*scaled+(scaled==0)*(scaled+1e-3)+(scaled==1.0)*(scaled-1e-3)
+                scaled=torch.where(scaled<=0.0, 1e-8, scaled)
+                scaled=torch.where(scaled>=1.0, scaled-1e-8,scaled)
 
-                inv=(torch.log(scaled)-torch.log(1.0-scaled))
+                #scaled=good_scaled*scaled+(scaled==0)*(scaled+1e-3)+(scaled==1.0)*(scaled-1e-3)
+
+                if(self.subspace_is_euclidean):
+                    inv=(torch.log(scaled)-torch.log(1.0-scaled))
                
-                log_det=log_det+(-torch.log(scaled)-torch.log(1.0-scaled)).sum(axis=-1)
+                    log_det=log_det+(-torch.log(scaled)-torch.log(1.0-scaled)).sum(axis=-1)
 
-                return inv, log_det
+                    return inv, log_det
+                else:
+                    return scaled, log_det
         else:
             raise Exception("Unknown subspace mapping", self.subspace_mapping)
 
@@ -211,19 +234,21 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                     #print("from eucl subspace ", lncyl, sf_extra)
                     return lncyl, log_det, sf_extra
                 else:
-
+                    ## we are already in subspace of [0,1] .. no log-det change needed
+                    ## lncyl takes log of lowe boundary, sf_extra takes log of higher_boundary (1-x),i.e. the survival function
                     lncyl=torch.log(x)
                     sf_extra=torch.log(1.0-x)
 
                     return lncyl, log_det, sf_extra
 
             else:
+                    
+                if(self.subspace_is_euclidean):
+                    lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
                 
-                lsexp=torch.cat( [torch.zeros_like(x).to(x)[:,:,None], x[:,:,None]] , dim=2).logsumexp(dim=2)
-            
-                log_det=log_det+(x-2.0*lsexp).sum(axis=-1)
+                    log_det=log_det+(x-2.0*lsexp).sum(axis=-1)
 
-                res=1.0/(1.0+torch.exp(-x))
+                    x=1.0/(1.0+torch.exp(-x))
 
                 #### linear trafo
                 #res*=numpy.pi
@@ -234,10 +259,11 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 ## FIXME .. this is only correct for 2-d!!
                 
                 #log_det+=-0.5*torch.log(res-res**2)[:,0]
-                res=torch.acos(1.0-2*res)
-                log_det=log_det-torch.log(torch.sin(res[:,0])/2.0)
+
+                x=torch.acos(1.0-2*x)
+                log_det=log_det-torch.log(torch.sin(x[:,0])/2.0)
                 
-                return res, log_det, None
+                return x, log_det, None
         else:
             raise Exception("Unknown subspace mapping", self.subspace_mapping)
 
@@ -248,9 +274,19 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
         [x,log_det]=inputs
 
+        sf_extra=None
+
+        if(self.always_parametrize_in_embedding_space):
+            print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
+
         ## this implementation requires another sin(theta) factor here
         ## 
-        log_det=log_det-torch.log(torch.sin(x[:,0]))
+        #log_det=log_det-torch.log(torch.sin(x[:,0]))
+
+        
+        if(self.always_parametrize_in_embedding_space):
+           
+            x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
         moebius_extra_inputs=None
         if(extra_inputs is not None):
@@ -262,21 +298,25 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         #xm=x[:,self.dimension-1:]
         #print("moeb af",xm )
         potential_eucl=x[:,:self.dimension-1]
-       
-        sf_extra=None
+        
+        ## parameter that holds possibly infinitesimal boundary of cylinder height parametrization
+        
+
         if(self.higher_order_cylinder_parametrization):
-            #print("_inv flow beg x", x[:, :self.dimension-1])
+            ## maps [0,pi] to [0,1]
             cos_coords=0.5-0.5*torch.cos(x[:, :self.dimension-1])
 
             ## small angle approximation of cosine for these values
             small_mask=x[:, :self.dimension-1]<1e-4
             large_mask=x[:, :self.dimension-1]>(numpy.pi-1e-4)
             
-            ln_cyl=torch.log(cos_coords)
-            ln_cyl[small_mask]=2*torch.log(x[:, :self.dimension-1][small_mask])-numpy.log(4.0)
+            #ln_cyl=torch.log(cos_coords)
+            #ln_cyl[small_mask]=2*torch.log(x[:, :self.dimension-1][small_mask])-numpy.log(4.0)
+            ln_cyl=torch.where(small_mask, 2*torch.log(x[:, :self.dimension-1])-numpy.log(4.0), torch.log(cos_coords))
 
-            sf_extra=torch.log(1.0-cos_coords)
-            sf_extra[large_mask]=2*torch.log(numpy.pi-x[:, :self.dimension-1][large_mask])-numpy.log(4.0)
+            sf_extra=torch.where(large_mask, 2*torch.log(numpy.pi-x[:, :self.dimension-1])-numpy.log(4.0), torch.log(1.0-cos_coords))
+            #sf_extra=torch.log(1.0-cos_coords)
+            #sf_extra[large_mask]=2*torch.log(numpy.pi-x[:, :self.dimension-1][large_mask])-numpy.log(4.0)
 
             potential_eucl=ln_cyl
             ## ddx = sin(x)/2
@@ -311,17 +351,30 @@ class segmented_sphere_nd(sphere_base.sphere_base):
          
             potential_eucl, log_det, sf_extra=self.from_subspace(eucl_x, log_det)
 
+        ## combine zylinder
         op=torch.cat([potential_eucl, xm],dim=1)
+
+        ##  if we are the first layer we dont want to embed and pass on sf_extra
+        if(self.always_parametrize_in_embedding_space):
+            op, log_det=self.spherical_to_eucl_embedding(op, log_det)
+        
+        
+
         return op, log_det, sf_extra
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         
+        if(self.always_parametrize_in_embedding_space):
+            print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
         [x,log_det]=inputs
 
         moebius_extra_inputs=None
         if(extra_inputs is not None):
             
             moebius_extra_inputs=extra_inputs[:,self.num_mlp_params:]
+
+        if(self.always_parametrize_in_embedding_space):
+            x, log_det=self.eucl_to_spherical_embedding(x, log_det)
         
         #print("forw moeb ", x[:,self.dimension-1:])
         xm,log_det=self.moebius_trafo.flow_mapping([x[:,self.dimension-1:],log_det], extra_inputs=moebius_extra_inputs)
@@ -370,12 +423,14 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             log_det=log_det-0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
             potential_eucl=torch.acos(1.0-2.0*ln_cyl.exp())
-            
-
+        
+        ## stitch cylinder back to together
         op=torch.cat([potential_eucl, xm],dim=1)
 
-        ## another sin(theta) factor 
-        log_det=log_det+torch.log(torch.sin(op[:,0]))
+        if(self.always_parametrize_in_embedding_space):
+            op, log_det=self.spherical_to_eucl_embedding(op, log_det)
+
+        #log_det=log_det+torch.log(torch.sin(op[:,0]))
 
         return op, log_det
 
@@ -383,7 +438,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
         ## first parameters are MLP / second part is the moebius flow
  
-        assert(len(params)== (self.num_mlp_params+self.num_moebius_pars))
+        assert(len(params)== (self.num_mlp_params+self.num_s1_pars))
 
         if(self.num_mlp_params>0):
             mlp_params=params[:self.num_mlp_params]
@@ -407,7 +462,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         ## The bias should be set to match a good euclidean flow init (i.e. Gaussianization flow)
 
       
-        gaussian_init=torch.randn((self.num_mlp_params+self.num_moebius_pars))/10000.0
+        gaussian_init=torch.randn((self.num_mlp_params+self.num_s1_pars))/10000.0
 
         #return gaussian_init
 
@@ -441,8 +496,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             desired_euclidean_pars=torch.cat(this_list)
 
 
-        gaussian_init[-self.total_euclidean_pars-self.num_moebius_pars:-self.num_moebius_pars]=desired_euclidean_pars
-        gaussian_init[-self.num_moebius_pars:]=self.moebius_trafo.get_desired_init_parameters()
+        gaussian_init[-self.total_euclidean_pars-self.num_s1_pars:-self.num_s1_pars]=desired_euclidean_pars
+        gaussian_init[-self.num_s1_pars:]=self.moebius_trafo.get_desired_init_parameters()
 
      
         return gaussian_init

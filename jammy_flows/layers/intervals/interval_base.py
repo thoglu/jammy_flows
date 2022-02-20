@@ -94,6 +94,10 @@ class interval_base(layer_base.layer_base):
         
         return self.dimension
 
+    def transform_target_space(self, x, log_det=0.0, transform_from="default", transform_to="embedding"):
+        
+        return x, log_det
+
     #############################################################################
 
     ## implement the following by specific interval child layers
