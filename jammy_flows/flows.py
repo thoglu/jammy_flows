@@ -1884,8 +1884,7 @@ class pdf(nn.Module):
             assert(x.shape[1]==self.total_target_dim_intrinsic)
            
             x, log_det=self.transform_target_space(x, log_det, transform_from="default", transform_to="intrinsic")
-        else:
-           
+      
         return x, log_det
 
     def _obtain_sample(self, conditional_input=None, predefined_target_input=None, samplesize=1, seed=None, device=torch.device("cpu"), amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
