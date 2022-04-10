@@ -3,39 +3,77 @@ from torch import nn
 import numpy
 import collections
 from .. import layer_base
+import itertools
 
 class sphere_base(layer_base.layer_base):
 
-    def __init__(self, dimension=1, euclidean_to_sphere_as_first=True, use_extra_householder=True, use_permanent_parameters=False, higher_order_cylinder_parametrization=False):
+    def __init__(self, 
+                 dimension=1, 
+                 euclidean_to_sphere_as_first=True, 
+                 use_extra_householder=False, 
+                 use_permanent_parameters=False, 
+                 rotation_mode="householder",
+                 add_rotation=False,
+                 higher_order_cylinder_parametrization=False):
     
         super().__init__(dimension=dimension)
 
         self.euclidean_to_sphere_as_first=euclidean_to_sphere_as_first
-        self.use_extra_householder=use_extra_householder
+
+        ### DEPRECATED parameter - superseeded by add_rotation
+        #self.use_extra_householder=use_extra_householder
+
         self.use_permanent_parameters=use_permanent_parameters
 
         self.higher_order_cylinder_parametrization=higher_order_cylinder_parametrization
 
+        assert(self.higher_order_cylinder_parametrization == False), "Disabled for now to allow for correct embedding transformations in all flows.... have to recheck if is worth it to enable it again."
+
         if(self.higher_order_cylinder_parametrization):
             assert(dimension > 1)
 
+
+
+        self.rotation_mode=rotation_mode
+        self.add_rotation=add_rotation
+
         self.num_householder_params=0
 
-        if(self.use_extra_householder):
+        if(self.add_rotation):
+            if(self.rotation_mode=="angles"):
 
-            self.num_householder_params=(dimension+1)*(dimension+1)
-            self.total_param_num+=self.num_householder_params
+                ## call angle params householder params for now for backwards compatibility
+                self.num_householder_params=0
 
-      
-            if(self.use_permanent_parameters):
+                emb_dim=self.dimension+1
+                self.num_householder_params=int((emb_dim*(emb_dim-1)/2))
 
-                self.householder_params=nn.Parameter(
-                    torch.randn(self.num_householder_params).type(torch.double)
-                )
+                self.total_param_num+=self.num_householder_params
+
+                #assert(self.dimension==2), "requires 2 dims at the moment"
+
+                if(use_permanent_parameters):
+                    self.householder_params=nn.Parameter(torch.randn((1, self.num_householder_params)).type(torch.double))
 
             else:
+                self.num_householder_params=0
+                #self.use_extra_householder=True
 
-                self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
+                #if(self.use_extra_householder):
+
+                self.num_householder_params=(dimension+1)*(dimension+1)
+                self.total_param_num+=self.num_householder_params
+
+          
+                if(self.use_permanent_parameters):
+
+                    self.householder_params=nn.Parameter(
+                        torch.randn(self.num_householder_params).type(torch.double)
+                    )
+
+                else:
+
+                    self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
 
     def return_safe_angle_within_pi(self, x):
         """
@@ -57,6 +95,58 @@ class sphere_base(layer_base.layer_base):
         """
 
         return ret
+
+    def compute_rotation_matrix(self, x, extra_inputs=None, mode="householder", device=torch.device("cpu")):
+
+        if(mode=="householder"):
+
+            hh_dim=self.dimension+1
+
+            mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
+
+            if(extra_inputs is not None):
+                
+                mat_pars=mat_pars+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
+
+                #extra_input_counter+=self.num_householder_params
+            else:
+                mat_pars=mat_pars.repeat(x.shape[0],1,1)
+
+            return self.compute_householder_matrix(mat_pars, hh_dim, device=device)
+
+        elif(mode=="angles"):
+
+            if(extra_inputs is None):
+                rotation_params=self.householder_params.repeat(x.shape[0], 1)
+
+            else:
+                
+                rotation_params=extra_inputs[:,:self.num_householder_params]
+
+            ## rotation is in embedding space with dim: self.dimension+1
+            combi_list=[]
+
+            for a, b in itertools.combinations(numpy.arange(self.dimension+1), 2):
+                combi_list.append( (a,b) )
+
+            base_matrix=torch.eye(self.dimension+1).to(rotation_params).unsqueeze(0).repeat(rotation_params.shape[0],1,1)
+
+            prev_matrix=base_matrix
+                
+            for ind, combi in enumerate(combi_list):
+
+                new_matrix=base_matrix.clone()
+
+                new_matrix[:, combi[0], combi[0]]=torch.cos(rotation_params[:, ind])
+                new_matrix[:, combi[1], combi[1]]=new_matrix[:, combi[0], combi[0]]
+                new_matrix[:, combi[0], combi[1]]=torch.sin(rotation_params[:, ind])
+                new_matrix[:, combi[1], combi[0]]=-new_matrix[:, combi[0], combi[1]]
+
+                prev_matrix=torch.bmm(new_matrix, prev_matrix)
+           
+            return prev_matrix
+        else:
+            raise Exception("Unknown rotation mode for spheres: ", mode)
 
     def compute_householder_matrix(self, vs, dim,device=torch.device("cpu")):
 
@@ -109,7 +199,7 @@ class sphere_base(layer_base.layer_base):
         ## TODO: change to standard convention for more convenience 
         if(self.dimension==1):
 
-            eucl=torch.cat( [torch.sin(x), torch.cos(x)], dim=1)
+            eucl=torch.cat( [torch.cos(x), torch.sin(x)], dim=1)
 
             return eucl, log_det
 
@@ -287,8 +377,8 @@ class sphere_base(layer_base.layer_base):
               
                 good_cos_x=(cos_x!=1.0) & (cos_x!=-1.0)
                 
-                cos_x=torch.where(cos_x==1.0, cos_x-1e-5, cos_x)
-                cos_x=torch.where(cos_x==-1.0, cos_x+1e-5, cos_x)
+                cos_x=torch.where(cos_x==1.0, cos_x-1e-6, cos_x)
+                cos_x=torch.where(cos_x==-1.0, cos_x+1e-6, cos_x)
 
                 #cos_x=(cos_x==1.0)*(cos_x-1e-5)+(cos_x==-1.0)*(cos_x+1e-5)+good_cos_x*cos_x
                 r_g=torch.sqrt(-torch.log( (1.0-cos_x)/2.0 )*2.0)
@@ -379,7 +469,7 @@ class sphere_base(layer_base.layer_base):
                 ## log_det-=-torch.log(r_g)-torch.log(1.0-torch.cos(new_theta[:,0]))#+torch.log(torch.sin(new_theta[:,0]))
 
                
-                log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))+torch.log(torch.sin(new_theta[:,0]))
+                log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))-torch.log(torch.sin(new_theta[:,0]))
               
                
                 x=torch.cat([new_theta, x[:,1:2]],dim=1)
@@ -419,26 +509,16 @@ class sphere_base(layer_base.layer_base):
         """
         ## (1) apply inverse householder rotation if desired
 
-        if(self.use_extra_householder):
+        if(self.add_rotation):
             
 
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
             ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
-            hh_dim=self.dimension+1
+            
 
-            mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
-
-            if(extra_inputs is not None):
-                
-                mat_pars=mat_pars+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
-
-                #extra_input_counter+=self.num_householder_params
-            else:
-                mat_pars=mat_pars.repeat(x.shape[0],1,1)
-
-            mat=self.compute_householder_matrix(mat_pars, hh_dim, device=x.device)
+            mat=self.compute_rotation_matrix(x, extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
             ## permute because we do inverse rotation
             x = torch.bmm(mat.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
@@ -459,7 +539,7 @@ class sphere_base(layer_base.layer_base):
             #print("inv 1) ld ", -torch.log(torch.sin(x[:,0])))
         ## (2) apply sphere intrinsic inverse flow function
         ## in 1 d case, _inv_flow_mapping should take as input values between 0 and 2pi, and outputs values between -pi and pi for easier further processing
-
+        
         sf_extra=None
         if(extra_inputs is None):
             inv_flow_results = self._inv_flow_mapping([x, log_det])
@@ -479,7 +559,6 @@ class sphere_base(layer_base.layer_base):
             if(self.always_parametrize_in_embedding_space and sf_extra is None):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
-       
             #sys.exit(-1)
             x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
             
@@ -517,30 +596,14 @@ class sphere_base(layer_base.layer_base):
     
         ## (3) apply householder rotation in embedding space if wanted
         #extra_input_counter=0
-        if(self.use_extra_householder):
+        if(self.add_rotation):
 
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
             #xy=torch.cat((x, y), dim=1)
 
-            #indices=self.householder_indices
-
-            ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
-            hh_dim=self.dimension+1
-
-            mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
-
-            if(extra_inputs is not None):
-                
-                mat_pars=mat_pars+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
-
-            
-                #extra_input_counter+=self.num_householder_params
-            else:
-                mat_pars=mat_pars.repeat(x.shape[0],1,1)
-
-            mat=self.compute_householder_matrix(mat_pars, hh_dim, device=x.device)
+            mat=self.compute_rotation_matrix(x,extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
             x = torch.bmm(mat, x.unsqueeze(-1)).squeeze(-1)  # uncomment
            
@@ -571,7 +634,7 @@ class sphere_base(layer_base.layer_base):
         assert(len(params)==self.total_param_num)
 
        
-        if(self.use_extra_householder):
+        if(self.add_rotation):
             
             self.householder_params.data=params[:self.num_householder_params].reshape(1, self.num_householder_params)
 
@@ -599,25 +662,12 @@ class sphere_base(layer_base.layer_base):
         Intended to be used for crosschecks and plotting purposes, since coordinates close to the poles can make problems for spheres.
         """
         
-        if(self.use_extra_householder==False):
+        if(self.add_rotation==False):
             return torch.Tensor([])
         
         eucl, _=self.spherical_to_eucl_embedding(x,0.0)
 
-        ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
-        hh_dim=self.dimension+1
-
-        mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
-
-        if(extra_inputs is not None):
-            
-            mat_pars=mat_pars+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
-
-            #extra_input_counter+=self.num_householder_params
-        else:
-            mat_pars=mat_pars.repeat(x.shape[0],1,1)
-
-        mat=self.compute_householder_matrix(mat_pars, hh_dim, device=x.device)
+        mat=self.compute_rotation_matrix(x, extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
         ## permute because we do inverse rotation
         eucl = torch.bmm(mat.permute(0,2,1), eucl.unsqueeze(-1)).squeeze(-1)
@@ -639,7 +689,7 @@ class sphere_base(layer_base.layer_base):
         else:
             self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs[:, self.num_householder_params:], previous_x=previous_x, extra_prefix=extra_prefix)
 
-        if(self.use_extra_householder):
+        if(self.add_rotation):
             hh_pars=self.householder_params
 
             if(extra_inputs is not None):

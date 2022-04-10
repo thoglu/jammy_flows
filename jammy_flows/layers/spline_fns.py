@@ -20,9 +20,6 @@ def rational_quadratic_spline(inputs,
                               rel_min_bin_height=1e-3,
                               min_derivative=1e-3):
 
-        ## this function only works for 2-d inputs currently (batch-size X num_splines)
-       
-        assert(len(inputs.shape)==2)
         
         if torch.min(inputs) < left or torch.max(inputs) > right:
            
@@ -58,7 +55,7 @@ def rational_quadratic_spline(inputs,
         cumheights[..., -1] = top
         heights = cumheights[..., 1:] - cumheights[..., :-1]
 
-       
+
         
         if inverse:
             bin_idx = searchsorted(cumheights, inputs)#[..., None]
@@ -66,16 +63,16 @@ def rational_quadratic_spline(inputs,
             bin_idx = searchsorted(cumwidths, inputs)#[..., None]
         
         if(cumwidths.shape[0]==1 and bin_idx.shape[0]>1):
+          repeats=[bin_idx.shape[0]]+(len(cumwidths.shape)-1)*[1]
           
-          cumwidths=cumwidths.repeat(bin_idx.shape[0], 1)
-          widths=widths.repeat(bin_idx.shape[0], 1)
-          heights=heights.repeat(bin_idx.shape[0], 1)
-          cumheights=cumheights.repeat(bin_idx.shape[0], 1)
-          derivatives=derivatives.repeat(bin_idx.shape[0], 1)
-
-
-       
+          cumwidths=cumwidths.repeat(repeats)
+          widths=widths.repeat(repeats)
+          heights=heights.repeat(repeats)
+          cumheights=cumheights.repeat(repeats)
+          derivatives=derivatives.repeat(repeats)
+        
         input_cumwidths = cumwidths.gather(-1, bin_idx)#[..., 0]
+
 
         
         input_bin_widths = widths.gather(-1, bin_idx)#[..., 0]
@@ -85,9 +82,10 @@ def rational_quadratic_spline(inputs,
         input_delta = delta.gather(-1, bin_idx)#[..., 0]
 
         input_derivatives = derivatives.gather(-1, bin_idx)#[..., 0]
-        input_derivatives_plus_one = derivatives[..., 1:].gather(-1, bin_idx)#[..., 0]
         
- 
+
+        input_derivatives_plus_one = derivatives[..., 1:].gather(-1, bin_idx)#[..., 0]
+       
         input_heights = heights.gather(-1, bin_idx)#[..., 0]
 
       

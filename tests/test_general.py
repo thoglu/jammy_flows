@@ -116,6 +116,8 @@ class Test(unittest.TestCase):
 
         self.flow_inits=[]
 
+        self.flow_inits.append([ ["s2", "v"], dict()])
+
         self.flow_inits.append([ ["e1", "p"], dict()])
         self.flow_inits.append([ ["e1", "g"], dict()])
         self.flow_inits.append([ ["s1", "m"], dict()])
@@ -190,23 +192,22 @@ class Test(unittest.TestCase):
                             d["flow_defs_detail"]=gf_setting
 
                             self.flow_inits.append([[pdf_def, flow_def], d])
-        ### exponential map
-        extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=0
+
+        # exponential map flow variations
+
+        for nat in [0,1]:
+            for setting in ["linear", "quadratic", "exponential", "splines"]:
+                ### exponential map
+                extra_flow_defs=dict()
+                extra_flow_defs["flow_defs_detail"]=dict()
+                extra_flow_defs["flow_defs_detail"]["v"]=dict()
+                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
+                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=nat
+                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["exp_map_type"]=setting
 
 
-        self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
+                self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
 
-        extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=1
-        self.flow_inits.append([ ["s2", "vvv"], extra_flow_defs])
-        
         #### mvn 
 
         for cov_type in ["full", "diagonal_symmetric", "diagonal", "unit_gaussian"]:
@@ -247,14 +248,16 @@ class Test(unittest.TestCase):
         self.flow_inits.append([ ["i1_-1.0_1.0", "r"], extra_flow_defs])
 
         ####
+        #zenith_layers=["g", "p", "x", "z", "r"]
+        zenith_layers=["g", "x", "z", "r"]
 
-        for z_layer in ["g", "p", "x", "z", "r"]:
+        for z_layer in zenith_layers:
             extra_flow_defs=dict()
             extra_flow_defs["flow_defs_detail"]=dict()
             extra_flow_defs["flow_defs_detail"]["n"]=dict()
             extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]=dict()
             extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
-            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
+            #extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
             extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["zenith_type_layers"]=z_layer
             ## all n-type flows
 
@@ -270,7 +273,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["flow_defs_detail"]["n"]=dict()
         extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]=dict()
         extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
-        extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
+        #extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
 
         ## general flow
         pdf_def="s2+e2+s1"
@@ -349,9 +352,8 @@ class Test(unittest.TestCase):
 
 
             #this_flow.count_parameters()
-
-            compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
             compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
+            compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
             compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
 
             """

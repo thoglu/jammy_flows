@@ -279,9 +279,11 @@ class pdf(nn.Module):
         self.flow_dict["n"]["kwargs"] = dict()
         self.flow_dict["n"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["n"]["kwargs"]["use_extra_householder"] = 1
+        self.flow_dict["n"]["kwargs"]["add_rotation"] = 1
+        self.flow_dict["n"]["kwargs"]["rotation_mode"] = "householder"
         self.flow_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["n"]["kwargs"]["num_basis_functions"] = 10
-        self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = True
+        self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = False
         self.flow_dict["n"]["kwargs"]["zenith_type_layers"] = "r"
         self.flow_dict["n"]["kwargs"]["max_rank"] = -1
 
@@ -305,9 +307,9 @@ class pdf(nn.Module):
         self.flow_dict["c"]["kwargs"]["use_permanent_parameters"]=0
         self.flow_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = False
-        self.flow_dict["c"]["kwargs"]["num_charts"] = 10
+        self.flow_dict["c"]["kwargs"]["num_charts"] = 4
         self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "128" # hidden dims of cnf MLP network
-        self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 1 # mlp highway dim - 0-4
+        self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 0 # mlp highway dim - 0-4
         self.flow_dict["c"]["kwargs"]["cnf_network_rank"] = 0 # 0 means full rank
         self.flow_dict["c"]["kwargs"]["natural_direction"] = 1 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
         self.flow_dict["c"]["kwargs"]["solver"] = "rk4" ## 
@@ -1877,11 +1879,13 @@ class pdf(nn.Module):
         if(force_embedding_coordinates):
 
             x, log_det=self.transform_target_space(x, log_det, transform_from="default", transform_to="embedding")
+            
         elif(force_intrinsic_coordinates):
             assert(x.shape[1]==self.total_target_dim_intrinsic)
-
+           
             x, log_det=self.transform_target_space(x, log_det, transform_from="default", transform_to="intrinsic")
-        
+        else:
+           
         return x, log_det
 
     def _obtain_sample(self, conditional_input=None, predefined_target_input=None, samplesize=1, seed=None, device=torch.device("cpu"), amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
@@ -1963,6 +1967,13 @@ class pdf(nn.Module):
             tot_dim+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
         
         return tot_dim
+
+    ### 
+    def transform_target_into_returnable_params(self, target):
+
+        res, _=self.transform_target_space(target)
+
+        return res
 
     def transform_target_space(self, target, log_det=0, transform_from="default", transform_to="embedding"):
         """

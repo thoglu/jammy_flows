@@ -24,6 +24,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                  dimension, 
                  euclidean_to_sphere_as_first=True, 
                  use_extra_householder=True, 
+                 add_rotation=1,
+                 rotation_mode="householder",
                  use_permanent_parameters=False, 
                  use_moebius_xyz_parametrization=True, 
                  num_basis_functions=5, 
@@ -33,11 +35,19 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                  subspace_mapping="logistic", 
                  higher_order_cylinder_parametrization=False):
 
-        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
+        super().__init__(dimension=dimension, 
+                         euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, 
+                         use_extra_householder=use_extra_householder, 
+                         add_rotation=add_rotation,
+                         rotation_mode=rotation_mode,
+                         use_permanent_parameters=use_permanent_parameters, 
+                         higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
         
         if(dimension==1):
             raise Exception("The moebius flow should be used for dimension 1!")
         
+
+        assert(self.higher_order_cylinder_parametrization==False)
         ## If this is not the only s2-flow, and not the first in the column, switch off shortcut via cylinder for coverage
         if(self.euclidean_to_sphere_as_first==False):
             self.higher_order_cylinder_parametrization=False
@@ -259,10 +269,14 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                 ## FIXME .. this is only correct for 2-d!!
                 
                 #log_det+=-0.5*torch.log(res-res**2)[:,0]
+                
+                x=torch.where(x<=1e-5, 1e-5, x)
+                x=torch.where(x>=1.0-1e-5, 1.0-1e-5, x)
 
                 x=torch.acos(1.0-2*x)
+
                 log_det=log_det-torch.log(torch.sin(x[:,0])/2.0)
-                
+                #print("after sub space ", log_det, x)
                 return x, log_det, None
         else:
             raise Exception("Unknown subspace mapping", self.subspace_mapping)
@@ -276,8 +290,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
         sf_extra=None
 
-        if(self.always_parametrize_in_embedding_space):
-            print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
+        #if(self.always_parametrize_in_embedding_space):
+        #    print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
 
         ## this implementation requires another sin(theta) factor here
         ## 
@@ -322,6 +336,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             ## ddx = sin(x)/2
             log_det=log_det+0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
+       
             #print("_inv flow cyl ln / sf", ln_cyl, sf_extra)
         if(len(self.zenith_type_layer_list)>0):
 
@@ -348,24 +363,23 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
                     extra_param_counter += layer.total_param_num
 
-         
+            #print("log det af ", log_det)
             potential_eucl, log_det, sf_extra=self.from_subspace(eucl_x, log_det)
-
+            
         ## combine zylinder
         op=torch.cat([potential_eucl, xm],dim=1)
-
+        #print("log_det", log_det)
         ##  if we are the first layer we dont want to embed and pass on sf_extra
         if(self.always_parametrize_in_embedding_space):
+
             op, log_det=self.spherical_to_eucl_embedding(op, log_det)
         
-        
-
         return op, log_det, sf_extra
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         
-        if(self.always_parametrize_in_embedding_space):
-            print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
+        #if(self.always_parametrize_in_embedding_space):
+        #    print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
         [x,log_det]=inputs
 
         moebius_extra_inputs=None

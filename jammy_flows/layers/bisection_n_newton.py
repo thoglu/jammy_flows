@@ -1,5 +1,7 @@
 import torch
 import numpy
+import pylab
+import time
 
 def close(a, b, rtol=1e-5, atol=1e-4):
     equal = torch.abs(a - b) <= atol + rtol * torch.abs(b)
@@ -306,7 +308,7 @@ def inverse_bisection_n_newton_slow(func, grad_func, target_arg, *args, min_boun
 
 
 
-def inverse_bisection_n_newton_sphere(combined_func, find_orthogonal_vecs_func, basic_exponential_map_func, target_arg, *args, num_newton_iter=50):
+def inverse_bisection_n_newton_sphere(combined_func, find_tangent_func, basic_exponential_map_func, target_arg, *args, num_newton_iter=25, visualize=True):
     """
     Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
     In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
@@ -315,95 +317,32 @@ def inverse_bisection_n_newton_sphere(combined_func, find_orthogonal_vecs_func, 
     We follow https://arxiv.org/abs/0906.0874 ("A Jacobian inequality for gradient maps on the sphere and its application to directional statistics"),
     in particular the implementation suggested in https://arxiv.org/abs/2002.02428 ("Normalizing Flows on Tori and Spheres") to get this requirement satisfied for "exponential_map_flows".
     """
-
-    ## start with very simple first guess ... could be done better probably
-
-    first_guesses=[]
-    pot_funcs=[]
+    
     prev=torch.zeros_like(target_arg)
     prev[:,2]=-1.0
-    
-    """
-    for dim in range(3):
-
-        ## up
-        prev[:,dim]=1.0
-
-        first_guesses.append(prev.clone().unsqueeze(2))
-        phi_res, _, jac_phi=combined_func(prev, *args)
-        pot_func=-(phi_res*target_arg).sum(axis=1)
-        
-        pot_funcs.append(pot_func.unsqueeze(1))
-
-        ## down
-        prev[:,dim]=-1.0
-
-        first_guesses.append(prev.clone().unsqueeze(2))
-        phi_res, _, jac_phi=combined_func(prev, *args)
-        pot_func=-(phi_res*target_arg).sum(axis=1)
-        pot_funcs.append(pot_func.unsqueeze(1))
-
-        prev[:,dim]=0.0
-
-    #######################
-
-    num_first_guesses=len(first_guesses)
-
-    first_guesses=torch.cat(first_guesses, dim=2)
-    first_guess_results=torch.cat(pot_funcs, dim=1)
-
-    min_values,min_pot_indices=first_guess_results.min(dim=1)
-
-    prev=first_guesses[torch.arange(first_guesses.shape[0]), :, min_pot_indices]
-    
-    """
-    #test_arg=target_arg[0:1]#torch.Tensor([[1.0,0.0,0.0]]).to(target_arg)
-
-    res_vec_return=0
+  
     for i in range(num_newton_iter):
         
-   
-        phi_res, _, jac_phi=combined_func(prev, *args)
+        phi_res, _, jac_phi,_=combined_func(prev, *args)
 
+
+        fn_eval=-(phi_res*target_arg).sum(axis=-1, keepdims=True)+1.0
+
+        res_vec=-torch.bmm(jac_phi.permute(0,2,1), target_arg.unsqueeze(2)).squeeze(-1)#*basic_pot_func.unsqueeze(1).unsqueeze(2)
+
+
+        grad_norm=(res_vec**2).sum(axis=1, keepdims=True).sqrt()
 
         
-        ## minimize 
-        #basic_pot_func=-(phi_res*target_arg).sum(axis=1)+1.0
-        # OR
-        #pot_func=0.5*(-(phi_res*target_arg).sum(axis=1)+1.0)**2
-        #if(pot_func.max()<-1.000+1e-5):
-        #    print("Potential minimum reached .. Breaking at iter ", i)
-        #    break
+        new_vs,_=find_tangent_func(prev, -(res_vec/grad_norm).squeeze(-1))
 
-
-        ## projection of 
-        res_vec=-torch.bmm(jac_phi.permute(0,2,1), target_arg.unsqueeze(2))#*basic_pot_func.unsqueeze(1).unsqueeze(2)
         
+        gpnew=(new_vs*res_vec).sum(axis=1,keepdims=True)
         
-        grad_lens=(res_vec**2).sum(axis=1, keepdims=True).sqrt()
-      
+        projection_2=fn_eval/gpnew
 
-        ## find the tangent vector along direction of negative gradient (newton iter)
-       
-        vs=find_orthogonal_vecs_func(prev, -res_vec/grad_lens, in_newton=True)
-      
-        projection=-(vs*res_vec).sum(axis=1)
+        projection_2=-projection_2
 
-      
-        # We use the projection again in an exponential map.. this should not be larger than pi to not wrap arround the sphere more than maximally once.
-        assert(projection.max()<numpy.pi)  
+        prev=basic_exponential_map_func(prev, new_vs, projection_2)
 
-        ## mirror because both are negative by construction
-        vs=-vs.squeeze(-1)
-        projection=-projection
-
-        ## A "Newton step" along the exponential map, where "vs" is the tangent vector, "projection" is its length or the step size, and prev is the previous point on the sphere.
-        ## The next Point after this exponential map should be closer to "target_arg"
-
-        #prev=prev*torch.cos(projection)+vs*torch.sin(projection)
-        prev=basic_exponential_map_func(prev, vs, projection)
-        
-      
-        #prev=new
-    
     return prev

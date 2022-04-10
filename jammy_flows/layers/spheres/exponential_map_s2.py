@@ -4,6 +4,7 @@ import numpy
 
 from . import sphere_base
 from . import moebius_1d
+from .. import spline_fns
 from ..bisection_n_newton import inverse_bisection_n_newton_sphere
 from ...amortizable_mlp import AmortizableMLP
 from ...extra_functions import list_from_str
@@ -11,9 +12,12 @@ from ..euclidean.gaussianization_flow import gf_block, find_init_pars_of_chained
 from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 
+from ...extra_functions import NONLINEARITIES
+
 
 import sys
 import os
+import time
 import copy
 
 import torch.autograd
@@ -24,6 +28,46 @@ import torch.autograd
 An implementation of exponential map flows as suggested in https://arxiv.org/abs/2002.02428 ("Normalizing Flows on Tori and Spheres"),
 which intself is based upon earlier work https://arxiv.org/abs/0906.0874 ("A Jacobian inequality for gradient maps on the sphere and its application to directional statistics").
 """
+
+def generate_normalization_function(max_value=1.0,stretch_factor=10.0):
+    """ 
+    Generates a function that bounds the input to be smaller than *max_value*. The input is assumed to be positive.
+    """
+   
+    def f(x):
+      
+        res=-torch.log(1.0+(numpy.exp(1.0)-1.0)*torch.exp(-x/stretch_factor))+max_value
+
+        return res
+
+    return f
+
+def generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=10, center=False):
+    
+    ## min and max values are in normal space -> must be positive
+    assert(min_val_normal_space > 0)
+
+    ln_max=numpy.log(max_val_normal_space)
+    ln_min=numpy.log(min_val_normal_space)
+
+    ## this shift makes the function equivalent to a normal exponential for small values
+    center_val=ln_max
+
+    ## can also center around zero (it will be centered in exp space, not in log space)
+    if(center==False):
+        center_val=0.0
+
+
+    def f(x):
+
+        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-x+center_val).unsqueeze(-1)], dim=-1)
+
+        first_term=ln_max-torch.logsumexp(res, dim=-1, keepdim=True)
+
+        return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_min], dim=-1), dim=-1)
+
+    return f
+
 
 
 class exponential_map_s2(sphere_base.sphere_base):
@@ -40,10 +84,24 @@ class exponential_map_s2(sphere_base.sphere_base):
         self.natural_direction=natural_direction
         self.num_potential_pars=0
 
-        if(self.exp_map_type=="linear"):
+        self.num_spline_basis_functions=10
+
+        if(self.exp_map_type=="linear" or self.exp_map_type=="quadratic"):
             self.num_potential_pars=3+1 # mu vector + weights
-        elif(self.exp_map_type=="exponential"):
-            self.num_potential_pars=3+2 # mu vector + weights
+        elif(self.exp_map_type=="exponential" or self.exp_map_type=="polynomial"):
+            self.num_potential_pars=3+2 # mu vector + weights + exponential
+        elif(self.exp_map_type=="splines"):
+
+            self.num_potential_pars=3+1+self.num_spline_basis_functions*3+1 # mu vector + weights + spline parameters (3*basis functions +1)
+        elif(self.exp_map_type=="nn"):
+            raise Exception("Only used for testing, nn exponential flow does not work currently.")
+            self.amortized_mlp=AmortizableMLP(3, "64-64", 3, low_rank_approximations=-1, use_permanent_parameters=use_permanent_parameters,svd_mode="smart")
+            self.num_mlp_params=self.amortized_mlp.num_amortization_params
+            self.total_param_num+=self.num_mlp_params
+
+            self.num_potential_pars=0 # mu vector + weights + 3*spline parameters (3*basis functions +1)
+            self.num_components=1
+
         else:
             raise Exception("Unknown exponential map parameterization %s. Allowed: linear/quadratic/exponential" % self.exp_map_type)
 
@@ -53,13 +111,15 @@ class exponential_map_s2(sphere_base.sphere_base):
         else:
             self.potential_pars=torch.zeros(self.num_potential_pars, self.num_components).type(torch.double).unsqueeze(0)
 
+        self.mu_norm_function=generate_normalization_function(stretch_factor=10.0, max_value=1.0)
+
+        self.exponent_log_norm_function=generate_log_function_bounded_in_logspace(min_val_normal_space=1.0, max_val_normal_space=30.0, center=False)
+
         ## param num = potential_pars*num_potentials 
         self.total_param_num+=self.num_potential_pars*self.num_components
-    
+    """
     def all_vs(self, x, normalized_mu, in_newton=False):
-        """ 
-        Calculates the normalized tangent vector of the projection of "normalized mu" onto x on the surface of the sphere.
-        """
+        
         mu_1=normalized_mu[:,0:1,:]
         mu_2=normalized_mu[:,1:2,:]
         mu_3=normalized_mu[:,2:3,:]
@@ -104,14 +164,6 @@ class exponential_map_s2(sphere_base.sphere_base):
         v_2=v_2_top/v_bottom
         v_3=v_3_top/v_bottom
 
-        """ 
-        make sure the tangent vector can be calculated. If x and normalized_mu are almost parallel, the calculaten can return nans. In these cases overwrite tangent
-        vector with an arbitrary one.
-        """
-       
-
-        #non_fin_mask=((torch.isfinite(b)==False) )
-
         ### Generate a vector that is orthogonal (but in principle arbitrary orientation)  
         arb_z=(-x[:,0:1]*0.5-x[:,1:2]*0.5)/x[:,2:3]
 
@@ -119,87 +171,25 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         arb=arb/((arb**2).sum(axis=1,keepdims=True).sqrt())
 
-        #if(non_fin_mask.sum()>0):
-        #    return arb
-        """
-        v_1=arb[:,0:1,:]*non_fin_mask+v_1*(1.0-non_fin_mask)
-        v_2=arb[:,1:2,:]*non_fin_mask+v_2*(1.0-non_fin_mask)
-        v_3=arb[:,2:3,:]*non_fin_mask+v_3*(1.0-non_fin_mask)
-        """
-        #v_1=arb[:,0:1,:].detach()
-        #v_2=arb[:,1:2,:].detach()
-        #v_3=arb[:,2:3,:].detach()
+      
 
         ### those values that have an issue with potential division by zero are replaced with arbitrary vecs .. doesnt make a difference really since target is basically reached already
         v_1 = torch.masked_scatter(input=v_1, mask=issue_mask, source=arb[:,0:1,:][issue_mask])
         v_2 = torch.masked_scatter(input=v_2, mask=issue_mask, source=arb[:,1:2,:][issue_mask])
         v_3 = torch.masked_scatter(input=v_3, mask=issue_mask, source=arb[:,2:3,:][issue_mask])
 
-        """
-        print("V1 / v2 / v3")
-        print(v_1)
-        print(v_2)
-        print(v_3)
-        print("---- arb")
-        print(arb)
-        
-        arb[:,0:1,:][non_fin_mask==False]=(v_1_top[non_fin_mask==False]/v_bottom[non_fin_mask==False])
-        arb[:,1:2,:][non_fin_mask==False]=(v_2_top[non_fin_mask==False]/v_bottom[non_fin_mask==False])
-        arb[:,2:3,:][non_fin_mask==False]=(v_3_top[non_fin_mask==False]/v_bottom[non_fin_mask==False])
-        """
-       
-
-        all_vs=torch.cat([v_1,v_2,v_3], dim=1)
-            
-        return all_vs
-
-        """
-
-        v_1=v_1_top/v_bottom
-        v_2=v_2_top/v_bottom
-        v_3=v_3_top/v_bottom
-
-        if(non_fin_mask.sum()>0):
-                
-            v_1[non_fin_mask]=arb[:,0:1,:][non_fin_mask]
-            v_2[non_fin_mask]=arb[:,1:2,:][non_fin_mask]
-            v_3[non_fin_mask]=arb[:,2:3,:][non_fin_mask]
-
-            all_vs=torch.cat([v_1,v_2,v_3], dim=1)
-            
-            return all_vs
-
-        """
-        
-
-        #v_1=torch.cat([torch.masked_select(v_1, non_fin_mask), torch.masked_select(v_1_top/v_bottom, ~non_fin_mask)],dim=1)
-        #v_2=torch.cat([v_2, torch.masked_select(v_2_top/v_bottom, ~non_fin_mask).unsqueeze(0).unsqueeze(0)],dim=1)
-        #v_3=torch.cat([v_3, torch.masked_select(v_3_top/v_bottom, ~non_fin_mask).unsqueeze(0).unsqueeze(0)],dim=1)
-        #print("after ", v_1.shape)
    
-        #v_1[~non_fin_mask]=(v_1_top[~non_fin_mask]/v_bottom[~non_fin_mask])
-        #v_2[~non_fin_mask]=(v_2_top[~non_fin_mask]/v_bottom[~non_fin_mask])
-        #v_3[~non_fin_mask]=(v_3_top[~non_fin_mask]/v_bottom[~non_fin_mask])
-        
- 
-        #v_2[non_fin_mask]=arb[:,1:2,:][non_fin_mask]
-        #v_3[non_fin_mask]=arb[:,2:3,:][non_fin_mask]
-        """
-        if(non_fin_mask.sum()>0):
 
-            norm_mu_lens=(normalized_mu**2).sum(axis=1,keepdims=True).sqrt()
-        """
-            
         all_vs=torch.cat([v_1,v_2,v_3], dim=1)
-
+            
         return all_vs
 
+    """
 
+    """
     ## jacobian of vs x,y,z axes
     def all_vs_jacobians(self, x, normalized_mu):
-        """ 
-        The jacobian of the tangent vector calculated in "all_vs"
-        """
+        
         mu_1=normalized_mu[:,0:1,:]
         mu_2=normalized_mu[:,1:2,:]
         mu_3=normalized_mu[:,2:3,:]
@@ -271,12 +261,13 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         return final
 
-
-
+    """
+    """
     def exp_map(self, x, potential_pars):
 
         ## calculate normalized tangent vector v of exponential map
         norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
+
         normalized_mu=potential_pars[:,:3,:]/norm
        
         all_vs=self.all_vs(x, normalized_mu)
@@ -339,36 +330,427 @@ class exponential_map_s2(sphere_base.sphere_base):
 
 
         return res, new_vs
+    """
+    """
+    def get_explicit_formula_result(self, x, potential_pars):
 
-    def basic_exponential_map(self, x, v_unit, v_norm):
+        ## works only for linear atm
+       
+        
+        norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
 
-        return x*torch.cos(v_norm)+v_unit*torch.sin(v_norm)
+        zero_mask=norm==0.0
+        assert(zero_mask.sum()==0)
+
+        normalized_mu=potential_pars[:,:3,:]/norm
+
+       
+        fake_norm=self.mu_norm_function(norm)
+
+     
+        log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+
+     
+        ############################
+
+        unsqueezed_x=x.unsqueeze(-1)
+
+        # angle between each kernel mu_i and x
+        alpha_i=torch.arccos((unsqueezed_x*normalized_mu).sum(axis=1, keepdims=True))
+
+        # tangent normal vector from x pointint towards mu_i
+        e_i=(normalized_mu-unsqueezed_x*torch.cos(alpha_i))/torch.sin(alpha_i)
+      
+        # xxT
+
+        x_x_t=torch.einsum("bia,bja->bija", unsqueezed_x, unsqueezed_x)
+
+        e_e_t=torch.einsum("bia,bja->bija", e_i, e_i)
+
+        if(self.exp_map_type=="linear"):
+            f_prime=-torch.sin(alpha_i)
+            f_double_prime=-torch.cos(alpha_i)
+
+        elif(self.exp_map_type=="quadratic"):
+            
+
+            #f_prime=-0.5*torch.sin(2*alpha_i)
+            #f_double_prime=-torch.cos(2*alpha_i)
+            # different parametrization more amenable to generalization
+            f_prime=-torch.cos(alpha_i)*torch.sin(alpha_i)
+            f_double_prime=torch.sin(alpha_i)**2-torch.cos(alpha_i)**2
+
+        elif(self.exp_map_type=="polynomial"):
+            
+            exponents=self.exponent_log_norm_function(potential_pars[:,4:5,:]).exp()
+
+        
+            f_prime=-(1.0/exponents)*torch.sin(exponents*alpha_i)
+            f_double_prime=-torch.cos(exponents*alpha_i)
+
+            #f_prime=-torch.sin(alpha_i)*torch.cos(alpha_i)**(exponents-1.0)
+            #f_double_prime=((exponents-1.0))*(torch.sin(alpha_i)**2)*torch.cos(alpha_i)**(exponents-2.0)-(1.0)*torch.cos(alpha_i)**(exponents)
+
+        elif(self.exp_map_type=="exponential"):
+            betas=potential_pars[:,4:5,:].exp()
+            
+            exp_factor=torch.exp( betas*(torch.cos(alpha_i)-1.0))
+            f_prime=-torch.sin(alpha_i)*exp_factor
+
+            f_double_prime=-torch.cos(alpha_i)*exp_factor+torch.sin(alpha_i)*betas*torch.sin(alpha_i)*exp_factor
+        else:
+            raise Exception("unsupported exp map type: %s", self.exp_map_type)
+
+      
+        v_total=-(log_weights.exp()*f_prime*e_i).sum(axis=-1)
+
+        norm_v_total=((v_total**2).sum(axis=-1, keepdims=True).sqrt())
+
+      
+        e_v_total=v_total/norm_v_total
+
+        e_v_e_v_t=torch.einsum("bi,bj->bij", e_v_total, e_v_total)
+
+       
+        H_v=e_v_e_v_t+norm_v_total.unsqueeze(-1)*torch.cos(norm_v_total.unsqueeze(-1))/torch.sin(norm_v_total.unsqueeze(-1))*(torch.eye(3).unsqueeze(0).to(norm_v_total)-x_x_t.squeeze(-1)-e_v_e_v_t)
+
+        
+        K_i=f_double_prime.unsqueeze(1)*e_e_t+f_prime.unsqueeze(1)*(torch.cos(alpha_i).unsqueeze(1)/torch.sin(alpha_i).unsqueeze(1))*(torch.eye(3).unsqueeze(0).unsqueeze(-1).to(norm_v_total)-x_x_t-e_e_t)
+        
+        K_tot=((log_weights.unsqueeze(1).exp())*K_i).sum(axis=-1)
+
+        
+        signs,log_det_fac=torch.linalg.slogdet(x_x_t.squeeze(-1)+H_v+K_tot)
+
+      
+        log_det_fac=log_det_fac+torch.log(torch.sin(norm_v_total).squeeze(-1))-torch.log(norm_v_total).squeeze(-1)
+        
+       
+        new_res=self.basic_exponential_map(x, e_v_total, norm_v_total)
+
+
+        full_jacobian=x_x_t.squeeze(-1)+H_v+K_tot
+        full_jacobian=full_jacobian*((torch.sin(norm_v_total)/norm_v_total)**(1/3)).unsqueeze(-1)
+            
+        fin_mask=(torch.isfinite(log_det_fac)==0)
+
+        if(fin_mask.sum()>0):
+            print("NON finite")
+            print(fin_mask.shape)
+
+            print("xxt")
+            print(x_x_t[fin_mask])
+
+            print("HV")
+            print(H_v[fin_mask])
+
+            print("ktot")
+            print(K_tot[fin_mask])
+
+            print(log_det_fac[fin_mask])
+
+            sign_res, bad_res=torch.linalg.slogdet(  (x_x_t.squeeze(-1)+H_v+K_tot)[fin_mask] )
+
+            print(sign_res)
+            print(bad_res)
+            sys.exit(-1)
+        
+        return new_res, log_det_fac, full_jacobian
+    """
+    def basic_exponential_map(self, start, v_unit, v_norm):
+        """
+        Expoential map at base point X with tangent vec v_unit with normalization v_norm.
+        """
+        return start*torch.cos(v_norm)+v_unit*torch.sin(v_norm)
+
+    def unnormalized_logarithmic_map(self, base, unnormalized_target, return_jacobian=False,jacobian_on_unnormalized_target=None):
+
+        assert(len(base.shape)==len(unnormalized_target.shape)), (base.shape, unnormalized_target.shape)
+        
+        #b=base/(base**2).sum(axis=1,keepdims=True).sqrt()
+        b=base
+        target_norm=(unnormalized_target**2).sum(axis=1,keepdims=True).sqrt()
+        normalized_target=unnormalized_target/target_norm
+
+        cos_alpha=(normalized_target*b).sum(axis=1,keepdims=True)
+        alpha=torch.arccos(cos_alpha)
+
+        normalized_tangent_vec=(normalized_target-b*cos_alpha)/torch.sin(alpha)
+
+        # project unnormalized target on tangent vector
+
+        projection=(unnormalized_target*normalized_tangent_vec).sum(axis=1,keepdims=True)
+
+        if(return_jacobian):
+
+            ## calculate jacobian w.r.t to *base*
+            d_tangent_d_base=torch.diag_embed((-cos_alpha/torch.sin(alpha)).repeat(1,3))
+            d_tangent_d_theta=((b-normalized_target*cos_alpha)/(torch.sin(alpha)**2)).unsqueeze(-1)
+            d_theta_d_base=((-1.0/torch.sqrt(1.0-((normalized_target*b).sum(axis=1,keepdims=True))**2))*normalized_target).unsqueeze(1)
+
+            sec_fac=d_tangent_d_theta @ d_theta_d_base
+
+            # total jacobian on the normalized tangent vector
+            total_jac_tangent_vec=d_tangent_d_base+sec_fac
+
+            # total jacobian on the projection onto the tangent vector
+            total_jac_projection=((total_jac_tangent_vec*unnormalized_target.unsqueeze(-1)).sum(axis=1, keepdims=True))
+
+            if(jacobian_on_unnormalized_target is not None):
+
+                assert(jacobian_on_unnormalized_target.shape[1:]==total_jac_tangent_vec.shape[1:]), (jacobian_on_unnormalized_target.shape, total_jac_tangent_vec.shape)
+
+                # we also have a jacobian of unnormalized_target w.r.t to base given
+                # calculate jaobian w.r.t. unnormlized target and propagate via chain rule
+
+                # d/d_unnormalized_target (normalized_tangent_vec) = 
+                d_theta_d_norm=((-1.0/torch.sqrt(1.0-((normalized_target*b).sum(axis=1,keepdims=True))**2))*b).unsqueeze(1)
+                d_norm_d_unnorm=(-unnormalized_target/target_norm**2).unsqueeze(-1) @ normalized_target.unsqueeze(1)+torch.diag_embed(1.0/target_norm.repeat(1,3))
+
+                d_tangent_d_norm=torch.diag_embed(1.0/torch.sin(alpha).repeat(1,3))
+            
+                # add jacobian parts on tangent vector for unnormalized vector
+                total_jac_tangent_vec=total_jac_tangent_vec+d_tangent_d_theta @ d_theta_d_norm @ d_norm_d_unnorm @ jacobian_on_unnormalized_target
+                total_jac_tangent_vec=total_jac_tangent_vec+d_tangent_d_norm @ d_norm_d_unnorm @ jacobian_on_unnormalized_target
+
+                # add jacobian parts for the projection aswell
+                total_jac_projection=total_jac_projection + (normalized_tangent_vec.unsqueeze(-1)*jacobian_on_unnormalized_target).sum(axis=1, keepdims=True)
+                
+            return normalized_tangent_vec, projection ,total_jac_tangent_vec, total_jac_projection
+        else:
+
+            return normalized_tangent_vec, projection
+
+    def basic_logarithmic_map(self, base, target):
+        """
+        Logarithmic map at base point "base" towards "target".
+        """
+
+        assert(len(base.shape)==len(target.shape)), (base.shape, target.shape)
+       
+        cos_alpha=(target*base).sum(axis=1,keepdims=True)
+     
+        alpha=torch.arccos(cos_alpha)
+
+        # make sure we get sane division by sin(alpha) for small (zero) alphas
+        alpha=torch.where(alpha<1e-6, 1e-6, alpha)
+
+        normalized_tangent_vec=(target-base*cos_alpha)/torch.sin(alpha)
+
+        return normalized_tangent_vec, alpha
+
+   
 
     def get_exp_map_and_jacobian(self, x, potential_pars):
         """
         Calculates the exponential map and its jacobian in one go, since Jacobian always requires to calculate the exponential map anyway.
         """
 
-        norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
-        normalized_mu=potential_pars[:,:3,:]/norm
-        
-        if(normalized_mu.shape[0]==1):
-            normalized_mu=normalized_mu.repeat(x.shape[0], 1,1)
+        if(self.exp_map_type!="nn"):
+            norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
 
-        vs_jac=self.all_vs_jacobians(x, normalized_mu)
-        vs=self.all_vs(x,normalized_mu)
+            zero_mask=norm==0.0
+            assert(zero_mask.sum()==0)
 
+            normalized_mu=potential_pars[:,:3,:]/norm
+
+            fake_norm=self.mu_norm_function(norm)
+       
+        #print("exm map type ", self.exp_map_type)
         if(self.exp_map_type=="exponential"):
-            log_weights=potential_pars[:,3:4,:]
-            weights=torch.softmax(log_weights, dim=2)
-            
+           
+    
+            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            weights=log_weights.exp()
+
+            #xl=x/(x**2).sum(axis=1,keepdims=True).sqrt()
+
+            #xl=xl/(xl**2).sum(axis=1,keepdims=True).sqrt()
+
             x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
 
             scaling_beta=potential_pars[:,4:5,:].exp()
 
             
+
+            pure_grad_vec=(weights*normalized_mu*torch.exp(scaling_beta*(x_times_mu-1.0))).sum(axis=-1)
+
+        
+
+            # B X 3 X 1 X num_compoents
+            pure_grad_vec_jacobian=(scaling_beta*weights*normalized_mu*torch.exp(scaling_beta*(x_times_mu-1.0))).unsqueeze(2)
+
+            # B X 1 X 3 X num_components
+            d_x_time_u_dx=normalized_mu.unsqueeze(1)
+           
+            pure_grad_vec_jacobian= torch.einsum("...iju, ...jlu -> ...ilu", pure_grad_vec_jacobian, d_x_time_u_dx)
+
+            ## sum over components
+            pure_grad_vec_jacobian=pure_grad_vec_jacobian.sum(axis=-1)
+        elif(self.exp_map_type=="linear"):
+
+            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            weights=log_weights.exp()
+
+            x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
+            
+            pure_grad_vec=(weights*normalized_mu).sum(axis=-1)
+
+            pure_grad_vec_jacobian=None
+        elif(self.exp_map_type=="quadratic"):
+
+            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            weights=log_weights.exp()
+
+            x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
+            
+            pure_grad_vec=(weights*normalized_mu*x_times_mu).sum(axis=-1)
+
+            # B X 3 X 1 X num_compoents
+            pure_grad_vec_jacobian=(weights*normalized_mu).unsqueeze(2)
+
+            # B X 1 X 3 X num_components
+            d_x_time_u_dx=normalized_mu.unsqueeze(1)
+           
+            pure_grad_vec_jacobian= torch.einsum("...iju, ...jlu -> ...ilu", pure_grad_vec_jacobian, d_x_time_u_dx)
+
+            ## sum over components
+            pure_grad_vec_jacobian=pure_grad_vec_jacobian.sum(axis=-1)
+
+       
+        elif(self.exp_map_type=="splines"):
+
+            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            weights=log_weights.exp()
+
+            x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
+
+            unnormalized_widths=potential_pars[:,4:self.num_spline_basis_functions+4,:].permute(0,2,1)
+            unnormalized_heights=potential_pars[:,self.num_spline_basis_functions+4:2*self.num_spline_basis_functions+4,:].permute(0,2,1)
+            unnormalized_derivatives=potential_pars[:,2*self.num_spline_basis_functions+4:3*self.num_spline_basis_functions+5,:].permute(0,2,1)
+
+            res, log_deriv=spline_fns.rational_quadratic_spline(x_times_mu.permute(0,2,1),
+                              unnormalized_widths,
+                              unnormalized_heights,
+                              unnormalized_derivatives,
+                              inverse=False,
+                              left=-1.0, right=1.0, bottom=-1.0, top=1.0,
+                              rel_min_bin_width=1e-3,
+                              rel_min_bin_height=1e-3,
+                              min_derivative=1e-3)
+
+            ## back to normal order
+            deriv=log_deriv.exp().permute(0,2,1)
+            res=res.permute(0,2,1)
+
+
+            # actual potential is integral of spline function
+            # grad is the actual spline function * inner part (normalized mu)
+            pure_grad_vec=(weights*normalized_mu*res).sum(axis=-1)
+
+
+
+            # B X 3 X 1 X num_compoents
+            pure_grad_vec_jacobian=(weights*normalized_mu*deriv).unsqueeze(2)
+
+            # B X 1 X 3 X num_components
+            d_x_time_u_dx=normalized_mu.unsqueeze(1)
+           
+            pure_grad_vec_jacobian= torch.einsum("...iju, ...jlu -> ...ilu", pure_grad_vec_jacobian, d_x_time_u_dx)
+
+            ## sum over components
+            pure_grad_vec_jacobian=pure_grad_vec_jacobian.sum(axis=-1)
+
+        elif(self.exp_map_type=="nn"):
+            # not really sure if this is truly bijective, but it seems to work
+            raise Exception("doees not work - only used for testing - bijection doesnt work ")
+            
+            ## grad vec between -1 and 1
+            apply_mlp=lambda xx: NONLINEARITIES["tanh"](self.amortized_mlp(xx))*1.0-0.5
+
+            pure_grad_vec=NONLINEARITIES["tanh"](self.amortized_mlp(x))*1.0-0.5
+
+            pure_grad_vec_jacobian=torch.autograd.functional.jacobian(apply_mlp, x, create_graph=False).sum(axis=2)
+
+        else:
+            raise Exception()
+
+        
+        # calculate quantities related to unnormalized logarithmic map
+        tangent_vec, tangent_vec_norm, tangent_vec_jac, tangent_vec_norm_jac=self.unnormalized_logarithmic_map(x, pure_grad_vec, jacobian_on_unnormalized_target=pure_grad_vec_jacobian, return_jacobian=True)
+
+        # calculate exponential map
+        total_exp_map_result=self.basic_exponential_map(x, tangent_vec, tangent_vec_norm)
+
+        ## unnormed_tangent_vec
+        #unnormed_tangent_vec=tangent_vec*tangent_vec_norm
+        
+        # jacobian of total tangent_vec
+        #jac_unnormed_tangent_vec=tangent_vec.unsqueeze(-1) @ tangent_vec_norm_jac+torch.diag_embed(tangent_vec_norm.repeat(1,3)) @ tangent_vec_jac
+
+        
+        outer=torch.einsum("...ij, ...jl -> ...il", (-x*torch.sin(tangent_vec_norm)).unsqueeze(-1), tangent_vec_norm_jac)
+
+        first=torch.diag_embed(torch.cos(tangent_vec_norm).repeat(1, 3))+outer
+
+        # d/dx (v/|v|)* sin(phi) 
+        second=tangent_vec_jac*torch.sin(tangent_vec_norm.unsqueeze(-1))+torch.einsum("...ij, ...jl -> ...il", (tangent_vec*torch.cos(tangent_vec_norm)).unsqueeze(-1), tangent_vec_norm_jac)
+
+        ## total jacobian of exponential map in embedding (3-dim) space
+        total_exp_map_jac=first+second
+        ####################################################################
+            
+        # project jacobian onto tangential plane
+        second_tangent_vec=torch.cross(x,tangent_vec, dim=1)
+
+        tangent_basis=torch.cat([tangent_vec.unsqueeze(2), second_tangent_vec.unsqueeze(2)], dim=2)
+
+        # project jacobian
+        projected_jacobian=torch.bmm(total_exp_map_jac, tangent_basis)
+            
+        # calculate p^T*p
+        projected_jacobian_squared=torch.bmm(projected_jacobian.permute(0,2,1), projected_jacobian)
+
+        ## return exponential map, the Jacobian^2 projected onto the tangent plane (3X3 Jacobian -> 2X3 Jacobian, -> squareding 2X3 X3X2=2X2), and the full Jacobian^2 (3x3 Jacobian)
+        return total_exp_map_result, projected_jacobian_squared, total_exp_map_jac, tangent_vec
+
+    """
+    def get_exp_map_and_jacobian_old(self, x, potential_pars):
+        
+
+        norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
+
+
+        zero_mask=norm==0.0
+        assert(zero_mask.sum()==0)
+
+        
+        normalized_mu=potential_pars[:,:3,:]/norm
+
+        fake_norm=self.mu_norm_function(norm)
+        
+        if(normalized_mu.shape[0]==1):
+            normalized_mu=normalized_mu.repeat(x.shape[0], 1,1)
+
+        vs_jac=self.all_vs_jacobians(x, normalized_mu)#.detach()
+        vs=self.all_vs(x,normalized_mu)#.detach()
+
+       
+        #print("exm map type ", self.exp_map_type)
+        if(self.exp_map_type=="exponential"):
+           
+    
+            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            weights=log_weights.exp()
+
+            x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
+
+            scaling_beta=potential_pars[:,4:5,:].exp()
+
+            ## grad PHI
             pure_grad_vec=weights*normalized_mu*torch.exp(scaling_beta*(x_times_mu-1.0))
 
+            
             outer_jac=torch.einsum("aib, ajb -> aijb", pure_grad_vec, normalized_mu*scaling_beta)
 
             res1=torch.einsum("aijb, ajb -> aib", outer_jac, vs)
@@ -384,10 +766,11 @@ class exponential_map_s2(sphere_base.sphere_base):
             tangent_vec_jacs=vs_jac*projections.unsqueeze(1)+torch.einsum("aib, ajb -> aijb", vs, jacobian_projections)
 
             joint_vec_jac=tangent_vec_jacs.sum(axis=3)
+
+            ## v vec tangential to sphere (the velocity vec!)
             joint_vec=(projections*vs).sum(axis=2)
-
-            ####### len of the the joint vec (grad phi norm)
-
+          
+            ####### len of the the velocity vec (grad phi norm) -> the velocity to flow around sphere
             grad_phi_norm=(joint_vec**2).sum(axis=1, keepdims=True).sqrt()
 
 
@@ -411,8 +794,10 @@ class exponential_map_s2(sphere_base.sphere_base):
             # d/dx (x * cos(phi) = diag(cos(phi))+ x X grad_phi *(-sin(phi))
             second=final_vec_jac*torch.sin(grad_phi_norm.unsqueeze(2))+torch.einsum("ai, aj -> aij", final_vec, (jac_grad_phi*torch.cos(grad_phi_norm)))
 
+            ## total jacobian in embedding (3-dim) space
             total_exp_map_jac=first+second
 
+           
             total_exp_map=x*torch.cos(grad_phi_norm)+final_vec*torch.sin(grad_phi_norm)
 
             ## get a basis within the tangent plane to project onto
@@ -428,12 +813,26 @@ class exponential_map_s2(sphere_base.sphere_base):
             
             projected_jacobian=torch.bmm(half_projected_jacobian.permute(0,2,1), half_projected_jacobian)
 
-        else:
-            raise NotImplementedError()
+        elif(self.exp_map_type=="linear" or self.exp_map_type=="quadratic" or self.exp_map_type=="polynomial"):
 
-        ## return exponential map, the Jacobian^2 projected onto the tangent plane (3X3 Jacobian -> 2X3 Jacobian), and the full Jacobian^2 (3x3 Jacobian)
+            # sum(weights)=fake_norm [eps,1.0]
+            #log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+
+            
+            #pure_grad_vec=(log_weights.exp()*normalized_mu).sum(axis=-1)
+            #len_of_grad_vec=(pure_grad_vec**2).sum(axis=-1, keepdims=True).sqrt()
+
+            #total_jacobian=torch.diag_embed(len_of_grad_vec.repeat(1,3))
+
+
+            total_exp_map, _, full_jacobian=self.get_explicit_formula_result(x, potential_pars)
+            projected_jacobian=full_jacobian
+            total_exp_map_jac=full_jacobian
+            
+
+        ## return exponential map, the Jacobian^2 projected onto the tangent plane (3X3 Jacobian -> 2X3 Jacobian, -> squareding 2X3 X3X2=2X2), and the full Jacobian^2 (3x3 Jacobian)
         return total_exp_map, projected_jacobian, total_exp_map_jac
-
+    """
   
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
@@ -455,29 +854,42 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         if(self.always_parametrize_in_embedding_space==False):
             # embedding to intrinsic
-           
+            #print("converting to spherical .. ", x)
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
            
-
+            #print("after ... ", x)
         if(self.natural_direction):
 
 
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x, potential_pars )
+            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.basic_logarithmic_map, self.basic_exponential_map, x, potential_pars )
 
-            _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
+            _, jac_squared, _,_=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
             log_det=log_det-0.5*slog_det
         else:
-            result, jac_squared, _=self.get_exp_map_and_jacobian(x, potential_pars)
-            sign, slog_det=torch.slogdet(jac_squared)
-            
-            
-            log_det=log_det+0.5*slog_det
 
-        ## sqrt of det(jacobian^T * jacobian)
-        
-        #res=self.eucl_to_spherical_embedding(result)
+
+            result, new_projected, new_standard,_=self.get_exp_map_and_jacobian(x, potential_pars)
+
+    
+         
+            #print(old_projected-new_projected)
+            _,ld_res=torch.slogdet(new_projected)
+                
+            log_det_update=0.5*ld_res
+
+            log_det=log_det+log_det_update
+           
+            """
+
+            explicit_res, ld_update_explicit,_=self.get_explicit_formula_result(x, potential_pars)
+
+            assert(torch.abs((explicit_res-result)).sum()<1e-10),torch.abs((explicit_res-result)).sum()
+
+           
+            assert( torch.abs((ld_update_explicit-0.5*ld_res)).sum()<1e-8)
+            """
 
         if(self.always_parametrize_in_embedding_space==False):
             # embedding to intrinsic
@@ -486,7 +898,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         return result, log_det, None
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
-        
+        #print("calculating forward flow ?!")
         [x,log_det]=inputs
         
         if(self.always_parametrize_in_embedding_space==False):
@@ -500,16 +912,18 @@ class exponential_map_s2(sphere_base.sphere_base):
         if(extra_inputs is not None):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
 
+        
+
         if(self.natural_direction):
-            result, jac_squared, _=self.get_exp_map_and_jacobian(x, potential_pars)
+            result, jac_squared, _,_=self.get_exp_map_and_jacobian(x, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
 
             log_det=log_det+0.5*slog_det
 
         else:
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, x, potential_pars )
+            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian,self.basic_logarithmic_map,  self.basic_exponential_map, x, potential_pars )
 
-            _, jac_squared, _=self.get_exp_map_and_jacobian(result, potential_pars)
+            _, jac_squared, _,_=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
             log_det=log_det-0.5*slog_det
@@ -521,16 +935,27 @@ class exponential_map_s2(sphere_base.sphere_base):
 
     def _init_params(self, params):
 
-        assert(len(params)== (self.num_potential_pars*self.num_components))
+        if(self.exp_map_type!="nn"):
 
-        self.potential_pars.data=params.reshape(1, self.num_potential_pars, self.num_components)
+            assert(len(params)== (self.num_potential_pars*self.num_components))
 
+            self.potential_pars.data=params.reshape(1, self.num_potential_pars, self.num_components)
+
+        else:
+            mlp_params=params[:self.num_mlp_params]
+
+            bias_mlp_pars=mlp_params[-3:]
+
+            self.amortized_mlp.initialize_uvbs(init_b=bias_mlp_pars)
 
     def _get_desired_init_parameters(self):
 
-      
-        gaussian_init=torch.randn((self.num_potential_pars*self.num_components))
+        if(self.exp_map_type!="nn"):
+            gaussian_init=torch.randn((self.num_potential_pars*self.num_components))
 
+            
+        else:
+            gaussian_init=torch.randn((self.num_mlp_params))
         return gaussian_init
 
 

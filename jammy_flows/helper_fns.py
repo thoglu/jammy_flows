@@ -168,9 +168,10 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
     
     ## require intrinsic coordinates
+    print("evaluating the model at ... ", eval_positions[mask_inner])
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
-    print("log res ", log_res)
+
     ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
     for ind, pdf_def in enumerate(model.pdf_defs_list):
         if (pdf_def == "s2" and s2_norm=="lambert"):
@@ -180,6 +181,8 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             print(upd.shape)
             ## angle -> cartesian -> subtract
             log_res-=upd
+
+    print("log res after area correction", log_res)
             
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])

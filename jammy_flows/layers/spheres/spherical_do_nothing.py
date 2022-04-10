@@ -16,6 +16,7 @@ class spherical_do_nothing(sphere_base.sphere_base):
 
         sf_extra=None
 
+
         if(self.always_parametrize_in_embedding_space==True):
             # s2 flow is defined in embedding space,
             #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
@@ -52,7 +53,7 @@ class spherical_do_nothing(sphere_base.sphere_base):
         
        
         [x,log_det]=inputs
-
+        
         if(self.always_parametrize_in_embedding_space==True):
             # s2 flow is defined in embedding space,
             #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
