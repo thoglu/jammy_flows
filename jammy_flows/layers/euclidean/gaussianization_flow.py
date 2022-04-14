@@ -7,6 +7,7 @@ from .. import layer_base
 from ... import extra_functions
 from .. import matrix_fns
 from . import euclidean_base
+from .. import spline_fns
 
 import math
 import torch.nn.functional as F
@@ -117,15 +118,9 @@ class gf_block(euclidean_base.euclidean_base):
         ## dimension of target space
         self.dimension = dimension
 
-        ## number of KDE components per dimension
-        self.num_kde = num_kde
-
-        ## number of total params for a given mean/width ...
-        self.num_params_datapoints=self.num_kde*self.dimension
-
-        ## initialization from Gaussianization flow paper for widths
-        bandwidth = (4. * numpy.sqrt(math.pi) / ((math.pi ** 4) * num_kde)) ** 0.2
-        self.init_log_width=numpy.log(bandwidth)
+        self.fit_normalization=fit_normalization
+        self.regulate_normalization=regulate_normalization
+        self.add_skewness=add_skewness
 
         #######################################
 
@@ -199,142 +194,168 @@ class gf_block(euclidean_base.euclidean_base):
                     self.cayley_pars=nn.Parameter(torch.randn((1, 1)).type(torch.double))
 
 
+        ## number of KDE components per dimension
+        self.num_kde = num_kde
+
+        ## number of total params for a given mean/width ...
+        self.num_params_datapoints=self.num_kde*self.dimension
+
+        ## initialization from Gaussianization flow paper for widths
+        bandwidth = (4. * numpy.sqrt(math.pi) / ((math.pi ** 4) * num_kde)) ** 0.2
+        self.init_log_width=numpy.log(bandwidth)
 
         #######################################
+        if(self.nonlinear_stretch_type=="classic"):
+            ## means
+            if use_permanent_parameters:
+                self.kde_means = nn.Parameter(torch.randn(self.num_kde, self.dimension).type(torch.double).unsqueeze(0))
 
-        ## means
-        if use_permanent_parameters:
-            self.kde_means = nn.Parameter(torch.randn(self.num_kde, self.dimension).type(torch.double).unsqueeze(0))
+            ## increase params per kde*dim
+            self.total_param_num+=self.num_params_datapoints
 
-        ## increase params per kde*dim
-        self.total_param_num+=self.num_params_datapoints
+            #######################################
 
-        #######################################
+            ## widths
+            #self.kde_log_widths = torch.zeros(num_kde, dimension).type(torch.double).unsqueeze(0)
+            if(use_permanent_parameters):
+                self.kde_log_widths = nn.Parameter(
+                    torch.ones(num_kde, dimension).type(torch.double).unsqueeze(0) * self.init_log_width
+                )
 
-        ## widths
-        #self.kde_log_widths = torch.zeros(num_kde, dimension).type(torch.double).unsqueeze(0)
-        if(use_permanent_parameters):
-            self.kde_log_widths = nn.Parameter(
-                torch.ones(num_kde, dimension).type(torch.double).unsqueeze(0) * self.init_log_width
-            )
+            ## increase params per kde*dim
+            self.total_param_num+=self.num_params_datapoints
 
-        ## increase params per kde*dim
-        self.total_param_num+=self.num_params_datapoints
+            ## softplus for width?
+            self.softplus_for_width=softplus_for_width
 
-        ## softplus for width?
-        self.softplus_for_width=softplus_for_width
+            ## we only want specific settings in the new implementation, but keep the older implementation for now
+            #assert(self.softplus_for_width==False)
+            #assert(self.width_smooth_saturation>0)
+            #assert(self.clamp_widths==0)
 
-        ## we only want specific settings in the new implementation, but keep the older implementation for now
-        #assert(self.softplus_for_width==False)
-        #assert(self.width_smooth_saturation>0)
-        #assert(self.clamp_widths==0)
-
-        ## setup up width regularization
-        if(self.softplus_for_width):
-            ## softplus
-            if(clamp_widths):
-                upper_clamp=None
-                if(self.width_max is not None):
-                    # clamp upper bound with exact width_max value
-                    upper_clamp=numpy.log(self.width_max)
-                self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
-            else:
-                self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(x)+self.width_min)
-            
-            
-
-        else:
-            ## exponential-type width relation
-            if(self.width_smooth_saturation == 0):
-                ## normal, infinetly growing exponential
-                if(self.clamp_widths):
-                    # clamp upper bound with exact width_max value
+            ## setup up width regularization
+            if(self.softplus_for_width):
+                ## softplus
+                if(clamp_widths):
                     upper_clamp=None
                     if(self.width_max is not None):
+                        # clamp upper bound with exact width_max value
                         upper_clamp=numpy.log(self.width_max)
-                    self.width_regulator=lambda x: torch.log(torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
+                    self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
                 else:
-                    self.width_regulator=lambda x: torch.log(torch.exp(x)+self.width_min)
+                    self.width_regulator=lambda x: torch.log(torch.nn.functional.softplus(x)+self.width_min)
+                
+                
 
             else:
-                ## exponential function at beginning but flattens out at width_max -> no infinite growth
-                ## numerically stable via logsumexp .. clamping should not be necessary, but can be done to damp down large gradients
-                ## in weird regions of parameter space
-                
-                ln_width_max=numpy.log(self.width_max)
-                ln_width_min=numpy.log(self.width_min)
-
-                if(self.clamp_widths):
-
-                    def exp_like_fn(x):
-
-                        res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-torch.clamp(x, min=self.log_width_min_to_clamp, max=self.log_width_max_to_clamp)+ln_width_max).unsqueeze(-1)], dim=-1)
-
-                        first_term=ln_width_max-torch.logsumexp(res, dim=-1, keepdim=True)
-
-                        return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_width_min], dim=-1), dim=-1)
+                ## exponential-type width relation
+                if(self.width_smooth_saturation == 0):
+                    ## normal, infinetly growing exponential
+                    if(self.clamp_widths):
+                        # clamp upper bound with exact width_max value
+                        upper_clamp=None
+                        if(self.width_max is not None):
+                            upper_clamp=numpy.log(self.width_max)
+                        self.width_regulator=lambda x: torch.log(torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
+                    else:
+                        self.width_regulator=lambda x: torch.log(torch.exp(x)+self.width_min)
 
                 else:
+                    ## exponential function at beginning but flattens out at width_max -> no infinite growth
+                    ## numerically stable via logsumexp .. clamping should not be necessary, but can be done to damp down large gradients
+                    ## in weird regions of parameter space
+                    
+                    ln_width_max=numpy.log(self.width_max)
+                    ln_width_min=numpy.log(self.width_min)
 
-                    exp_like_fn=generate_log_function_bounded_in_logspace(self.width_min, self.width_max, center=True)
+                    if(self.clamp_widths):
 
-                self.width_regulator=exp_like_fn
+                        def exp_like_fn(x):
 
-                
-        #######################################
+                            res=torch.cat([torch.zeros_like(x).unsqueeze(-1), (-torch.clamp(x, min=self.log_width_min_to_clamp, max=self.log_width_max_to_clamp)+ln_width_max).unsqueeze(-1)], dim=-1)
 
-        # normalization parameters
-        #self.kde_log_weights = torch.zeros(self.num_kde, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
-        if(fit_normalization):
+                            first_term=ln_width_max-torch.logsumexp(res, dim=-1, keepdim=True)
 
-            if(use_permanent_parameters):
-                self.kde_log_weights = nn.Parameter(torch.randn(num_kde, self.dimension).type(torch.double).unsqueeze(0))
+                            return torch.logsumexp( torch.cat([first_term, torch.ones_like(first_term)*ln_width_min], dim=-1), dim=-1)
+
+                    else:
+
+                        exp_like_fn=generate_log_function_bounded_in_logspace(self.width_min, self.width_max, center=True)
+
+                    self.width_regulator=exp_like_fn
+
+                    
+            #######################################
+
+            # normalization parameters
+            #self.kde_log_weights = torch.zeros(self.num_kde, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
+            if(fit_normalization):
+
+                if(use_permanent_parameters):
+                    self.kde_log_weights = nn.Parameter(torch.randn(num_kde, self.dimension).type(torch.double).unsqueeze(0))
 
 
-            self.total_param_num+=self.num_params_datapoints
+                self.total_param_num+=self.num_params_datapoints
 
 
-        self.fit_normalization=fit_normalization
-        self.regulate_normalization=regulate_normalization
-
-        self.normalization_regulator = None
-        if(self.fit_normalization):
-            if(self.regulate_normalization):
-                ## bound normalization into a range that spans roughly ~ 100 . .we dont want huge discrepancies in normalization
-                ## this serves as a stabilizer during training compared to no free-floating normalization, but at the same time
-                ## avoids near zero normalizations which can also lead to unwanted side effects
-
-                self.normalization_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=100)
-
-        #######################################
-
-        #### skewness
-        self.add_skewness=add_skewness
-
-        ## shape to B X KDE index dim X dimension
-        self.kde_log_skew_exponents=torch.DoubleTensor([0.0]).view(1,1,1)
-        self.kde_skew_signs=torch.DoubleTensor([1.0])
-
-        if(self.add_skewness):
-
-            self.kde_skew_signs=torch.ones( (1,self.num_kde,1)).type(torch.double)
-
-            num_negative=int(float(self.num_kde)/2.0)
-
-            ## half of the KDEs use a flipped prescription
-            self.kde_skew_signs[:,num_negative:,:]=-1.0
-
-            if(use_permanent_parameters):
-                self.kde_log_skew_exponents = nn.Parameter(
-                    torch.randn(self.num_kde, dimension).type(torch.double).unsqueeze(0)
-                )
             
-            #else:
-            #    self.skew_exponents = torch.zeros(self.num_kde, dimension).type(torch.double).unsqueeze(0) 
 
-            ## with 0.1 and 9.0 the function maps 0 to 0 approximately -> 0 -> 1 in normal exponent space, the starting point we want
-            self.exponent_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=0.1, max_val_normal_space=9.0, center=True)
-            self.total_param_num+=self.num_params_datapoints
+            self.normalization_regulator = None
+            if(self.fit_normalization):
+                if(self.regulate_normalization):
+                    ## bound normalization into a range that spans roughly ~ 100 . .we dont want huge discrepancies in normalization
+                    ## this serves as a stabilizer during training compared to no free-floating normalization, but at the same time
+                    ## avoids near zero normalizations which can also lead to unwanted side effects
+
+                    self.normalization_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=100)
+
+            #######################################
+
+            
+
+            ## shape to B X KDE index dim X dimension
+            self.kde_log_skew_exponents=torch.DoubleTensor([0.0]).view(1,1,1)
+            self.kde_skew_signs=torch.DoubleTensor([1.0])
+
+            if(self.add_skewness):
+
+                self.kde_skew_signs=torch.ones( (1,self.num_kde,1)).type(torch.double)
+
+                num_negative=int(float(self.num_kde)/2.0)
+
+                ## half of the KDEs use a flipped prescription
+                self.kde_skew_signs[:,num_negative:,:]=-1.0
+
+                if(use_permanent_parameters):
+                    self.kde_log_skew_exponents = nn.Parameter(
+                        torch.randn(self.num_kde, dimension).type(torch.double).unsqueeze(0)
+                    )
+                
+                #else:
+                #    self.skew_exponents = torch.zeros(self.num_kde, dimension).type(torch.double).unsqueeze(0) 
+
+                ## with 0.1 and 9.0 the function maps 0 to 0 approximately -> 0 -> 1 in normal exponent space, the starting point we want
+                self.exponent_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=0.1, max_val_normal_space=9.0, center=True)
+                self.total_param_num+=self.num_params_datapoints
+
+        elif(self.nonlinear_stretch_type=="rq_splines"):
+
+            if(use_permanent_parameters):
+                self.log_widths = nn.Parameter(torch.randn(self.dimension, self.num_kde).type(torch.double).unsqueeze(0))
+                self.log_heights = nn.Parameter(torch.randn(self.dimension, self.num_kde).type(torch.double).unsqueeze(0))
+                self.log_derivatives = nn.Parameter(torch.randn(self.dimension, self.num_kde+1).type(torch.double).unsqueeze(0))
+                self.boundary_points=nn.Parameter(torch.randn(self.dimension, 4).type(torch.double).unsqueeze(0))  
+
+            print("tot param num so far ", self.total_param_num)
+            self.total_param_num+=(self.num_kde*self.dimension)*2+(self.num_kde+1)*self.dimension
+
+            # add 4*dimension boundary pts
+            self.total_param_num+=(4*self.dimension)
+
+            print("total param num at aend ", self.total_param_num)
+        else:
+            raise Exception("Unknown non linear stretch type: %s" % self.nonlinear_stretch_type)
+
 
 
     def logistic_kernel_log_pdf_quantities(self, x, means, log_widths, log_norms, log_skew_exponents, skew_signs, calculate_pdf=True):
@@ -704,6 +725,7 @@ class gf_block(euclidean_base.euclidean_base):
 
                 else:
                     rotation_params=extra_inputs[:, :self.num_angle_pars]
+                    
                 extra_input_counter+=self.num_angle_pars
 
                 combi_list=[]
@@ -746,56 +768,121 @@ class gf_block(euclidean_base.euclidean_base):
 
                 rotation_params=rot_matrix
 
+        if(self.nonlinear_stretch_type=="classic"):
 
-        kde_log_skew_exponents=self.kde_log_skew_exponents.to(x)
-        kde_skew_signs=self.kde_skew_signs.to(x)
+            kde_log_skew_exponents=self.kde_log_skew_exponents.to(x)
+            kde_skew_signs=self.kde_skew_signs.to(x)
 
-        if(extra_inputs is None):
+            if(extra_inputs is None):
 
-            kde_means=self.kde_means.to(x)
-            kde_log_widths=self.kde_log_widths.to(x)
-            if(self.fit_normalization):
-                kde_log_weights=self.kde_log_weights.to(x)
+                kde_means=self.kde_means.to(x)
+                kde_log_widths=self.kde_log_widths.to(x)
+                if(self.fit_normalization):
+                    kde_log_weights=self.kde_log_weights.to(x)
+                else:
+                    kde_log_weights=torch.zeros_like(kde_log_widths)
+                
             else:
-                kde_log_weights=torch.zeros_like(kde_log_widths)
-            
-        else:
-            ## skipping householder params
-            #extra_input_counter=self.num_householder_params
+                ## skipping householder params
+                #extra_input_counter=self.num_householder_params
 
-            kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
-            extra_input_counter+=self.num_params_datapoints
-
-            kde_log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
-            extra_input_counter+=self.num_params_datapoints
-
-            if(self.fit_normalization):
-                kde_log_weights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
+                kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
                 extra_input_counter+=self.num_params_datapoints
-            else:
-                kde_log_weights=torch.zeros(x.shape[0], self.num_kde, self.dimension).to(x)
 
+                kde_log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
+                extra_input_counter+=self.num_params_datapoints
+
+                if(self.fit_normalization):
+                    kde_log_weights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
+                    extra_input_counter+=self.num_params_datapoints
+                else:
+                    kde_log_weights=torch.zeros(x.shape[0], self.num_kde, self.dimension).to(x)
+
+                if(self.add_skewness):
+
+                    kde_log_skew_exponents=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
+            
+            ## transform width
+
+            kde_log_widths=self.width_regulator(kde_log_widths)
+
+            ## transform normalization if necessary
+            if(self.fit_normalization and self.regulate_normalization):
+
+                ## regulate log-normalizations if desired
+                kde_log_weights=self.normalization_regulator(kde_log_weights)
+          
+            ## transform skewness if necessary
             if(self.add_skewness):
-
-                kde_log_skew_exponents=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
         
-        ## transform width
+                kde_log_skew_exponents=self.exponent_regulator(kde_log_skew_exponents)
 
-        kde_log_widths=self.width_regulator(kde_log_widths)
 
-        ## transform normalization if necessary
-        if(self.fit_normalization and self.regulate_normalization):
+            return (kde_means, kde_log_widths, kde_log_weights, kde_log_skew_exponents, kde_skew_signs), rotation_params
+        else:
+            # nonlinear stretch type is based on rq_splines
 
-            ## regulate log-normalizations if desired
-            kde_log_weights=self.normalization_regulator(kde_log_weights)
-      
-        ## transform skewness if necessary
-        if(self.add_skewness):
-    
-            kde_log_skew_exponents=self.exponent_regulator(kde_log_skew_exponents)
+            if(extra_inputs is None):
+                log_widths = self.log_widths.to(x)
+                log_heights = self.log_heights.to(x)
+                log_derivatives = self.log_derivatives.to(x)
+                boundary_points = self.boundary_points.to(x)
 
-        return (kde_means, kde_log_widths, kde_log_weights, kde_log_skew_exponents, kde_skew_signs), rotation_params
-        ## if we fit normalization ... 
+            else:
+
+                log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [x.shape[0] , self.dimension, self.num_kde])
+                extra_input_counter+=self.dimension*self.num_kde
+
+                log_heights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [x.shape[0] , self.dimension, self.num_kde])
+                extra_input_counter+=self.dimension*self.num_kde
+
+                log_derivatives=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*(self.num_kde+1)], [x.shape[0] ,  self.dimension,self.num_kde+1])
+                extra_input_counter+=self.dimension*(self.num_kde+1)
+
+                boundary_points=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*4], [x.shape[0] , self.dimension, 4])
+                extra_input_counter+=self.dimension*4
+
+
+            ## sort boundary points
+
+            if(False):
+                left=boundary_points[:,:,0:1]
+                right=boundary_points[:,:,1:2]
+
+                new_left=torch.where(left<right, left, right)
+                new_right=torch.where(left<right, right, left)
+
+                bottom=boundary_points[:,:,2:3]
+                top=boundary_points[:,:,3:4]
+
+                if( (bottom>top).sum() > 0):
+
+
+                    print("bottom/top !!!!!!")
+                    
+
+                if( (left>right).sum()>0):
+                    print("left right !!!!!!!!")
+                    
+                new_bottom=torch.where(bottom<top, bottom, top)
+                new_top=torch.where(bottom<top, top, bottom)
+            else:
+                min_abs_width=1e-3
+
+                new_left=boundary_points[:,:,0:1]
+                #new_right=new_left+torch.nn.functional.softplus(boundary_points[:,:,1:2])+min_abs_width
+                new_right=new_left+torch.exp(boundary_points[:,:,1:2])+min_abs_width
+
+                new_bottom=boundary_points[:,:,2:3]
+                new_top=new_bottom+torch.exp(boundary_points[:,:,3:4])+min_abs_width
+
+
+
+
+            return (log_widths, log_heights, log_derivatives, new_left,new_right,new_bottom,new_top), rotation_params
+
+
+         
 
 
     def _flow_mapping(self, inputs, extra_inputs=None, verbose=False, lower=-1e5, upper=1e5): 
@@ -803,43 +890,31 @@ class gf_block(euclidean_base.euclidean_base):
         [z, log_det]=inputs
 
         device=z.device
-        """
-        extra_input_counter=0
-
-        if(self.use_hh_replacement):
-
-            if(extra_inputs is not None):
-
-                extra_input_counter
-
-            else:
-
-        else:
-            if self.use_householder:
-                this_vs=self.vs.to(z)
-
-                if(extra_inputs is not None):
-
-                  
-                    this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [z.shape[0], self.vs.shape[1], self.vs.shape[2]])
-
-                    extra_input_counter+=self.num_householder_params
-            
-                rotation_matrix = self.compute_householder_matrix(this_vs, device=z.device)
-
-                if(rotation_matrix.shape[0]<z.shape[0]):
-                    if(rotation_matrix.shape[0]==1):
-                        rotation_matrix=rotation_matrix.repeat(z.shape[0], 1,1)
-                    else:
-                        raise Exception("something went wrong with first dim of rot matrix!")
-        """
 
         flow_params, rotation_params=self._obtain_usable_flow_params(z, extra_inputs=extra_inputs)
-        
-        res=bn.inverse_bisection_n_newton_joint_func_and_grad(self.sigmoid_inv_error_pass_w_params, self.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1],flow_params[2],flow_params[3],flow_params[4], min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
-        log_deriv=self.sigmoid_inv_error_pass_log_derivative_w_params(res, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4])
 
-        log_det=log_det-log_deriv.sum(axis=-1)
+        if(self.nonlinear_stretch_type=="classic"):
+        
+            res=bn.inverse_bisection_n_newton_joint_func_and_grad(self.sigmoid_inv_error_pass_w_params, self.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1],flow_params[2],flow_params[3],flow_params[4], min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
+            log_deriv=self.sigmoid_inv_error_pass_log_derivative_w_params(res, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4])
+
+            log_det=log_det-log_deriv.sum(axis=-1)
+
+        elif(self.nonlinear_stretch_type=="rq_splines"):
+           
+            res, log_deriv=spline_fns.rational_quadratic_spline_with_linear_extension(z.unsqueeze(-1), 
+                                                                       flow_params[0],
+                                                                        flow_params[1],
+                                                                        flow_params[2],
+                                                                        left=flow_params[3],
+                                                                        right=flow_params[4],
+                                                                        bottom=flow_params[5],
+                                                                        top=flow_params[6],
+                                                                        inverse=True)
+
+            res=res.squeeze(-1)
+          
+            log_det=log_det+log_deriv.squeeze(-1).sum(axis=-1)
 
         if(self.rotation_mode=="triangular_combination"):
           
@@ -898,33 +973,6 @@ class gf_block(euclidean_base.euclidean_base):
 
         [x, log_det] = inputs
 
-        """
-        extra_input_counter=0
-
-
-        if self.use_householder:
-            this_vs=self.vs.to(x)
-            if(extra_inputs is not None):
-                
-
-                this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.vs.shape[1], self.vs.shape[2]])
-
-                
-                extra_input_counter+=self.num_householder_params
-
-            rotation_matrix = self.compute_householder_matrix(this_vs, device=x.device)
-
-            
-            if(rotation_matrix.shape[0]<x.shape[0]):
-                if(rotation_matrix.shape[0]==1):
-                    rotation_matrix=rotation_matrix.repeat(x.shape[0], 1,1)
-                else:
-                    raise Exception("something went wrong with first dim of rot matrix!")
-
-            x = torch.bmm(rotation_matrix.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)  # uncomment
-        """
-
-
         #############################################################################################
         # Compute inverse CDF
         #############################################################################################
@@ -981,17 +1029,65 @@ class gf_block(euclidean_base.euclidean_base):
 
         if(self.nonlinear_stretch_type=="classic"):
         
-            #log_det=log_det+self.sigmoid_inv_error_pass_log_derivative(x, this_datapoints, this_hs,this_log_norms, this_skew_exponent, this_skew_signs).sum(axis=-1)
-
             x, log_deriv=self.sigmoid_inv_error_pass_combined_val_n_log_derivative(x, *flow_params)
 
             log_det=log_det+log_deriv.sum(axis=-1)
 
-        elif(self.nonlinear_stretch_type=="spline"):
-            raise Exception()
-            print("None")
-            #x, log_det_update=spline_fns.
+        elif(self.nonlinear_stretch_type=="rq_splines"):
+            x, log_deriv=spline_fns.rational_quadratic_spline_with_linear_extension(x.unsqueeze(-1), 
+                                                                       flow_params[0],
+                                                                        flow_params[1],
+                                                                        flow_params[2],
+                                                                        left=flow_params[3],
+                                                                        right=flow_params[4],
+                                                                        bottom=flow_params[5],
+                                                                        top=flow_params[6],
+                                                                        inverse=False)
 
+            """
+            testz=torch.linspace(-2.5, 2.1, 1000).unsqueeze(-1).unsqueeze(-1)
+
+            fig=pylab.figure()
+
+            ax=fig.add_subplot(221)
+            ax2=fig.add_subplot(222)
+
+            for do_inv in [False, True]:
+                
+                
+
+              
+                res, log_deriv=spline_fns.rational_quadratic_spline_with_linear_extension(testz, 
+                                                                           flow_params[0][:,0:1,:],
+                                                                            flow_params[1][:,0:1,:],
+                                                                            flow_params[2][:,0:1,:],
+                                                                            left=flow_params[3][:,0:1,:],
+                                                                            right=flow_params[4][:,0:1,:],
+                                                                            bottom=flow_params[5][:,0:1,:],
+                                                                            top=flow_params[6][:,0:1,:],
+                                                                            inverse=do_inv)
+                
+            
+            
+                ax.plot(testz.squeeze(-1).squeeze(-1).numpy(), res.detach().squeeze(-1).squeeze(-1).numpy(), color="k" if do_inv else "r")
+
+                
+
+                ax2.plot(testz.squeeze(-1).squeeze(-1).numpy(), log_deriv.detach().exp().squeeze(-1).squeeze(-1).numpy(), color="k" if do_inv else "r")
+
+            ax2.semilogy()
+
+
+            pylab.savefig("test.png")
+            sys.exit(-1)
+            """
+            
+
+
+            x=x.squeeze(-1)
+
+            log_det=log_det+log_deriv.squeeze(-1).sum(axis=-1)
+        
         return x, log_det
 
     def _get_desired_init_parameters(self):
@@ -1014,20 +1110,37 @@ class gf_block(euclidean_base.euclidean_base):
         elif(self.rotation_mode=="cayley"):
             desired_param_vec.append(torch.zeros(self.num_cayley_pars))
 
-        ## means
-        desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
+        if(self.nonlinear_stretch_type=="classic"):
+            ## means
+            desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
 
-        ## widths
-        desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)
+            ## widths
+            desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)
 
-        ## normalization
-        if(self.fit_normalization):
+            ## normalization
+            if(self.fit_normalization):
+                desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
+
+            ## normalization
+            if(self.add_skewness):
+                desired_param_vec.append(torch.zeros(self.num_kde*self.dimension))
+        else:
+
+            # log_widths
             desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
 
-        ## normalization
-        if(self.add_skewness):
-            desired_param_vec.append(torch.zeros(self.num_kde*self.dimension))
+            # log heights
+            desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
 
+            # log derivatives
+            # 0.54135 corresponds to 1 if input to soft_plus
+            desired_param_vec.append(torch.ones((self.num_kde+1)*self.dimension)*0.54135)
+
+            # boundary
+
+            desired_param_vec.append(torch.Tensor(self.dimension*[-1.0, 1.0, -1.0, 1.0]))
+            
+         
         return torch.cat(desired_param_vec)
 
     def _init_params(self, params):
@@ -1055,19 +1168,34 @@ class gf_block(euclidean_base.euclidean_base):
             if(self.dimension>1):
                 self.cayley_pars.data=torch.reshape(params[:, self.num_cayley_pars], [1, self.num_cayley_pars])
         
-        self.kde_means.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-        counter+=self.num_params_datapoints
-
-        self.kde_log_widths.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-        counter+=self.num_params_datapoints
-
-        if(self.fit_normalization):
-            self.kde_log_weights.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+        if(self.nonlinear_stretch_type=="classic"):
+            # classic gaussianization flow
+            self.kde_means.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
             counter+=self.num_params_datapoints
 
-        if(self.add_skewness):
-            self.kde_log_skew_exponents.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+            self.kde_log_widths.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
             counter+=self.num_params_datapoints
+
+            if(self.fit_normalization):
+                self.kde_log_weights.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+                counter+=self.num_params_datapoints
+
+            if(self.add_skewness):
+                self.kde_log_skew_exponents.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
+                counter+=self.num_params_datapoints
+        else:
+            # rq_splines
+            self.log_widths.data=torch.reshape(params[counter:counter+self.num_kde*self.dimension], [1,self.dimension,self.num_kde])
+            counter+=self.num_kde*self.dimension
+
+            self.log_heights.data=torch.reshape(params[counter:counter+self.num_kde*self.dimension], [1,self.dimension,self.num_kde])
+            counter+=self.num_kde*self.dimension
+
+            self.log_derivatives.data=torch.reshape(params[counter:counter+(self.num_kde+1)*self.dimension], [1,self.dimension,(self.num_kde+1)])
+            counter+=(self.num_kde+1)*self.dimension
+
+            self.boundary_points.data=torch.reshape(params[counter:counter+4*self.dimension], [1,self.dimension,4])
+            counter+=4*self.dimension
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
         """ 
@@ -1105,7 +1233,7 @@ class gf_block(euclidean_base.euclidean_base):
         elif(self.rotation_mode=="angles"):
             if(self.dimension>1):
                 if(extra_inputs is None):
-                    param_dict[extra_prefix+"anglears"]=self.angle_pars.data
+                    param_dict[extra_prefix+"anglepars"]=self.angle_pars.data
                 else:
                     param_dict[extra_prefix+"anglepars"]=extra_inputs[:,:self.num_angle_pars]
 
@@ -1119,44 +1247,67 @@ class gf_block(euclidean_base.euclidean_base):
 
                     extra_input_counter+=self.num_cayley_pars
 
+        if(self.nonlinear_stretch_type=="classic"):
+            ### non rotation stuff
+            kde_log_skew_exponents=self.kde_log_skew_exponents
 
-        ### non rotation stuff
-        kde_log_skew_exponents=self.kde_log_skew_exponents
+            if(extra_inputs is None):
 
-        if(extra_inputs is None):
+                kde_means=self.kde_means
+                kde_log_widths=self.kde_log_widths
+                kde_log_weights=self.kde_log_weights
+                
+            else:
+                ## skipping householder params
+                
 
-            kde_means=self.kde_means
-            kde_log_widths=self.kde_log_widths
-            kde_log_weights=self.kde_log_weights
-            
-        else:
-            ## skipping householder params
-            
-
-            kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
-            extra_input_counter+=self.num_params_datapoints
-
-            kde_log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
-            extra_input_counter+=self.num_params_datapoints
-
-            if(self.fit_normalization):
-                kde_log_weights=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
+                kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
                 extra_input_counter+=self.num_params_datapoints
 
+                kde_log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
+                extra_input_counter+=self.num_params_datapoints
+
+                if(self.fit_normalization):
+                    kde_log_weights=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
+                    extra_input_counter+=self.num_params_datapoints
+
+                if(self.add_skewness):
+
+                    kde_log_skew_exponents=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
+            
+
+            param_dict[extra_prefix+"means"]=kde_means.data
+            param_dict[extra_prefix+"log_widths"]=kde_log_widths.data
+
+            if(self.fit_normalization):
+                param_dict[extra_prefix+"log_norms"]=kde_log_weights.data
+
             if(self.add_skewness):
+                param_dict[extra_prefix+"exponents"]=kde_log_skew_exponents.data
+        else:
 
-                kde_log_skew_exponents=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1,self.num_kde, self.dimension)
-        
+            if(extra_inputs is None):
 
-        param_dict[extra_prefix+"means"]=kde_means.data
-        param_dict[extra_prefix+"log_widths"]=kde_log_widths.data
+                log_widths=self.log_widths
+                log_heights=self.log_heights
+                log_derivatives=self.log_derivatives
+                boundary_points=self.boundary_points
+            else:
+                log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde].reshape(-1, self.dimension, self.num_kde)
+                extra_input_counter+=self.dimension*self.num_kde
 
-        if(self.fit_normalization):
-            param_dict[extra_prefix+"log_norms"]=kde_log_weights.data
+                log_heights=extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde].reshape(-1, self.dimension, self.num_kde)
+                extra_input_counter+=self.dimension*self.num_kde
 
-        if(self.add_skewness):
-            param_dict[extra_prefix+"exponents"]=kde_log_skew_exponents.data
+                log_derivatives=extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*(self.num_kde+1)].reshape(-1, self.dimension, self.num_kde+1)
+                extra_input_counter+=self.dimension*(self.num_kde+1)
 
+                boundary_points=extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*4].reshape(-1, self.dimension, 4)
+            
+            param_dict[extra_prefix+"log_widths"]=log_widths.data
+            param_dict[extra_prefix+"log_heights"]=log_heights.data
+            param_dict[extra_prefix+"log_derivatives"]=log_derivatives.data
+            param_dict[extra_prefix+"boundary_points"]=boundary_points.data
 
 ## transformations
 
@@ -1289,88 +1440,93 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
             num_kde=cur_layer.num_kde
 
             assert(num_kde<100)
-            #percentiles_to_use=numpy.linspace(0,100,num_kde+2)[1:-1]
-            ## use all percentiles for KDE
-            percentiles_to_use=numpy.linspace(0,100,num_kde)#[1:-1]
-            percentiles=torch.from_numpy(numpy.percentile(cur_data.detach().numpy(), percentiles_to_use, axis=0))
 
-         
-            ## add means
-            param_list.append(percentiles.flatten())
+            if(cur_layer.nonlinear_stretch_type=="classic"):
+                
+                ## use all percentiles for KDE
+                percentiles_to_use=numpy.linspace(0,100,num_kde)#[1:-1]
+                percentiles=torch.from_numpy(numpy.percentile(cur_data.detach().numpy(), percentiles_to_use, axis=0))
+
+             
+                ## add means
+                param_list.append(percentiles.flatten())
+                
+
+             
+                quarter_diffs=percentiles[1:,:]-percentiles[:-1,:]
+                min_perc_diff=quarter_diffs.min(axis=0, keepdim=True)[0]
+
             
+                ## this seems to be optimized settings for num_kde=20
+                bw=numpy.log(min_perc_diff*1.5)
+                bw=torch.ones_like(percentiles[None,:,:])*bw
 
-         
-            quarter_diffs=percentiles[1:,:]-percentiles[:-1,:]
-            min_perc_diff=quarter_diffs.min(axis=0, keepdim=True)[0]
+               
+                flattened_bw=bw.flatten()
+                #############
+                """
+                fig=pylab.figure()
 
-        
-            ## this seems to be optimized settings for num_kde=20
-            bw=numpy.log(min_perc_diff*1.5)
-            bw=torch.ones_like(percentiles[None,:,:])*bw
+                for x in cur_data:
+                    pylab.gca().axvline(x[0],color="black")
+                log_yvals=cur_layer.logistic_kernel_log_pdf(torch.from_numpy(pts)[:,None], percentiles[None,:,0:1], bw[:,:,0:1], torch.ones_like(percentiles[None,:,0:1]))
+                yvals=log_yvals.exp().detach().numpy()
+                pylab.gca().plot(pts, yvals, color="green")
 
-           
-            flattened_bw=bw.flatten()
-            #############
-            """
-            fig=pylab.figure()
-
-            for x in cur_data:
-                pylab.gca().axvline(x[0],color="black")
-            log_yvals=cur_layer.logistic_kernel_log_pdf(torch.from_numpy(pts)[:,None], percentiles[None,:,0:1], bw[:,:,0:1], torch.ones_like(percentiles[None,:,0:1]))
-            yvals=log_yvals.exp().detach().numpy()
-            pylab.gca().plot(pts, yvals, color="green")
-
-            pylab.savefig("test_kde_0.png")
+                pylab.savefig("test_kde_0.png")
 
 
-            fig=pylab.figure()
+                fig=pylab.figure()
 
-            for x in cur_data:
-                pylab.gca().axvline(x[1],color="black")
-            log_yvals=cur_layer.logistic_kernel_log_pdf(torch.from_numpy(pts)[:,None], percentiles[None,:,1:2], bw[:,:,1:2], torch.ones_like(percentiles[None,:,1:2]))
-            yvals=log_yvals.exp().detach().numpy()
-            pylab.gca().plot(pts, yvals, color="green")
+                for x in cur_data:
+                    pylab.gca().axvline(x[1],color="black")
+                log_yvals=cur_layer.logistic_kernel_log_pdf(torch.from_numpy(pts)[:,None], percentiles[None,:,1:2], bw[:,:,1:2], torch.ones_like(percentiles[None,:,1:2]))
+                yvals=log_yvals.exp().detach().numpy()
+                pylab.gca().plot(pts, yvals, color="green")
 
-            pylab.savefig("test_kde_1.png")
+                pylab.savefig("test_kde_1.png")
 
-            print("CUR PARAMS", param_list)
-            ##########
+                print("CUR PARAMS", param_list)
+                ##########
 
-            """
+                """
+                
+                param_list.append(torch.flatten(bw))
+
+
+                ## widths
+
+                if(cur_layer.fit_normalization):
+
+                    ## norms
+
+                    param_list.append(torch.ones_like(flattened_bw))
+
+                ## skewness is not used, just as a single multiplicator
+                this_skewness_exponent=torch.DoubleTensor([1.0])
+
+                # signs is not used, used as a single multiplicator
+                this_skewness_signs=torch.DoubleTensor([1.0])
+
+                if(cur_layer.add_skewness):
+
+                    ## store zeros (log_exponents) in params
+                    param_list.append(torch.zeros_like(flattened_bw))
+
+                    ## pass exponents as 1.0
+                    this_skewness_exponent=cur_layer.exponent_regulator(torch.zeros_like(bw)).exp()
+
+                    this_skewness_signs=cur_layer.kde_skew_signs
+
+                all_layers_params.append(torch.cat(param_list))
+
+                ## transform params according to CDF_norm^-1(CDF_KDE)
+
+                #gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
+                cur_data=cur_layer.sigmoid_inv_error_pass_w_params(cur_data, percentiles[None,:,:], bw, torch.ones_like(bw), this_skewness_exponent, this_skewness_signs)
             
-            param_list.append(torch.flatten(bw))
-
-
-            ## widths
-
-            if(cur_layer.fit_normalization):
-
-                ## norms
-
-                param_list.append(torch.ones_like(flattened_bw))
-
-            ## skewness is not used, just as a single multiplicator
-            this_skewness_exponent=torch.DoubleTensor([1.0])
-
-            # signs is not used, used as a single multiplicator
-            this_skewness_signs=torch.DoubleTensor([1.0])
-
-            if(cur_layer.add_skewness):
-
-                ## store zeros (log_exponents) in params
-                param_list.append(torch.zeros_like(flattened_bw))
-
-                ## pass exponents as 1.0
-                this_skewness_exponent=cur_layer.exponent_regulator(torch.zeros_like(bw)).exp()
-
-                this_skewness_signs=cur_layer.kde_skew_signs
-
-            all_layers_params.append(torch.cat(param_list))
-
-            ## transform params according to CDF_norm^-1(CDF_KDE)
-
-            #gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
-            cur_data=cur_layer.sigmoid_inv_error_pass_w_params(cur_data, percentiles[None,:,:], bw, torch.ones_like(bw), this_skewness_exponent, this_skewness_signs)
+            else:
+                raise Exception("Data initilaization only implemented (and probably only makes sense) for classic Gaussianization Flow structure")
 
 
 

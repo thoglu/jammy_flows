@@ -171,7 +171,8 @@ class Test(unittest.TestCase):
                      {"g":{"kwargs":{"rotation_mode": "householder"}}},
                      {"g":{"kwargs":{"rotation_mode": "angles"}}},
                      {"g":{"kwargs":{"rotation_mode": "triangular_combination"}}},
-                     {"g":{"kwargs":{"rotation_mode": "cayley"}}}
+                     {"g":{"kwargs":{"rotation_mode": "cayley"}}},
+                     {"g":{"kwargs":{"nonlinear_stretch_type": "rq_splines"}}}
 
                      ]
 

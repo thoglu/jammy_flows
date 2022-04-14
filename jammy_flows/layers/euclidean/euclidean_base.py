@@ -81,8 +81,8 @@ class euclidean_base(layer_base.layer_base):
         return torch.cat(par_list)
 
     def init_params(self, params):
-
-        assert(len(params)==self.total_param_num)
+      
+        assert(len(params)==self.total_param_num), (len(params), self.total_param_num)
 
         ## this function should only be called when the pdf has permanent parameters
         assert(self.use_permanent_parameters==1)

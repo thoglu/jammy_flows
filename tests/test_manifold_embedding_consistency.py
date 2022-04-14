@@ -43,9 +43,6 @@ def compare_two_arrays(arr1, arr2, name1, name2):
 
     diff_value=1e-7
 
-    print(name1, name2)
-    print(arr1)
-    print(arr2)
     diff_too_large_mask=numpy.fabs(arr1-arr2)>diff_value
 
     if(diff_too_large_mask.sum()>0):
@@ -67,63 +64,129 @@ This test checks the inversion by bisection and newton iterations by comparing i
 
 def setup_and_test_multiple_pdfs(pdf_def, layer_def):
 
-    seed_everything(0)
 
+    seed_everything(0)
     normal_pdf=f.pdf(pdf_def, layer_def)
 
-    normal_sample,_,_,_=normal_pdf.sample(samplesize=10000)
-    normal_eval,_,_=normal_pdf(normal_sample)
-
-    # now go to embedding space
-    detail=dict()
-    for ld in layer_def.split("+"):
-        for l in ld:
-            if(l in ["w", "u"]):
-
-                if(l not in detail.keys()):
-                    detail[l]=dict()
-                    detail[l]["kwargs"]=dict()
-                    detail[l]["kwargs"]["always_parametrize_in_embedding_space"]=1
-
-    
-        
-    embedded_sample=normal_pdf.transform_target_into_returnable_params(normal_sample)
-    
+    seed_everything(0)
+    embedded_pdf=f.pdf(pdf_def, layer_def)
+    embedded_pdf.set_use_embedding_parameters_flag(True)
 
     seed_everything(0)
-    embedded_pdf=f.pdf(pdf_def, layer_def, flow_defs_detail=detail)
+    intrinsic_pdf=f.pdf(pdf_def, layer_def)
+    intrinsic_pdf.set_use_embedding_parameters_flag(False)
 
-    embedded_eval,_,_=embedded_pdf(embedded_sample)
 
-    for ind in range(10):
-        res1=torch.autograd.grad(normal_eval[ind], normal_pdf.parameters(), allow_unused=True, retain_graph=True)[0]
-        res2=torch.autograd.grad(embedded_eval[ind], embedded_pdf.parameters(), allow_unused=True, retain_graph=True)[0]
-       
+    for sub_pdf_index in [-1]+list(range(len(normal_pdf.layer_list))):
+        print("sub pdf ", sub_pdf_index)
+        normal_pdf.set_use_embedding_parameters_flag(False)
+        if(sub_pdf_index>=0):
+           
+            normal_pdf.set_use_embedding_parameters_flag(True, sub_pdf_index=sub_pdf_index)
 
-        compare_two_arrays(res1.detach().numpy(), res2.detach().numpy(), "normal_%s" % pdf_def, "embedded_%s" % pdf_def)
+        normal_sample,_,_,_=normal_pdf.sample(samplesize=100)
+        normal_eval,_,_=normal_pdf(normal_sample)
+
+        embedded_sample,_=normal_pdf.transform_target_space(normal_sample, transform_to="embedding")
+        embedded_eval,_,_=embedded_pdf(embedded_sample)
+
+        intrinsic_sample,_=normal_pdf.transform_target_space(normal_sample, transform_to="intrinsic")
+        intrinsic_eval,_,_=intrinsic_pdf(intrinsic_sample)
+
+        normal_forced_intrinsic_eval,_,_=normal_pdf(intrinsic_sample, force_intrinsic_coordinates=True)
+
+
+        embedded_forced_intrinsic_eval,_,_=embedded_pdf(intrinsic_sample, force_intrinsic_coordinates=True)
+
+        normal_forced_embedded_eval,_,_=normal_pdf(embedded_sample, force_embedding_coordinates=True)
+        intrinsic_forced_embedded_eval,_,_=intrinsic_pdf(embedded_sample, force_embedding_coordinates=True)
+      
+        for ind in range(1):
+            
+            res1=torch.autograd.grad(normal_eval[ind], normal_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+            res2=torch.autograd.grad(embedded_eval[ind], embedded_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+
+            compare_two_arrays(res1.detach().numpy(), res2.detach().numpy(), "normal_%s" % pdf_def, "embedded_%s" % pdf_def)
+
+            res_intrinsic=torch.autograd.grad(intrinsic_eval[ind], intrinsic_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+
+            compare_two_arrays(res1.detach().numpy(), res_intrinsic.detach().numpy(), "normal_%s" % pdf_def, "intrinsic_%s" % pdf_def)
+
+            ### normal forced intrinsic
+            res_nfi=torch.autograd.grad(normal_forced_intrinsic_eval[ind], normal_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+            compare_two_arrays(res_nfi.detach().numpy(), res_intrinsic.detach().numpy(), "nfi_%s" % pdf_def, "intrinsic_%s" % pdf_def)
+
+            ### embedded forced intrinsic
+            res_efi=torch.autograd.grad(embedded_forced_intrinsic_eval[ind], embedded_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+            compare_two_arrays(res_efi.detach().numpy(), res_intrinsic.detach().numpy(), "efi_%s" % pdf_def, "intrinsic_%s" % pdf_def)
+
+            ### normal forced embedded
+            res_nfe=torch.autograd.grad(normal_forced_embedded_eval[ind], normal_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+            compare_two_arrays(res_nfe.detach().numpy(), res_intrinsic.detach().numpy(), "nfe_%s" % pdf_def, "intrinsic_%s" % pdf_def)
+
+            ### intrinsic forced embedded
+            res_ife=torch.autograd.grad(intrinsic_forced_embedded_eval[ind], intrinsic_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
+            compare_two_arrays(res_ife.detach().numpy(), res_intrinsic.detach().numpy(), "ife_%s" % pdf_def, "intrinsic_%s" % pdf_def)
+
+
 
 class Test(unittest.TestCase):
     def setUp(self):
 
         self.test_cases=[]
 
+        testcase=dict()
+        testcase["pdf_def"]="e1+s2+c3+e1+s2"
+        testcase["layer_def"]="g+v+w+g+v"
+
+        self.test_cases.append(testcase)
+        
         ## multiple simplices 
         testcase=dict()
-        testcase["pdf_def"]="c3"
-        testcase["layer_def"]="w"
-        testcase["flow_defs_detail"]=dict()
-        testcase["flow_defs_detail"]["w"]=dict()
-        testcase["flow_defs_detail"]["w"]["kwargs"]=dict()
+        testcase["pdf_def"]="c3+e1"
+        testcase["layer_def"]="w+g"
+
+        self.test_cases.append(testcase)
+        
+        ### spheres
+
+        testcase=dict()
+        testcase["pdf_def"]="s2"
+        testcase["layer_def"]="n"
 
         self.test_cases.append(testcase)
 
+        testcase=dict()
+        testcase["pdf_def"]="s2"
+        testcase["layer_def"]="v"
+
+        self.test_cases.append(testcase)
+
+        testcase=dict()
+        testcase["pdf_def"]="s1"
+        testcase["layer_def"]="o"
+
+        self.test_cases.append(testcase)
+
+        ## mixed
+
+        
+
+        
+        
+        
+
+
+        
+
     def test_manifold_embedding(self):
         """ 
-        Comparing the derivatives and normal results of newton iterations with two different versions of Gaussianization flow (h - old), (g - new).
+        Testing that switch between intrinsic/embedding coordinates works correctly for manifold sub pdfs..
         """
         print("Testing agreement betweeen normal and embedding evaluation for manifold flows.")
 
         for tc in self.test_cases:
+            print("testing ", tc)
             setup_and_test_multiple_pdfs(tc["pdf_def"], tc["layer_def"])
         
            

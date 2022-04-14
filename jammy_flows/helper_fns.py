@@ -168,7 +168,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
     
     ## require intrinsic coordinates
-    print("evaluating the model at ... ", eval_positions[mask_inner])
+    
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
 
@@ -176,14 +176,13 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     for ind, pdf_def in enumerate(model.pdf_defs_list):
         if (pdf_def == "s2" and s2_norm=="lambert"):
             ## first coordinate is theta currently
-            print(log_res.shape)
+           
             upd=torch.log(torch.sin(eval_positions[mask_inner][:,model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][0]+1])).sum(axis=-1)
-            print(upd.shape)
+            
             ## angle -> cartesian -> subtract
             log_res-=upd
 
-    print("log res after area correction", log_res)
-            
+        
     ## no conditional input and only s2 pdf .. mask bad regions
     flagged_coords=numpy.array([])
     if(conditional_input is None and model.pdf_defs_list[0]=="s2"):
@@ -219,7 +218,10 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
       print((numpy.isfinite(res)==False).sum())
       print(numpy_positions[(numpy.isfinite(res)==False)])
 
-      r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:], conditional_input=cinput[torch.isfinite(log_res)==False])
+      if(cinput is None):
+        r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:])
+      else:
+        r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:], conditional_input=cinput[torch.isfinite(log_res)==False])
       print(r)
       raise Exception()
 

@@ -200,6 +200,7 @@ class pdf(nn.Module):
         self.flow_dict["g"]["kwargs"]["regulate_normalization"]=1
         self.flow_dict["g"]["kwargs"]["add_skewness"]=0
         self.flow_dict["g"]["kwargs"]["rotation_mode"]="householder"
+        self.flow_dict["g"]["kwargs"]["nonlinear_stretch_type"]="classic"
 
         self.flow_dict["h"] = dict()
         self.flow_dict["h"]["module"] = gf_block_old
@@ -2057,14 +2058,21 @@ class pdf(nn.Module):
                 ## special initalizations
                 ## check if all are gaussianization flow
                 gf_init=True
-                for layer_type in self.flow_defs_list[subflow_index]:
+                for layer_index, layer_type in enumerate(self.flow_defs_list[subflow_index]):
                     if(layer_type!="g" and layer_type !="h"):
                         gf_init=False
+                    
+                    if(layer_type=="g"):
+                        print(this_layer_list[layer_index].nonlinear_stretch_type)
+                        if(this_layer_list[layer_index].nonlinear_stretch_type=="rq_splines"):
+                            gf_init=False
+
                 if(data is None):
                     gf_init=False
 
                 if(gf_init):
                     if(layer_type=="g"):
+                        print("GF INIT !!!!!!!!!!!!!!!!!!!!")
                         params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
                     elif(layer_type=="h"):
                         params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
@@ -2154,8 +2162,7 @@ class pdf(nn.Module):
                             for layer_ind, layer in enumerate(self.layer_list[ind]):
                                 
                                 this_layer_num_params=self.layer_list[ind][layer_ind].get_total_param_num()
-
-                              
+                               
                                 self.layer_list[ind][layer_ind].init_params(these_params[tot_param_index:tot_param_index+this_layer_num_params])
 
                                 if(ind==0 and self.amortize_everything):

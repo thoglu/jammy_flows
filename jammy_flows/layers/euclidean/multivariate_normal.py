@@ -117,9 +117,9 @@ class mvn_block(euclidean_base.euclidean_base):
                 if(self.width_max is not None):
                     # clamp upper bound with exact width_max value
                     upper_clamp=numpy.log(self.width_max)
-                self.make_positive=lambda x: torch.log(torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
+                self.make_log_positive=lambda x: torch.log(torch.nn.functional.softplus(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
             else:
-                self.make_positive=lambda x: torch.log(torch.nn.functional.softplus(x)+self.width_min)
+                self.make_log_positive=lambda x: torch.log(torch.nn.functional.softplus(x)+self.width_min)
             
             
 
@@ -132,9 +132,9 @@ class mvn_block(euclidean_base.euclidean_base):
                     upper_clamp=None
                     if(self.width_max is not None):
                         upper_clamp=numpy.log(self.width_max)
-                    self.make_positive=lambda x: torch.log(torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
+                    self.make_log_positive=lambda x: torch.log(torch.exp(torch.clamp(x, min=self.log_width_min_to_clamp, max=upper_clamp))+self.width_min)
                 else:
-                    self.make_positive=lambda x: torch.log(torch.exp(x)+self.width_min)
+                    self.make_log_positive=lambda x: torch.log(torch.exp(x)+self.width_min)
 
             else:
                 ## exponential function at beginning but flattens out at width_max -> no infinite growth
@@ -152,7 +152,7 @@ class mvn_block(euclidean_base.euclidean_base):
 
                     exp_like_fn=generate_log_function_bounded_in_logspace(self.width_min, self.width_max, center=True)
 
-                self.make_positive=exp_like_fn
+                self.make_log_positive=exp_like_fn
 
         
         if(self.cov_type=="diagonal_symmetric"):
@@ -196,29 +196,29 @@ class mvn_block(euclidean_base.euclidean_base):
             extra_counter=0
             if(cov_type=="diagonal_symmetric"):
 
-                single_diagonal=extra_inputs
+                single_diagonal=self.make_log_positive(extra_inputs)
 
             elif(cov_type=="diagonal"):
 
-                full_diagonal=extra_inputs
+                full_diagonal=self.make_log_positive(extra_inputs)
 
             elif(cov_type=="full"):
 
-                full_diagonal=extra_inputs[:, :self.dimension]
+                full_diagonal=self.make_log_positive(extra_inputs[:, :self.dimension])
 
                 lower_triangular_entries=extra_inputs[:,self.dimension:]
         else:
 
             if(cov_type=="diagonal_symmetric"):
-                single_diagonal=self.single_diagonal_log.to(x)
+                single_diagonal=self.make_log_positive(self.single_diagonal_log.to(x))
 
             elif(cov_type=="diagonal"):
 
-                full_diagonal=self.full_diagonal_log.to(x)
+                full_diagonal=self.make_log_positive(self.full_diagonal_log.to(x))
 
             elif(cov_type=="full"):
 
-                full_diagonal=self.full_diagonal_log.to(x)
+                full_diagonal=self.make_log_positive(self.full_diagonal_log.to(x))
 
                 lower_triangular_entries=self.lower_triangular_entries.to(x)
 
@@ -294,7 +294,7 @@ class mvn_block(euclidean_base.euclidean_base):
 
             self.full_diagonal_log.data=torch.reshape(params[:self.dimension], [1, self.dimension])
 
-        elif(self.cov_type=="diagonal"):
+        elif(self.cov_type=="full"):
 
             self.full_diagonal_log.data=torch.reshape(params[:self.dimension], [1, self.dimension])
             self.lower_triangular_entries.data=torch.reshape(params[self.dimension:], [1, int(self.dimension*(self.dimension-1)/2)])
