@@ -166,39 +166,44 @@ class sphere_base(layer_base.layer_base):
 
     def eucl_to_spherical_embedding(self, x, log_det):
         
-        ## Follows convention in DOI: 10.2307/2308932
-        #####
         ### X = f(theta) -> det(dX/dtheta) = sin(theta)
         ### theta=f^-1(X) -> det(df^-1/dX) = 1/sin(theta) (used here)
 
         angles=[]
-        for ind in range(x.shape[1]-1):
-            if(ind< (x.shape[1]-2)):
-                # 0 to pi angle
-                angles.append(torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt()))
+        if(self.dimension==1):
+            for ind in range(x.shape[1]-1):
+                if(ind< (x.shape[1]-2)):
+                    # 0 to pi angle
+                    angles.append(torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt()))
 
-                if(self.dimension>1):
-                    assert(self.dimension == 2), "This direction is currently only implemented for d=2"
-                    log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
-            else:
+                    if(self.dimension>1):
+                        assert(self.dimension == 2), "This direction is currently only implemented for d=2"
+                        log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
+                else:
 
-                # last one is 0 to 2pi
-                new_angle=torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt())
-                #mask_smaller=(x[:,ind+1:ind+2]<0).double()
-                new_angle=torch.where(x[:,ind+1:ind+2]<0, 2*numpy.pi-new_angle, new_angle)
+                    # last one is 0 to 2pi
+                    new_angle=torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt())
+                    #mask_smaller=(x[:,ind+1:ind+2]<0).double()
+                    new_angle=torch.where(x[:,ind+1:ind+2]<0, 2*numpy.pi-new_angle, new_angle)
 
-                #new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
-                angles.append(new_angle)
+                    #new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
+                    angles.append(new_angle)
+        elif(self.dimension==2):
+            # theta
+            angles.append(torch.acos(x[:,2:3]/torch.sum(x[:,:]**2, dim=1, keepdims=True).sqrt()))
+            log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
+
+            # phi
+            new_angle=torch.acos(x[:,0:1]/torch.sum(x[:,:2]**2, dim=1, keepdims=True).sqrt())
+            new_angle=torch.where(x[:,1:2]<0, 2*numpy.pi-new_angle, new_angle)
+            angles.append(new_angle)
 
         return torch.cat(angles, dim=1), log_det
 
     def spherical_to_eucl_embedding(self, x, log_det):
-       
-        ## Follows convention in DOI: 10.2307/2308932
-        ## 2d is flipped, and 3d is permuted twice from usual x=rcosphi sin theta, y=r sinphi sintheta, z= r cos theta
-        ## TODO: change to standard convention for more convenience 
+        
         if(self.dimension==1):
-
+            # follows slightly different convention than the actual stereographic projection
             eucl=torch.cat( [torch.cos(x), torch.sin(x)], dim=1)
 
             return eucl, log_det
@@ -208,9 +213,13 @@ class sphere_base(layer_base.layer_base):
             theta=x[:,0:1]
             phi=x[:,1:2]
 
-            x=torch.cos(theta)
-            y=torch.sin(theta)*torch.cos(phi)
-            z=torch.sin(theta)*torch.sin(phi)
+            #x=torch.cos(theta)
+            #y=torch.sin(theta)*torch.cos(phi)
+            #z=torch.sin(theta)*torch.sin(phi)
+
+            x=torch.sin(theta)*torch.cos(phi)
+            y=torch.sin(theta)*torch.sin(phi)
+            z=torch.cos(theta)
 
             eucl=torch.cat( [x,y,z], dim=1)
 
@@ -219,6 +228,10 @@ class sphere_base(layer_base.layer_base):
             return eucl, log_det
         else:
 
+            raise NotImplementedError("Higher order spheres not supported")
+
+            """
+            # older definition based on 10.2307/2308932
             eucl_list=[]
 
             for ind in range(x.shape[1]):
@@ -242,6 +255,7 @@ class sphere_base(layer_base.layer_base):
             eucl=torch.cat( eucl_list, dim=1)
 
             return eucl
+            """
 
     def inplane_euclidean_to_spherical(self, x, log_det):
 
