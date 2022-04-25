@@ -295,7 +295,7 @@ class Test(unittest.TestCase):
 
             gf_layer=flow_exact.layer_list[0][0]
 
-            flow_params=gf_layer._obtain_usable_flow_params(z)
+            flow_params,_=gf_layer._obtain_usable_flow_params(z)
         
             newton_tolerance=1e-14
             res_new_fast=bn.inverse_bisection_n_newton_joint_func_and_grad(gf_layer.sigmoid_inv_error_pass_w_params, gf_layer.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4], min_boundary=-1e5, max_boundary=1e5, num_bisection_iter=25, num_newton_iter=20, newton_tolerance=newton_tolerance, verbose=0)
@@ -353,7 +353,7 @@ class Test(unittest.TestCase):
 
                 gf_layer=flow_exact.layer_list[0][0]
 
-                flow_params=gf_layer._obtain_usable_flow_params(z)
+                flow_params,_=gf_layer._obtain_usable_flow_params(z)
 
                 newton_tolerance=1e-14
                 tbef=time.time()
