@@ -2,6 +2,7 @@ from torch import nn
 import torch
 import numpy
 import time
+import math
 
 from .extra_functions import NONLINEARITIES, list_from_str
 
@@ -345,9 +346,8 @@ class AmortizableMLP(nn.Module):
 
         return num_amortization_params
 
-          
-    def initialize_uvbs(self, init_b=None):
-
+    def obtain_default_init_tensor(self, fix_final_bias=None, prev_damping_factor=1000.0):
+        
         init_tensor=torch.randn(self.num_amortization_params, dtype=torch.float64).unsqueeze(0)
     
         index=0
@@ -358,17 +358,28 @@ class AmortizableMLP(nn.Module):
 
                 ## this layer is not low-rank aproximated, use kaiming init
                 if(mlp_def["full_weight_matrix_flags"][ind]==1):
+                    
+                    fan_in=mlp_def["inputs"][ind]
 
-                    ## init weights
-                    nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][ind]], a=numpy.sqrt(5))
-                    fan_in, _ = nn.init._calculate_fan_in_and_fan_out(init_tensor[:,index:index+mlp_def["num_u_s"][ind]])
+                    ## default settings from init.kaiming_uniform_ used in Linear layer initialization
+                    gain = nn.init.calculate_gain("leaky_relu", numpy.sqrt(5))
+                    std = gain / math.sqrt(fan_in)
+                    bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+
+                    #print("weigths bef", init_tensor[:,index:index+mlp_def["num_u_s"][ind]])
+                    with torch.no_grad():
+                        init_tensor[:,index:index+mlp_def["num_u_s"][ind]].uniform_(-bound, bound)
+                   
+                    #nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][ind]], a=numpy.sqrt(5))
+                   
+                    # now bias
                     bound = 1 / numpy.sqrt(fan_in)
                     
                     ## init biases
                     #bs=nn.Parameter(torch.randn(outputs[ind]))
                     if(mlp_def["num_b_s"][ind]>0):
                         nn.init.uniform_(init_tensor[:,index+mlp_def["num_u_s"][ind]:index+mlp_def["num_u_s"][ind]+mlp_def["num_b_s"][ind]], -bound, bound)
-
+                        
                 ## increase index, also for layers that are low-rank approximated
                 index+=mlp_def["num_u_s"][ind]+mlp_def["num_v_s"][ind]+mlp_def["num_b_s"][ind]
 
@@ -376,18 +387,31 @@ class AmortizableMLP(nn.Module):
         if("linear_highway" in self.sub_mlp_structures.keys()):
 
             mlp_def=self.sub_mlp_structures["linear_highway"]
+            fan_in=mlp_def["inputs"][0]
 
-            nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][0]], a=numpy.sqrt(5))
-            fan_in, _ = nn.init._calculate_fan_in_and_fan_out(init_tensor[:,index:index+mlp_def["num_u_s"][0]])
+            ## default settings from init.kaiming_uniform_ used in Linear layer initialization
+            gain = nn.init.calculate_gain("leaky_relu", numpy.sqrt(5))
+            std = gain / math.sqrt(fan_in)
+            bound = math.sqrt(3.0) * std  # Calculate uniform bounds from standard deviation
+            #print("weigths bef", init_tensor[:,index:index+mlp_def["num_u_s"][ind]])
+            with torch.no_grad():
+                init_tensor[:,index:index+mlp_def["num_u_s"][0]].uniform_(-bound, bound)
+
+            #nn.init.kaiming_uniform_(init_tensor[:,index:index+mlp_def["num_u_s"][0]], a=numpy.sqrt(5))
+            #fan_in, _ = nn.init._calculate_fan_in_and_fan_out(init_tensor[:,index:index+mlp_def["num_u_s"][0]])
+            
             bound = 1 / numpy.sqrt(fan_in)
 
             nn.init.uniform_(init_tensor[:,index+mlp_def["num_u_s"][0]:index+mlp_def["num_u_s"][0]+mlp_def["num_b_s"][0]], -bound, bound)
 
-        init_tensor=init_tensor/1000.0
+        #init_tensor=init_tensor/1000.0
 
 
         ## initialize last b pars if desired
-        if(init_b is not None):
+        if(fix_final_bias is not None):
+
+            # scale down all previous weights/biases
+            init_tensor=init_tensor/prev_damping_factor
 
             relevant_mlp=self.sub_mlp_structures["mlp_list"][-1]
 
@@ -395,15 +419,27 @@ class AmortizableMLP(nn.Module):
 
                 relevant_mlp=self.sub_mlp_structures["linear_highway"]
 
-            init_tensor[0,-relevant_mlp["num_b_s"][-1]:]=init_b
+            init_tensor[0,-relevant_mlp["num_b_s"][-1]:]=fix_final_bias
 
-        if(self.use_permanent_parameters):
-            self.u_v_b_pars.data=init_tensor
+        return init_tensor.squeeze(0)
+
+    def initialize_uvbs(self, fix_total=None, fix_final_bias=None, prev_damping_factor=1000.0):
+        """ 
+        Initialize the parameters of the MLPs. Either all parameters are initialized similar to default procedures in pytorch,
+        or all parameters are handed over (fix_total), or the final bias vector is handed over (fix_final_bias).
+
+        fix_total (None/Tensor): If not None, has to be of size *u_v_b_pars* to initialize all params of all MLPs.
+        fix_final_offset(None/Tensor): If not None, has to be of size of the target dimension (final bias) to set the final bias vector.
+        """
+        assert(self.use_permanent_parameters), "Initialization of uvb tensor only makes sense for permanent parameters. Use 'obtain_init_tensor' instead to obtain parameter vector."
+
+        if(fix_total is not None):
+            self.u_v_b_pars.data[0,...]=fix_total
         else:
-            ## return desired init for amortization purposes
-            return init_tensor.squeeze(0)
+            init_tensor=self.obtain_default_init_tensor(fix_final_bias=fix_final_bias, prev_damping_factor=prev_damping_factor)
 
-
+            self.u_v_b_pars.data[0,...]=init_tensor
+            
     def _adaptive_matmul(self, matrix, vec):
 
         ret=torch.einsum("...ij,...j",matrix,vec)
@@ -509,7 +545,6 @@ class AmortizableMLP(nn.Module):
 
         amortization_params=self.u_v_b_pars.to(i)
 
-        
         if(extra_inputs is not None):
 
             if(self.use_permanent_parameters):

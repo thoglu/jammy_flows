@@ -459,7 +459,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
             bias_mlp_pars=mlp_params[-self.total_euclidean_pars:]
 
-            self.amortized_mlp.initialize_uvbs(init_b=bias_mlp_pars)
+            self.amortized_mlp.initialize_uvbs(fix_final_bias=bias_mlp_pars)
 
             ## 
 

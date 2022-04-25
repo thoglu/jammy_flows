@@ -346,13 +346,12 @@ class gf_block(euclidean_base.euclidean_base):
                 self.log_derivatives = nn.Parameter(torch.randn(self.dimension, self.num_kde+1).type(torch.double).unsqueeze(0))
                 self.boundary_points=nn.Parameter(torch.randn(self.dimension, 4).type(torch.double).unsqueeze(0))  
 
-            print("tot param num so far ", self.total_param_num)
+           
             self.total_param_num+=(self.num_kde*self.dimension)*2+(self.num_kde+1)*self.dimension
 
             # add 4*dimension boundary pts
             self.total_param_num+=(4*self.dimension)
 
-            print("total param num at aend ", self.total_param_num)
         else:
             raise Exception("Unknown non linear stretch type: %s" % self.nonlinear_stretch_type)
 
@@ -843,9 +842,8 @@ class gf_block(euclidean_base.euclidean_base):
                 extra_input_counter+=self.dimension*4
 
 
-            ## sort boundary points
-
-            if(False):
+            ## TODO: might make the next choice a parameter
+            if(True):
                 left=boundary_points[:,:,0:1]
                 right=boundary_points[:,:,1:2]
 
@@ -854,19 +852,11 @@ class gf_block(euclidean_base.euclidean_base):
 
                 bottom=boundary_points[:,:,2:3]
                 top=boundary_points[:,:,3:4]
-
-                if( (bottom>top).sum() > 0):
-
-
-                    print("bottom/top !!!!!!")
-                    
-
-                if( (left>right).sum()>0):
-                    print("left right !!!!!!!!")
                     
                 new_bottom=torch.where(bottom<top, bottom, top)
                 new_top=torch.where(bottom<top, top, bottom)
             else:
+                # currently not used
                 min_abs_width=1e-3
 
                 new_left=boundary_points[:,:,0:1]
@@ -876,14 +866,7 @@ class gf_block(euclidean_base.euclidean_base):
                 new_bottom=boundary_points[:,:,2:3]
                 new_top=new_bottom+torch.exp(boundary_points[:,:,3:4])+min_abs_width
 
-
-
-
             return (log_widths, log_heights, log_derivatives, new_left,new_right,new_bottom,new_top), rotation_params
-
-
-         
-
 
     def _flow_mapping(self, inputs, extra_inputs=None, verbose=False, lower=-1e5, upper=1e5): 
         

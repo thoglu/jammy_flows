@@ -130,6 +130,19 @@ class pdf(nn.Module):
 
         self.init_encoding_structure()
 
+        # add self reference for specific layers
+        for subflow_index, subflow_description in enumerate(self.pdf_defs_list):
+
+            layer_descr=self.flow_defs_list[subflow_index]
+
+            for layer_index, layer in enumerate(self.layer_list[subflow_index]):
+
+                ## sphere charts
+                if(layer_descr[layer_index]=="c"):
+
+                    layer.set_variables_from_parent(self)
+
+        
         ## initialize params
         self.init_params()
 
@@ -309,10 +322,10 @@ class pdf(nn.Module):
         self.flow_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
         self.flow_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = False
         self.flow_dict["c"]["kwargs"]["num_charts"] = 4
-        self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "128" # hidden dims of cnf MLP network
+        self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "64-64" # hidden dims of cnf MLP network
         self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 0 # mlp highway dim - 0-4
         self.flow_dict["c"]["kwargs"]["cnf_network_rank"] = 0 # 0 means full rank
-        self.flow_dict["c"]["kwargs"]["natural_direction"] = 1 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
+        self.flow_dict["c"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
         self.flow_dict["c"]["kwargs"]["solver"] = "rk4" ## 
 
         """
@@ -759,6 +772,7 @@ class pdf(nn.Module):
                 ## we dont want to pass this to layer
                 if(layer_type=="g" or layer_type=="h"):
                     del this_kwargs["replace_first_sigmoid_with_icdf"]
+
                     
                 self.layer_list[subflow_index].append(
                     self.flow_dict[layer_type]["module"](int(subflow_description.split("_")[0][1:]), **this_kwargs)
@@ -2063,7 +2077,7 @@ class pdf(nn.Module):
                         gf_init=False
                     
                     if(layer_type=="g"):
-                        print(this_layer_list[layer_index].nonlinear_stretch_type)
+                        
                         if(this_layer_list[layer_index].nonlinear_stretch_type=="rq_splines"):
                             gf_init=False
 
@@ -2072,7 +2086,6 @@ class pdf(nn.Module):
 
                 if(gf_init):
                     if(layer_type=="g"):
-                        print("GF INIT !!!!!!!!!!!!!!!!!!!!")
                         params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
                     elif(layer_type=="h"):
                         params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
@@ -2128,11 +2141,13 @@ class pdf(nn.Module):
 
                             ## custom low-rank MLPs - initialization is done inside the custom MLP class
                             if(self.use_custom_low_rank_mlps):
-                                desired_uvb_params=mlp_predictor.initialize_uvbs(init_b=these_params)
-
+                                
                                 if(self.amortize_everything):
+                                    desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params)
                                     num_uvb_pars=mlp_predictor.num_amortization_params
                                     global_amortization_init[global_amortization_index:global_amortization_index+num_uvb_pars]=desired_uvb_params
+                                else:
+                                    mlp_predictor.initialize_uvbs(fix_final_bias=these_params)
 
                             else:
                                 # initialize all layers

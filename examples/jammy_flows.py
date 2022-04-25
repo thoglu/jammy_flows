@@ -77,13 +77,11 @@ def sample_character(char, path='OpenSans-Bold.ttf', fontsize=60, width_per_cell
 
     ## scale azimuth to make it similar to zenith
     if(manifold_type=="s"):
-        print("shift s")
+       
         azi_diff=(samples[:,1]-numpy.pi)
-        print(samples[:,1].min(), samples[:,1].max())
+      
         samples[:,1]=numpy.pi+azi_diff*2
 
-        print(samples[:,1].min(), samples[:,1].max())
-      
 
     return samples
 
@@ -133,17 +131,17 @@ def sample_data(pdf_def, sentence, num_samples=10000):
         #    raise Exception("Characters take 2 dimensions, so string is visualized with 2*len(str) dims. Every PDF must have a dimension divisible by 2 for simplicity.")
 
         #len_per_word=int(pdf[1:])//2
-
-        pdf_dim+=int(pdf[1:])
+        cur_pdf_dim=int(pdf[1:])
+        pdf_dim+=cur_pdf_dim
 
         if("e" in pdf):
-            manifold_str+=pdf_dim*"e"
+            manifold_str+=cur_pdf_dim*"e"
         elif("s" in pdf):
-            manifold_str+=pdf_dim*"s"
+            manifold_str+=cur_pdf_dim*"s"
         elif("i" in pdf):
             manifold_str+="i"
         elif("c" in pdf):
-            manifold_str+="c"*pdf_dim
+            manifold_str+="c"*cur_pdf_dim
         else:
             raise Exception("Unsupported manifold ", pdf)
 
@@ -169,9 +167,9 @@ def sample_data(pdf_def, sentence, num_samples=10000):
             if(manifold_str[c_index*2+1]=="s"):
                 sec_center+=numpy.pi/2.0
             
-            res=sample_character(c, num_samples=class_occurences[w_index], width_per_cell=(first_stretch, sec_stretch), center_coords=(first_center, sec_center), manifold_type=manifold_str[c_index])
+            res=sample_character(c, num_samples=class_occurences[w_index], width_per_cell=(first_stretch, sec_stretch), center_coords=(first_center, sec_center), manifold_type=manifold_str[c_index*2+1])
             
-            if(manifold_str[c_index]=="s"):
+            if(manifold_str[c_index*2+1]=="s"):
                 assert( ((res[:,0]<0) | (res[:,0]>np.pi)).sum()==0), res
                 assert( ((res[:,1]<0) | (res[:,1]>2*np.pi)).sum()==0), ("min ", res[:,1].min(), "max ", res[:,1].max())
             this_w_sample.append(torch.from_numpy(res))
@@ -201,7 +199,10 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     word_ids=torch.nn.functional.one_hot(torch.arange(num_words), num_words).type(torch.float64)
 
     ## 2 * log_pdf differences
-    pdf_res, base_pdf_res, _=model(test_labels, conditional_input=test_data)
+    cinput=test_data
+    if(model.conditional_input_dim is None):
+        cinput=None
+    pdf_res, base_pdf_res, _=model(test_labels, conditional_input=cinput)
 
     dim=test_labels.shape[1]
 
@@ -210,6 +211,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     bmin=9999
     bmax=-9999
     mask=[]
+    """
     for pdf_str in model.pdf_defs_list:
         this_dim=int(pdf_str[1:])
         this_type=pdf_str[0]
@@ -230,7 +232,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
         else:
             glob_dim_index+=2
             continue
-    
+    """
    
     sphere_plot_type="standard"
     for pdf_str in model.pdf_defs_list:
@@ -246,7 +248,10 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
                 bounds.append([-2,2])
                 bounds.append([-2,2])
 
-            glob_dim_index+=2
+            #glob_dim_index+=2
+        elif(this_type=="e"):
+            bounds.append([-12.0,12.0])
+            bounds.append([-12.0,12.0])
 
         elif(this_type=="i"):
             bounds.append([0.0,1.0])
@@ -257,7 +262,8 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
             for ind in range(this_dim):
                 bounds.append([bmin,bmax])
-    
+
+
     logpz_max= scipy.stats.multivariate_normal.logpdf( dim*[0], mean=dim*[0])
     twice_pdf_diff=2*(logpz_max - base_pdf_res)
 
@@ -271,16 +277,24 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     for word_index, wid in enumerate(word_ids):
 
-        helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=wid.unsqueeze(0), total_pdf_eval_pts=20000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        cinput=wid.unsqueeze(0)
+
+        if(model.conditional_input_dim is None):
+            cinput=None
+
+        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=20000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
+     
         
         act_cov=[]
         for ind,true_cov in enumerate(coverage_probs):
+
             act_cov.append(sum(this_coverage<true_twice_llhs[ind])/float(len(this_coverage)))
 
-        cov_ax.plot(coverage_probs, act_cov, label=r"$p(x|'%s')$" % words[word_index], color=colors[word_index])
+           
+        cov_ax.plot(coverage_probs, act_cov, label=r"$p(x|'%s')$ (integral: %.2f)" % (words[word_index],pdf_integral), color=colors[word_index])
 
     cov_ax.plot([0.0,1.0],[0.0,1.0], color="k", lw=2.0, ls="--")
     cov_ax.set_xlim(0,1)
@@ -308,19 +322,24 @@ if __name__ == "__main__":
     ###
     parser = argparse.ArgumentParser('train_example')
 
-    parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
+    parser.add_argument("-sentence", type=str, default="JAMMY FLOWS GREAT")
     parser.add_argument("-pdf_def", type=str, default="e10")
     parser.add_argument("-layer_def", type=str, default="ggggg") 
+    parser.add_argument("-use_conditional_pdf", type=int, default=1) 
     parser.add_argument("-train_size", type=int, default=200000)
     parser.add_argument("-batch_size", type=int, default=20)
-    parser.add_argument("-test_size", type=int, default=1000)
+    parser.add_argument("-test_size", type=int, default=500)
     parser.add_argument("-lr", type=float, default=0.001)
+    parser.add_argument("-plot_every_n", type=int, default=200)
 
     args=parser.parse_args()
 
     seed_everything(1)
 
     assert(args.train_size % args.batch_size==0)
+
+    if(args.use_conditional_pdf==0):
+        assert(len(args.sentence.split(" "))==1), "Using no conditional pdf means we can only have one word, but more than one word in sentence!"
 
     ## train data used for training
     train_data, train_labels=sample_data(args.pdf_def, args.sentence, num_samples=args.train_size)
@@ -332,19 +351,36 @@ if __name__ == "__main__":
     extra_flow_defs["n"]=dict()
     extra_flow_defs["n"]["kwargs"]=dict()
     extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="g"
-    extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
+    extra_flow_defs["n"]["kwargs"]["rotation_mode"]="householder"
+    extra_flow_defs["n"]["kwargs"]["add_rotation"]=1
 
     extra_flow_defs["g"]=dict()
     extra_flow_defs["g"]["kwargs"]=dict()
     extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=1
     extra_flow_defs["g"]["kwargs"]["fit_normalization"]=1
-    extra_flow_defs["g"]["kwargs"]["add_skewness"]=0
+    extra_flow_defs["g"]["kwargs"]["add_skewness"]=0  
+    extra_flow_defs["g"]["kwargs"]["rotation_mode"]="angles"
+    extra_flow_defs["g"]["kwargs"]["nonlinear_stretch_type"]="classic" 
 
     extra_flow_defs["t"]=dict()
     extra_flow_defs["t"]["kwargs"]=dict()
     extra_flow_defs["t"]["kwargs"]["cov_type"]="full"
 
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=len(args.sentence.split(" ")), hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
+    extra_flow_defs["v"]=dict()
+    extra_flow_defs["v"]["kwargs"]=dict()
+    extra_flow_defs["v"]["kwargs"]["exp_map_type"]="splines"
+    extra_flow_defs["v"]["kwargs"]["num_components"]=10
+    extra_flow_defs["v"]["kwargs"]["natural_direction"]=1
+
+    extra_flow_defs["c"]=dict()
+    extra_flow_defs["c"]["kwargs"]=dict()
+    extra_flow_defs["c"]["kwargs"]["cnf_network_highway_mode"]=4
+    extra_flow_defs["c"]["kwargs"]["cnf_network_hidden_dims"]="512-512"
+
+    cinput=len(args.sentence.split(" "))
+    if(args.use_conditional_pdf==0):
+        cinput=None
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=cinput, hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
     word_pdf.count_parameters(verbose=True)
@@ -354,7 +390,7 @@ if __name__ == "__main__":
     ## start training loop
     num_batches=args.train_size//args.batch_size
     num_epochs=300
-    plot_every_n=200
+    #plot_every_n=200
     glob_counter=0
 
     cur_lr=args.lr
@@ -371,8 +407,10 @@ if __name__ == "__main__":
             optimizer.zero_grad()
 
             ## evaluate PDF
-           
-            log_pdf, _,_=word_pdf(batch_labels, conditional_input=batch_data)
+            cinput=batch_data
+            if(args.use_conditional_pdf==0):
+                cinput=None
+            log_pdf, _,_=word_pdf(batch_labels, conditional_input=cinput)
            
             ## neg log-loss
             loss=-log_pdf.mean()
@@ -386,12 +424,15 @@ if __name__ == "__main__":
             optimizer.step()
 
             ## plot test data
-            if(glob_counter%plot_every_n==0):
+            if(glob_counter%args.plot_every_n==0):
 
 
                 with torch.no_grad():
-                    print("VALIDATION EVAL")    
-                    val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_data)
+                    print("VALIDATION EVAL")
+                    test_cinput=test_data
+                    if(args.use_conditional_pdf==0):
+                        test_cinput=None
+                    val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_cinput)
                     val_loss=-val_log_pdf.mean()
                     print("ep: %d / batch_id: %d / val-loss %.3f" % (ep_id, batch_id, val_loss))
                     print("before plotting")
