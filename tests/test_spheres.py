@@ -40,28 +40,28 @@ class Test(unittest.TestCase):
 
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
 
-
-
         extra_flow_defs=dict()
         extra_flow_defs["n"]=dict()
         extra_flow_defs["n"]["kwargs"]=dict()
         extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
-        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=1
+        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=0
 
         this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
-        input=torch.from_numpy(numpy.array([[0.00,2.0],[numpy.pi,2.0]]))
-
-        ev,_,_=this_flow(input)
-
+        test_input=torch.from_numpy(numpy.array([[0.0,0.0],[numpy.pi,0.0]]))
+        
+        ev,_,_=this_flow(test_input)
+        
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
-
 
         ###
      
         this_flow=f.pdf("s2", "vvv")
-        input=torch.from_numpy(numpy.array([[0.00,2.0],[numpy.pi,2.0]]))
+        ev,_,_=this_flow(test_input)
 
-        ev,_,_=this_flow(input)
+        self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
+
+        this_flow=f.pdf("s2", "c")
+        ev,_,_=this_flow(test_input)
 
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
     
@@ -80,46 +80,49 @@ class Test(unittest.TestCase):
             """
             eval_nums=[10,50,100, 200]
 
-            pdf_sums=[]
+            
 
             print("checking flow ...", fl.pdf_defs_list, fl.flow_defs_list)
 
-            for num_per_dim in eval_nums:
+            for epsilon in [0.0,1e-3]:
+                print("Theta epsilon: ", epsilon)
+                pdf_sums=[]
 
-                print("NO ", num_per_dim)
-                theta=torch.linspace(0, numpy.pi,num_per_dim)[1:-1]
-                phi=torch.linspace(0, 2*numpy.pi, len(theta)+1)[:-1]
+                for num_per_dim in eval_nums:
 
-                phi_bin_width=phi[1]-phi[0]
-                theta_bin_width=theta[1]-theta[0]
+                    theta=torch.linspace(0+epsilon, numpy.pi-epsilon,num_per_dim)[1:-1]
+                    phi=torch.linspace(0, 2*numpy.pi, len(theta)+1)[:-1]
 
-                mesh_theta, mesh_phi=torch.meshgrid(theta,phi)
+                    phi_bin_width=phi[1]-phi[0]
+                    theta_bin_width=theta[1]-theta[0]
 
-                mesh_theta=mesh_theta.flatten().unsqueeze(1)
-                mesh_phi=mesh_phi.flatten().unsqueeze(1)
+                    mesh_theta, mesh_phi=torch.meshgrid(theta,phi)
 
-                area=theta_bin_width*phi_bin_width
+                    mesh_theta=mesh_theta.flatten().unsqueeze(1)
+                    mesh_phi=mesh_phi.flatten().unsqueeze(1)
 
-                combined_coords=torch.cat([mesh_theta,mesh_phi],dim=1).type(torch.float64)
+                    area=theta_bin_width*phi_bin_width
+
+                    combined_coords=torch.cat([mesh_theta,mesh_phi],dim=1).type(torch.float64)
+                    
+                    log_evals, _,_=this_flow(combined_coords)
+
+                    ## need that extra sin(theta) factor for correct summation in theta/phi coordinates (not required in equal-area projections of the sphere)
+                    pdf_sum=((log_evals[:,None].exp()*area)).sum().detach().numpy()
+
+                    pdf_sums.append(pdf_sum)
+
                 
-                log_evals, _,_=this_flow(combined_coords)
+                print("PDF SUMS ", pdf_sums)
 
-                ## need that extra sin(theta) factor for correct summation in theta/phi coordinates (not required in equal-area projections of the sphere)
-                pdf_sum=((log_evals[:,None].exp()*torch.sin(mesh_theta)*area)).sum().detach().numpy()
-
-                pdf_sums.append(pdf_sum)
-
-            
-            print("PDF SUMS ", pdf_sums)
-
-            ## smaller than 1 % off from 1.00
-            assert( numpy.fabs(pdf_sums[-1]-1.0) < 1e-2)
+                ## smaller than 1 % off from 1.00 for the last one with the highest number of bins
+                assert( numpy.fabs(pdf_sums[-1]-1.0) < 1e-2)
 
 
         ## Autoregressive flow With various options
 
         for zenith_layer_type in ["g", "p", "x", "z", "r"]:
-            for cyl_para in [1]:
+            for cyl_para in [0]:
 
                 extra_flow_defs=dict()
                 extra_flow_defs["n"]=dict()
@@ -159,9 +162,8 @@ class Test(unittest.TestCase):
         extra_flow_defs=dict()
         extra_flow_defs["c"]=dict()
         extra_flow_defs["c"]["kwargs"]=dict()
-        extra_flow_defs["c"]["kwargs"]["natural_direction"]=1
         extra_flow_defs["c"]["kwargs"]["cnf_network_hidden_dims"]=""
-        extra_flow_defs["c"]["kwargs"]["num_charts"]=30
+        extra_flow_defs["c"]["kwargs"]["num_charts"]=4
 
         this_flow=f.pdf("s2", "c", flow_defs_detail=extra_flow_defs)
         with torch.no_grad():

@@ -5,6 +5,26 @@ import collections
 from .. import layer_base
 import itertools
 
+def return_safe_angle_within_pi(x, safety_margin=1e-10):
+    """
+    Restricts the angle to not hit 0 or pi exactly.
+    """
+ 
+    small_mask=x<safety_margin
+    large_mask=x>(numpy.pi-safety_margin)
+   
+    ret=torch.where(small_mask, safety_margin, x)
+    ret=torch.where(large_mask, numpy.pi-safety_margin, ret)
+
+    """
+    ret=torch.ones_like(x)
+    ret[small_mask]=angle_diff
+    ret[large_mask]=numpy.pi-angle_diff
+    ret[(~small_mask) & (~large_mask)]=x[(~small_mask) & (~large_mask)]
+    """
+
+    return ret
+
 class sphere_base(layer_base.layer_base):
 
     def __init__(self, 
@@ -75,26 +95,7 @@ class sphere_base(layer_base.layer_base):
 
                     self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
 
-    def return_safe_angle_within_pi(self, x):
-        """
-        Restricts the angle to not hit 0 or pi exactly.
-        """
-        angle_diff=1e-10
-
-        small_mask=x<angle_diff
-        large_mask=x>(numpy.pi-angle_diff)
-
-        ret=torch.where(small_mask, angle_diff, x)
-        ret=torch.where(large_mask, numpy.pi-angle_diff, x)
-
-        """
-        ret=torch.ones_like(x)
-        ret[small_mask]=angle_diff
-        ret[large_mask]=numpy.pi-angle_diff
-        ret[(~small_mask) & (~large_mask)]=x[(~small_mask) & (~large_mask)]
-        """
-
-        return ret
+    
 
     def compute_rotation_matrix(self, x, extra_inputs=None, mode="householder", device=torch.device("cpu")):
 
@@ -191,6 +192,9 @@ class sphere_base(layer_base.layer_base):
         elif(self.dimension==2):
             # theta
             angles.append(torch.acos(x[:,2:3]/torch.sum(x[:,:]**2, dim=1, keepdims=True).sqrt()))
+
+            angles[-1]=return_safe_angle_within_pi(angles[-1])
+
             log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
 
             # phi
@@ -212,7 +216,9 @@ class sphere_base(layer_base.layer_base):
             # theta / phi
             theta=x[:,0:1]
             phi=x[:,1:2]
-
+            
+            theta=return_safe_angle_within_pi(theta)
+            
             #x=torch.cos(theta)
             #y=torch.sin(theta)*torch.cos(phi)
             #z=torch.sin(theta)*torch.sin(phi)
@@ -222,7 +228,7 @@ class sphere_base(layer_base.layer_base):
             z=torch.cos(theta)
 
             eucl=torch.cat( [x,y,z], dim=1)
-
+            
             log_det=log_det+torch.log(torch.sin(theta)).sum(axis=-1)
 
             return eucl, log_det

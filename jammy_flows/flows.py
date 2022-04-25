@@ -325,7 +325,6 @@ class pdf(nn.Module):
         self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "64-64" # hidden dims of cnf MLP network
         self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 0 # mlp highway dim - 0-4
         self.flow_dict["c"]["kwargs"]["cnf_network_rank"] = 0 # 0 means full rank
-        self.flow_dict["c"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
         self.flow_dict["c"]["kwargs"]["solver"] = "rk4" ## 
 
         """

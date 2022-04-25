@@ -147,7 +147,7 @@ class AmbientProjNN(nn.Module):
 
 class cnf_sphere_charts(sphere_base.sphere_base):
 
-    def __init__(self, dimension, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=False, natural_direction=0, cnf_network_hidden_dims="64-64", cnf_network_rank=0, cnf_network_highway_mode=1, num_charts=6, solver="rk4", higher_order_cylinder_parametrization=False):
+    def __init__(self, dimension, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=False, cnf_network_hidden_dims="64-64", cnf_network_rank=0, cnf_network_highway_mode=1, num_charts=6, solver="rk4", higher_order_cylinder_parametrization=False):
         """
         solvers: 
         """
@@ -158,8 +158,7 @@ class cnf_sphere_charts(sphere_base.sphere_base):
 
         
         self.cnf_network_hidden_dims=cnf_network_hidden_dims
-        self.natural_direction=natural_direction
-    
+        
         ## 4 input parameters (x,y,z - the embedding coordinates of S-2, aswell as a time coordinate to indicate where in the ODE we are)
         ## 3 outputs, as the output is 3-d vector indicating the ODE vector field
         #prev_net=create_network(4,3,20,1)
@@ -359,15 +358,16 @@ class cnf_sphere_charts(sphere_base.sphere_base):
 
         if(self.always_parametrize_in_embedding_space==False):
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-     
+        """
         if(self.natural_direction):
            
             res, log_det_fac=self._forward(x, reverse=True, extra_inputs=extra_inputs)
             
             log_det=log_det+log_det_fac
         else:
-            res, log_det_fac=self._forward(x, reverse=False, extra_inputs=extra_inputs)
-            log_det=log_det+log_det_fac
+        """
+        res, log_det_fac=self._forward(x, reverse=False, extra_inputs=extra_inputs)
+        log_det=log_det+log_det_fac
 
         if(self.always_parametrize_in_embedding_space==False):
             res, log_det=self.eucl_to_spherical_embedding(res, log_det)
@@ -381,13 +381,14 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         if(self.always_parametrize_in_embedding_space==False):
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
-        
+        """
         if(self.natural_direction):
             res, log_det_fac=self._forward(x, reverse=False, extra_inputs=extra_inputs)
             log_det=log_det+log_det_fac
         else:
-            res, log_det_fac=self._forward(x, reverse=True, extra_inputs=extra_inputs)
-            log_det=log_det+log_det_fac
+        """
+        res, log_det_fac=self._forward(x, reverse=True, extra_inputs=extra_inputs)
+        log_det=log_det+log_det_fac
 
         if(self.always_parametrize_in_embedding_space==False):
             res, log_det=self.eucl_to_spherical_embedding(res, log_det)
