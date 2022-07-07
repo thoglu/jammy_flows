@@ -33,6 +33,8 @@ class AmortizableMLP(nn.Module):
         if(len(precise_mlp_structure.keys())>0):
             self.sub_mlp_structures=precise_mlp_structure
             
+            assert("mlp_list" in self.sub_mlp_structures.keys())
+
             if(self.highway_mode>0):
                 assert("linear_highway" in self.sub_mlp_structures.keys())
                 

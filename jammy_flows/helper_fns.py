@@ -547,7 +547,8 @@ def plot_joint_pdf(pdf,
                    colormap=cm.rainbow,
                    s2_rotate_to_true_value=True,
                    s2_show_gridlines=True,
-                   skip_plotting_samples=False):
+                   skip_plotting_samples=False,
+                   var_names=[]):
 
     plot_density = False
     dim = len(samples[0])
@@ -854,7 +855,7 @@ def plot_joint_pdf(pdf,
         
         for ind1 in range(dim):
             for ind2 in range(dim):
-               
+                      
                 if (ind2 < ind1):
 
                     found_ax=False
@@ -981,7 +982,8 @@ def visualize_pdf(pdf,
                   colormap=cm.rainbow,
                   s2_rotate_to_true_value=True,
                   s2_show_gridlines=True,
-                  skip_plotting_samples=False):
+                  skip_plotting_samples=False,
+                  var_names=[]):
 
     with torch.no_grad():
       sample_conditional_input = conditional_input
@@ -1025,7 +1027,8 @@ def visualize_pdf(pdf,
           colormap=colormap,
           s2_rotate_to_true_value=s2_rotate_to_true_value,
           s2_show_gridlines=s2_show_gridlines,
-          skip_plotting_samples=skip_plotting_samples)
+          skip_plotting_samples=skip_plotting_samples,
+          var_names=var_names)
         
     
     return samples, new_subgridspec, total_pdf_integral
