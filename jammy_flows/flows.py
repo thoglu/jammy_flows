@@ -15,7 +15,7 @@ from .layers.spheres.spherical_do_nothing import spherical_do_nothing
 from .layers.spheres.cnf_sphere_charts import cnf_sphere_charts
 
 from .layers.euclidean.euclidean_base import euclidean_base
-from .layers.euclidean.euclidean_do_nothing import euclidean_do_nothing
+
 
 from .layers.intervals.interval_base import interval_base
 from .layers.intervals.interval_do_nothing import interval_do_nothing
@@ -24,6 +24,8 @@ from .layers.intervals.rational_quadratic_spline import rational_quadratic_splin
 from .layers.simplex.inner_loop_simplex import inner_loop_simplex
 from .layers.simplex.gumbel_softmax import gumbel_softmax
 from .layers.simplex.simplex_base import simplex_base
+
+from . import flow_options
 
 from . import extra_functions
 from . import amortizable_mlp
@@ -35,6 +37,8 @@ import copy
 import sys
 
 from typing import Union
+
+
 
 class pdf(nn.Module):
 
@@ -58,7 +62,8 @@ class pdf(nn.Module):
         rank_of_mlp_mappings_sub_pdfs=0,
         custom_mlp_highway_mode=0,
         amortize_everything=False,
-        use_as_passthrough_instead_of_pdf=False
+        use_as_passthrough_instead_of_pdf=False,
+        skip_mlp_initialization=False
     ):  
         """
         Initializes a general flow pdf object.
@@ -99,6 +104,7 @@ class pdf(nn.Module):
         self.custom_mlp_highway_mode=custom_mlp_highway_mode
         self.amortize_everything=amortize_everything
         self.use_as_passthrough_instead_of_pdf=use_as_passthrough_instead_of_pdf
+        self.skip_mlp_initialization=skip_mlp_initialization
 
         ## holds total number of params for amortization - only used if "amortize_everything" set to True
         self.total_number_amortizable_params=None
@@ -187,229 +193,89 @@ class pdf(nn.Module):
             No return value
 
         """
-
-        ## provide standard settings
-        self.flow_dict = dict()
-
-        """ 
-        Euclidean flows
-        """
-        self.flow_dict["g"] = dict()
-        self.flow_dict["g"]["module"] = gf_block
-        self.flow_dict["g"]["type"] = "e"
-        self.flow_dict["g"]["kwargs"] = dict()
-        self.flow_dict["g"]["kwargs"]["fit_normalization"] = 1
-        self.flow_dict["g"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["g"]["kwargs"]["num_householder_iter"] = -1
-        self.flow_dict["g"]["kwargs"]["num_kde"] = 10
-        self.flow_dict["g"]["kwargs"]["inverse_function_type"] = "isigmoid"
-        self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
-        self.flow_dict["g"]["kwargs"]["skip_model_offset"]=0
-        self.flow_dict["g"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
-        self.flow_dict["g"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
-        self.flow_dict["g"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
-        self.flow_dict["g"]["kwargs"]["clamp_widths"]=0
-        self.flow_dict["g"]["kwargs"]["width_smooth_saturation"]=1 # 
-        self.flow_dict["g"]["kwargs"]["regulate_normalization"]=1
-        self.flow_dict["g"]["kwargs"]["add_skewness"]=0
-        self.flow_dict["g"]["kwargs"]["rotation_mode"]="householder"
-        self.flow_dict["g"]["kwargs"]["nonlinear_stretch_type"]="classic"
-
-        self.flow_dict["h"] = dict()
-        self.flow_dict["h"]["module"] = gf_block_old
-        self.flow_dict["h"]["type"] = "e"
-        self.flow_dict["h"]["kwargs"] = dict()
-        self.flow_dict["h"]["kwargs"]["fit_normalization"] = 1
-        self.flow_dict["h"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["h"]["kwargs"]["num_householder_iter"] = -1
-        self.flow_dict["h"]["kwargs"]["num_kde"] = 10
-        self.flow_dict["h"]["kwargs"]["inverse_function_type"] = "isigmoid"
-        self.flow_dict["h"]["kwargs"]["replace_first_sigmoid_with_icdf"]=1
-        self.flow_dict["h"]["kwargs"]["skip_model_offset"]=0
-        self.flow_dict["h"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
-        self.flow_dict["h"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
-        self.flow_dict["h"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
-        self.flow_dict["h"]["kwargs"]["clamp_widths"]=0
-        self.flow_dict["h"]["kwargs"]["width_smooth_saturation"]=1 # 
-        self.flow_dict["h"]["kwargs"]["regulate_normalization"]=1
-        self.flow_dict["h"]["kwargs"]["add_skewness"]=0
-
-
-        self.flow_dict["p"] = dict()
-        self.flow_dict["p"]["module"] = psf_block
-        self.flow_dict["p"]["type"] = "e"
-        self.flow_dict["p"]["kwargs"] = dict()
-        self.flow_dict["p"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["p"]["kwargs"]["num_householder_iter"] = -1
-        self.flow_dict["p"]["kwargs"]["num_transforms"] = 1
-        self.flow_dict["p"]["kwargs"]["exact_mode"] = True
-        self.flow_dict["p"]["kwargs"]["skip_model_offset"]=0
-
-        self.flow_dict["t"] = dict()
-        self.flow_dict["t"]["module"] = mvn_block
-        self.flow_dict["t"]["type"] = "e"
-        self.flow_dict["t"]["kwargs"] = dict()
-        self.flow_dict["t"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["t"]["kwargs"]["skip_model_offset"]=0
-        self.flow_dict["t"]["kwargs"]["softplus_for_width"]=0 # use softplus instead of exp to transform log_width -> width
-        self.flow_dict["t"]["kwargs"]["upper_bound_for_widths"]=100 # define an upper bound for the value of widths.. -1 = no upper bound
-        self.flow_dict["t"]["kwargs"]["lower_bound_for_widths"]=0.01 # define a lower bound for the value of widths
-        self.flow_dict["t"]["kwargs"]["clamp_widths"]=0
-        self.flow_dict["t"]["kwargs"]["width_smooth_saturation"]=1 # 
-        self.flow_dict["t"]["kwargs"]["cov_type"]="diagonal"
-        
-
-
-        """
-        S1 flows
-        """
-        self.flow_dict["m"] = dict()
-        self.flow_dict["m"]["module"] = moebius
-        self.flow_dict["m"]["type"] = "s"
-        self.flow_dict["m"]["kwargs"] = dict()
-        self.flow_dict["m"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["m"]["kwargs"]["use_extra_householder"] = 0
-        self.flow_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["m"]["kwargs"]["num_basis_functions"] = 5
-        self.flow_dict["m"]["kwargs"]["natural_direction"] = 0
-
-        self.flow_dict["o"] = dict()
-        self.flow_dict["o"]["module"] = sphere_spline_1d
-        self.flow_dict["o"]["type"] = "s"
-        self.flow_dict["o"]["kwargs"] = dict()
-        self.flow_dict["o"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["o"]["kwargs"]["use_extra_householder"] = 0
-        self.flow_dict["o"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["o"]["kwargs"]["num_basis_functions"] = 5
-        self.flow_dict["o"]["kwargs"]["natural_direction"] = 0
-        
-
-        """
-        S2 flows
-        """
-        self.flow_dict["n"] = dict()
-        self.flow_dict["n"]["module"] = segmented_sphere_nd
-        self.flow_dict["n"]["type"] = "s"
-        self.flow_dict["n"]["kwargs"] = dict()
-        self.flow_dict["n"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["n"]["kwargs"]["use_extra_householder"] = 1
-        self.flow_dict["n"]["kwargs"]["add_rotation"] = 1
-        self.flow_dict["n"]["kwargs"]["rotation_mode"] = "householder"
-        self.flow_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["n"]["kwargs"]["num_basis_functions"] = 10
-        self.flow_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = False
-        self.flow_dict["n"]["kwargs"]["zenith_type_layers"] = "r"
-        self.flow_dict["n"]["kwargs"]["max_rank"] = -1
-
-        self.flow_dict["v"] = dict()
-        self.flow_dict["v"]["module"] = exponential_map_s2
-        self.flow_dict["v"]["type"] = "s"
-        self.flow_dict["v"]["kwargs"] = dict()
-        self.flow_dict["v"]["kwargs"]["use_extra_householder"] = 0
-        self.flow_dict["v"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = False
-        self.flow_dict["v"]["kwargs"]["exp_map_type"] = "exponential" ## supported linear  / exponential
-        self.flow_dict["v"]["kwargs"]["num_components"] = 10 ## number of components in convex superposition
-        self.flow_dict["v"]["kwargs"]["natural_direction"] = 0 ## natural direction corresponds to the transformation happing in the forward direction - default: 0
-
-        self.flow_dict["c"] = dict()
-        self.flow_dict["c"]["module"] = cnf_sphere_charts
-        self.flow_dict["c"]["type"] = "s"
-        self.flow_dict["c"]["kwargs"] = dict()
-        self.flow_dict["c"]["kwargs"]["use_extra_householder"] = 0
-        self.flow_dict["c"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-        self.flow_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = False
-        self.flow_dict["c"]["kwargs"]["num_charts"] = 4
-        self.flow_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = "64-64" # hidden dims of cnf MLP network
-        self.flow_dict["c"]["kwargs"]["cnf_network_highway_mode"] = 0 # mlp highway dim - 0-4
-        self.flow_dict["c"]["kwargs"]["cnf_network_rank"] = 0 # 0 means full rank
-        self.flow_dict["c"]["kwargs"]["solver"] = "rk4" ## 
-
-        """
-        Interval flows
-        """
-        self.flow_dict["r"] = dict()
-        self.flow_dict["r"]["module"] = rational_quadratic_spline
-        self.flow_dict["r"]["type"] = "i"
-        self.flow_dict["r"]["kwargs"] = dict()
-        self.flow_dict["r"]["kwargs"]["use_permanent_parameters"]=0
-        self.flow_dict["r"]["kwargs"]["euclidean_to_interval_as_first"] = 0
-        self.flow_dict["r"]["kwargs"]["num_basis_elements"] = 10
-
-        """
-        Simplex flows
-        """
-
-        self.flow_dict["u"] = dict()
-        self.flow_dict["u"]["module"] = gumbel_softmax
-        self.flow_dict["u"]["type"] = "c"
-        self.flow_dict["u"]["kwargs"] = dict()
-      
-        self.flow_dict["u"]["kwargs"]["use_permanent_parameters"]=0
-        #self.flow_dict["u"]["kwargs"]["always_parametrize_in_embedding_space"]=0
-        self.flow_dict["u"]["kwargs"]["project_from_gauss_to_simplex"]=0
-
-        self.flow_dict["w"] = dict()
-        self.flow_dict["w"]["module"] = inner_loop_simplex
-        self.flow_dict["w"]["type"] = "c"
-        self.flow_dict["w"]["kwargs"] = dict()
-
-      
-        self.flow_dict["w"]["kwargs"]["use_permanent_parameters"]=0
-        #self.flow_dict["w"]["kwargs"]["always_parametrize_in_embedding_space"]=0
-        self.flow_dict["w"]["kwargs"]["project_from_gauss_to_simplex"]=0
-        """
-        Spherical/Euclidean/Interval flows that do nothing
-        """
-        self.flow_dict["x"] = dict()
-        self.flow_dict["x"]["module"] = euclidean_do_nothing
-        self.flow_dict["x"]["type"] = "e"
-        self.flow_dict["x"]["kwargs"] = dict()
-
-        self.flow_dict["y"] = dict()
-        self.flow_dict["y"]["module"] = spherical_do_nothing
-        self.flow_dict["y"]["type"] = "s"
-        self.flow_dict["y"]["kwargs"] = dict()
-
-        self.flow_dict["z"] = dict()
-        self.flow_dict["z"]["module"] = interval_do_nothing
-        self.flow_dict["z"]["type"] = "i"
-        self.flow_dict["z"]["kwargs"] = dict()
-    
-
-
-        for k in flow_defs_detail:
-            if k not in self.flow_dict.keys():
-
-                self.flow_dict[k] = dict()
-                if "module" not in flow_defs_detail[k].keys():
-                    raise Exception(
-                        "Flow defs of ",
-                        k,
-                        " do not contain the module object .. this is a requirement!",
-                    )
-                    
-                self.flow_dict[k]["module"] = flow_defs_detail[k]["module"]
-                self.flow_dict[k]["kwargs"] = dict()
-
-            # copy kwargs if required
-            if "kwargs" in flow_defs_detail[k].keys():
-                
-                for kwarg in flow_defs_detail[k]["kwargs"].keys():
-
-                    if(kwarg not in self.flow_dict[k]["kwargs"].keys()):
-                        raise Exception("%s is an invalid kw argument for flow type %s" % (kwarg, k))
-
-                    self.flow_dict[k]["kwargs"][kwarg] = flow_defs_detail[k]["kwargs"][kwarg]
-
-                    print(" ovewrite basic option ", kwarg, " with ", flow_defs_detail[k]["kwargs"][kwarg])
-
-
-    
+        # list of the pdf defs (e.g. e2 for 2-d Euclidean) for each subpdf
+        # i.e. e2+s2 will yield 2 entries, one for each manifold
         self.pdf_defs_list = pdf_defs.split("+")
+
+        # respective flow functions for each submanifold
         self.flow_defs_list = flow_defs.split("+")
+
+        ## dictionary holding the options used by the flows of this pdf
+        self.flow_opts = dict()
+
+        #top_flow_def_keys=[k for k in flow_defs_detail.keys()]
+
+        ## loop through flow defs and initialize sub-manifold specific options
+        for ind, cur_flow_defs in enumerate(self.flow_defs_list):
+
+            this_iter_flow_abbrvs=list(set(cur_flow_defs))
+
+            self.flow_opts[ind]=dict()
+
+            for flow_abbrv in this_iter_flow_abbrvs:
+
+                ## first copy default options
+
+                self.flow_opts[ind][flow_abbrv]=flow_options.obtain_default_options(flow_abbrv)
+
+                ## make sure default options are consistent
+                for opt in self.flow_opts[ind][flow_abbrv].keys():
+                    flow_options.check_flow_option(flow_abbrv, opt, self.flow_opts[ind][flow_abbrv][opt])
+
+                for k in flow_defs_detail.keys():
+                    if(type(k)==int):
+
+                        assert( (k>=0) and (k<len(self.flow_defs_list))), "Index of detailed options is outside allowed range of defined autoregressive structure."
+                        
+                        if(k != ind):
+                            continue
+
+                        for detail_abbrv in flow_defs_detail[k].keys():
+
+                            if(detail_abbrv == flow_abbrv):
+
+                                for detail_opt in flow_defs_detail[k][detail_abbrv].keys():
+
+                                    flow_options.check_flow_option(flow_abbrv, detail_opt, flow_defs_detail[k][detail_abbrv][detail_opt])
+
+                                    self.flow_opts[ind][flow_abbrv][detail_opt]=flow_defs_detail[k][detail_abbrv][detail_opt]
+                            
+                    elif(k==flow_abbrv):
+
+                        for detail_opt in flow_defs_detail[k].keys():
+
+                            flow_options.check_flow_option(flow_abbrv, detail_opt, flow_defs_detail[k][detail_opt])
+
+                            self.flow_opts[ind][flow_abbrv][detail_opt]=flow_defs_detail[k][detail_opt]
+                    
+
+                    """
+                    if k not in self.flow_opts.keys():
+
+                        self.flow_opts[k] = dict()
+                        if "module" not in flow_defs_detail[k].keys():
+                            raise Exception(
+                                "Flow defs of ",
+                                k,
+                                " do not contain the module object .. this is a requirement!",
+                            )
+                            
+                        self.flow_opts[k]["module"] = flow_defs_detail[k]["module"]
+                        self.flow_opts[k]["kwargs"] = dict()
+
+                    # copy kwargs if required
+                    if "kwargs" in flow_defs_detail[k].keys():
+                        
+                        for kwarg in flow_defs_detail[k]["kwargs"].keys():
+
+                            if(kwarg not in self.flow_opts[k]["kwargs"].keys()):
+                                raise Exception("%s is an invalid kw argument for flow type %s" % (kwarg, k), "allowed: ", self.flow_opts[k]["kwargs"].keys())
+
+                            self.flow_opts[k]["kwargs"][kwarg] = flow_defs_detail[k]["kwargs"][kwarg]
+
+                            print(" ovewrite basic option ", kwarg, " with ", flow_defs_detail[k]["kwargs"][kwarg])
+                    """
+
 
         """
         self.conditional_manifold_input_embedding=dict()
@@ -482,13 +348,6 @@ class pdf(nn.Module):
         self.total_base_dim=total_base_dim
 
         """
-
-        ## make sure all specified layers are actually defined in the internal "flow_dict" dictionary
-        for flow_def in self.flow_defs_list:
-            for single_layer in flow_def:
-                if(single_layer not in self.flow_dict.keys()):
-                    raise Exception("single layer abbreviation ", single_layer, " not defined in internal flow dict .. please give description via the flow_defs_detail kwarg")
-                   
 
         if(len(self.pdf_defs_list)!=len(self.flow_defs_list)):
             raise Exception("PDF defs list has to be same length as flow defs list, but ... ", self.pdf_defs_list, self.flow_defs_list)
@@ -686,6 +545,9 @@ class pdf(nn.Module):
 
         ## loop through flows and define layers according to flow definitions
         ## also count number of parameters of each layer
+
+        flow_info=flow_options.obtain_overall_flow_info()
+
         for subflow_index, subflow_description in enumerate(self.pdf_defs_list):
 
             ## append a collection for this subflow which will hold the number of parameters of each layer in the sub-flow
@@ -703,10 +565,10 @@ class pdf(nn.Module):
             #detected_always_embedding_flag=None
 
             for layer_ind, layer_type in enumerate(self.flow_defs_list[subflow_index]):
-                if(self.flow_dict[layer_type]["type"]!=subflow_description[0]):
+                if(flow_info[layer_type]["type"]!=subflow_description[0]):
                     raise Exception("layer type ", layer_type, " is not compatible with flow type ", subflow_description)
                   
-                this_kwargs = copy.deepcopy(self.flow_dict[layer_type]["kwargs"])
+                this_kwargs = copy.deepcopy(self.flow_opts[subflow_index][layer_type])
 
                 """
                 if("always_parametrize_in_embedding_space" in this_kwargs.keys()):
@@ -725,12 +587,12 @@ class pdf(nn.Module):
                 if(subflow_index>0):
                     this_kwargs["use_permanent_parameters"] = 0
 
-                
-
                 if("s" in subflow_description):
                     ## this flow is a spherical flow, so the first layer should also project from plane to sphere or vice versa
                     if(layer_ind==0 and self.use_as_passthrough_instead_of_pdf==False):
                         this_kwargs["euclidean_to_sphere_as_first"]=1
+                    else:
+                        this_kwargs["euclidean_to_sphere_as_first"]=0
 
                 elif("i" in subflow_description):
                     ## this flow is an interval flow, so the first layer should also project from real line to interval or vice versa
@@ -747,13 +609,15 @@ class pdf(nn.Module):
                         this_kwargs["high_boundary"]=float(interval_boundaries[1])
                      
                     if(layer_ind==0 and self.use_as_passthrough_instead_of_pdf==False):
-                        
                         this_kwargs["euclidean_to_interval_as_first"]=1
+                    else:
+                        this_kwargs["euclidean_to_interval_as_first"]=0
                 elif("c" in subflow_description):
 
                     if(layer_ind==0 and self.use_as_passthrough_instead_of_pdf==False):
-                        
                         this_kwargs["project_from_gauss_to_simplex"]=1
+                    else:
+                        this_kwargs["project_from_gauss_to_simplex"]=0
 
                 elif("e" in subflow_description):
                     if(layer_type!="x"):
@@ -765,7 +629,7 @@ class pdf(nn.Module):
                                 if(this_kwargs["replace_first_sigmoid_with_icdf"]>0 and this_kwargs["inverse_function_type"]=="isigmoid"):
                                     this_kwargs["inverse_function_type"]="inormal_partly_precise"
 
-                ## this is not a real parameter - delete it
+                ## this is not a real parameter to pass on to the flow layers - delete it
                 if("skip_model_offset" in this_kwargs):
                     del this_kwargs["skip_model_offset"]
                 ## we dont want to pass this to layer
@@ -774,7 +638,7 @@ class pdf(nn.Module):
 
                     
                 self.layer_list[subflow_index].append(
-                    self.flow_dict[layer_type]["module"](int(subflow_description.split("_")[0][1:]), **this_kwargs)
+                    flow_info[layer_type]["module"](int(subflow_description.split("_")[0][1:]), **this_kwargs)
                 )
 
                 # add parameters for the very first layer to total amortizable_params
@@ -994,179 +858,179 @@ class pdf(nn.Module):
 
 
         self.mlp_predictors=nn.ModuleList()
+        self.log_normalization_mlp=None
 
         #num_encoder_for_other_encoders=len(self.input_encoder)-1
 
         ## only one MLP predictor for all ??
 
+        if(self.skip_mlp_initialization==False):
 
-        prev_extra_input_num=0
+            prev_extra_input_num=0
 
-        if(self.join_poisson_and_pdf_description):
-            if(len(self.pdf_defs_list)>1):
-                raise Exception("A common poisson log-lambda and flow parameter prediction is currently only supported for a PDF that has a single flow (no autoregressive structure) for simplicity! .. number of autoregressive parts here: ", len(self.pdf_defs_list))
-            if(self.data_summary_dim is None):
-                raise Exception("Flow does not depend on conditional input .. please set 'join_poisson_and_pdf_description' to False, currently True")
-       
-        for pdf_index, pdf in enumerate(self.pdf_defs_list):
+            if(self.join_poisson_and_pdf_description):
+                if(len(self.pdf_defs_list)>1):
+                    raise Exception("A common poisson log-lambda and flow parameter prediction is currently only supported for a PDF that has a single flow (no autoregressive structure) for simplicity! .. number of autoregressive parts here: ", len(self.pdf_defs_list))
+                if(self.data_summary_dim is None):
+                    raise Exception("Flow does not depend on conditional input .. please set 'join_poisson_and_pdf_description' to False, currently True")
+           
+            for pdf_index, pdf in enumerate(self.pdf_defs_list):
 
 
-            if(pdf_index==0 and self.data_summary_dim is None):
-              
-                self.mlp_predictors.append(None)
-
-                prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
-
-                ### we amortize everything and have no encoder (data_summary_dim=None) -> the first layer column is also amortized
-                if(self.amortize_everything):
-                    ##
-                    self.total_number_amortizable_params+=sum(self.num_parameter_list[0])
-                    
-                    if(self.predict_log_normalization and self.join_poisson_and_pdf_description==False):
-                        self.total_number_amortizable_params+=1
-
-                continue
-
-            
-            if(pdf_index>0):
-                tot_num_pars_this_pdf=0
-
-                tot_num_pars_this_pdf=sum(self.num_parameter_list[pdf_index])
-    
-                ## if this sub pdf has no parameters, we do not need to define an MLP
-                if(tot_num_pars_this_pdf==0):
-                    
+                if(pdf_index==0 and self.data_summary_dim is None):
+                  
                     self.mlp_predictors.append(None)
 
-                    # actually get the embedding dim for each layer
+                    prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
 
-                    #if(self.conditional_manifold_input_embedding[pdf[0]]):
-                    #    prev_extra_input_num+=self.target_dims[pdf_index]+1
-                    #else:
-                    #    prev_extra_input_num+=self.target_dims[pdf_index]
-                    
+                    ### we amortize everything and have no encoder (data_summary_dim=None) -> the first layer column is also amortized
+                    if(self.amortize_everything):
+                        ##
+                        self.total_number_amortizable_params+=sum(self.num_parameter_list[0])
+                        
+                        if(self.predict_log_normalization and self.join_poisson_and_pdf_description==False):
+                            self.total_number_amortizable_params+=1
+
                     continue
 
-          
-            # calculate the number of output parameters for the mlp
-            num_predicted_pars=sum(self.num_parameter_list[pdf_index])
-    
-            # add log normalization as a single output parameters
-            if(self.predict_log_normalization):
-                if(pdf_index==0 and self.join_poisson_and_pdf_description):
-                    num_predicted_pars+=1
-
-            if(num_predicted_pars==0):
-                self.mlp_predictors.append(None)
-                continue
-
-            ## take previous dimensions as input
-            this_summary_dim=prev_extra_input_num
-
-            # also add input summary dimensions
-            if(self.data_summary_dim is not None):
-                this_summary_dim+=self.data_summary_dim[-1]
-
-            if(self.use_custom_low_rank_mlps):
-
-                these_hidden_dims=list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-
-                custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
                 
-                if(self.amortize_everything):
-                    self.total_number_amortizable_params+=custom_mlp.num_amortization_params
+                if(pdf_index>0):
+                    tot_num_pars_this_pdf=0
 
-                """
-                if(quasi_gaussian_initialization):
-
-               
-                    bias_index=0
-                    tot_bias=[]
-
-                    for sublayer in self.layer_list[pdf_index]:
-                       
-                        these_params=sublayer.get_desired_init_parameters()
-                       
-                        if(these_params is not None):
-                           tot_bias.append(these_params)
-                    
-                    if(len(tot_bias)==0):
-                        custom_mlp.initialize_uvbs()
-                    else:
-                        tot_bias=torch.cat(tot_bias)
-                     
-                        custom_mlp.initialize_uvbs(init_b=tot_bias)
-                """
-                self.mlp_predictors.append(custom_mlp)
-
-            else:
-
-                mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-                mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
-
-                nn_list = []
-                for i in range(len(mlp_in_dims)):
-                   
-                    l = torch.nn.Linear(mlp_in_dims[i], mlp_out_dims[i])
-
-                    nn_list.append(l)
-                    
-                    if i < (len(mlp_in_dims) - 1):
-                        nn_list.append(NONLINEARITIES["tanh"])
-                    
-                
-                self.mlp_predictors.append(torch.nn.Sequential(*nn_list))
-
-
-            prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
-           
-
-
-        ##
-
-        self.log_normalization_mlp=None
-
-        if(self.predict_log_normalization):
-
-            if(self.data_summary_dim is not None):
-
-                ## we only have the encoding summary dim.. poisson mean does not depend on the other PDF pars
-
-                ## only generate a Poisson MLP if poisson log-lambda and other flow parameters are to be predicted by separate MLPs
-                if(self.join_poisson_and_pdf_description==False):
-
-                    assert(self.amortize_everything==False), "Separate poisson log-lambda predictor not implemented with 'amortize_everything' currently"
-                    this_summary_dim=self.data_summary_dim[-1]
-                    num_predicted_pars=1
-
-                    if(self.use_custom_low_rank_mlps):
-                       
-                        self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
-
-                    else:
-
-                        mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-                        mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
-
-                        nn_list = []
-                        for i in range(len(mlp_in_dims)):
-                           
-                            l = torch.nn.Linear(mlp_in_dims[i], mlp_out_dims[i])
-
-                            nn_list.append(l)
-
-                            if i < (len(mlp_in_dims) - 1):
-                                nn_list.append(NONLINEARITIES["tanh"])
-                            else:
-                                ## initialize some weights
-
-                                nn_list[-1].weight.data/=1000.0
-
-                                nn_list[-1].bias.data[0]=-1.0
-                                
-                        self.log_normalization_mlp=torch.nn.Sequential(*nn_list)
-
+                    tot_num_pars_this_pdf=sum(self.num_parameter_list[pdf_index])
         
+                    ## if this sub pdf has no parameters, we do not need to define an MLP
+                    if(tot_num_pars_this_pdf==0):
+                        
+                        self.mlp_predictors.append(None)
+
+                        # actually get the embedding dim for each layer
+
+                        #if(self.conditional_manifold_input_embedding[pdf[0]]):
+                        #    prev_extra_input_num+=self.target_dims[pdf_index]+1
+                        #else:
+                        #    prev_extra_input_num+=self.target_dims[pdf_index]
+                        
+                        continue
+
+              
+                # calculate the number of output parameters for the mlp
+                num_predicted_pars=sum(self.num_parameter_list[pdf_index])
+        
+                # add log normalization as a single output parameters
+                if(self.predict_log_normalization):
+                    if(pdf_index==0 and self.join_poisson_and_pdf_description):
+                        num_predicted_pars+=1
+
+                if(num_predicted_pars==0):
+                    self.mlp_predictors.append(None)
+                    continue
+
+                ## take previous dimensions as input
+                this_summary_dim=prev_extra_input_num
+
+                # also add input summary dimensions
+                if(self.data_summary_dim is not None):
+                    this_summary_dim+=self.data_summary_dim[-1]
+
+                if(self.use_custom_low_rank_mlps):
+
+                    these_hidden_dims=list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
+
+                    custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
+                    
+                    if(self.amortize_everything):
+                        self.total_number_amortizable_params+=custom_mlp.num_amortization_params
+
+                    """
+                    if(quasi_gaussian_initialization):
+
+                   
+                        bias_index=0
+                        tot_bias=[]
+
+                        for sublayer in self.layer_list[pdf_index]:
+                           
+                            these_params=sublayer.get_desired_init_parameters()
+                           
+                            if(these_params is not None):
+                               tot_bias.append(these_params)
+                        
+                        if(len(tot_bias)==0):
+                            custom_mlp.initialize_uvbs()
+                        else:
+                            tot_bias=torch.cat(tot_bias)
+                         
+                            custom_mlp.initialize_uvbs(init_b=tot_bias)
+                    """
+                    self.mlp_predictors.append(custom_mlp)
+
+                else:
+
+                    mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
+                    mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
+
+                    nn_list = []
+                    for i in range(len(mlp_in_dims)):
+                       
+                        l = torch.nn.Linear(mlp_in_dims[i], mlp_out_dims[i])
+
+                        nn_list.append(l)
+                        
+                        if i < (len(mlp_in_dims) - 1):
+                            nn_list.append(NONLINEARITIES["tanh"])
+                        
+                    
+                    self.mlp_predictors.append(torch.nn.Sequential(*nn_list))
+
+
+                prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
+               
+            if(self.predict_log_normalization):
+
+                if(self.data_summary_dim is not None):
+
+                    ## we only have the encoding summary dim.. poisson mean does not depend on the other PDF pars
+
+                    ## only generate a Poisson MLP if poisson log-lambda and other flow parameters are to be predicted by separate MLPs
+                    if(self.join_poisson_and_pdf_description==False):
+
+                        assert(self.amortize_everything==False), "Separate poisson log-lambda predictor not implemented with 'amortize_everything' currently"
+                        this_summary_dim=self.data_summary_dim[-1]
+                        num_predicted_pars=1
+
+                        if(self.use_custom_low_rank_mlps):
+                           
+                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
+
+                        else:
+
+                            mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
+                            mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
+
+                            nn_list = []
+                            for i in range(len(mlp_in_dims)):
+                               
+                                l = torch.nn.Linear(mlp_in_dims[i], mlp_out_dims[i])
+
+                                nn_list.append(l)
+
+                                if i < (len(mlp_in_dims) - 1):
+                                    nn_list.append(NONLINEARITIES["tanh"])
+                                else:
+                                    ## initialize some weights
+
+                                    nn_list[-1].weight.data/=1000.0
+
+                                    nn_list[-1].bias.data[0]=-1.0
+                                    
+                            self.log_normalization_mlp=torch.nn.Sequential(*nn_list)
+
+        else:
+            # If we chose to not initilaize MLPs here, make sure we do not separately also predict log normalization
+            # Externel initializations should predict the Poisson and PDF description jointly.
+            if(self.predict_log_normalization):
+                assert(self.join_poisson_and_pdf_description==True)
 
     def count_parameters(self, verbose=False):
 
@@ -1322,7 +1186,7 @@ class pdf(nn.Module):
         if conditional_input is not None:
 
             if self.input_encoder is None:
-                raise Exception("encoder is none but conditionl input is given ...")
+                raise Exception("encoder is none but conditional input is given ...")
                
             if self.mlp_predictors is None:
                 raise Exception("mlp predictor is none but conditional input is given ...")

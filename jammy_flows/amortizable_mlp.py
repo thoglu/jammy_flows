@@ -212,11 +212,11 @@ class AmortizableMLP(nn.Module):
 
         for sub_mlp_index in range(len(self.sub_mlp_structures["mlp_list"])):
 
-            this_num_params=self.initialize_uv_structure(self.sub_mlp_structures["mlp_list"][sub_mlp_index])
+            this_num_params=self._initialize_uv_structure(self.sub_mlp_structures["mlp_list"][sub_mlp_index])
             num_amortization_params+=this_num_params
 
         if("linear_highway" in self.sub_mlp_structures.keys()):
-            this_num_params=self.initialize_uv_structure(self.sub_mlp_structures["linear_highway"])
+            this_num_params=self._initialize_uv_structure(self.sub_mlp_structures["linear_highway"])
             num_amortization_params+=this_num_params
 
         # the number of parameters is the total number of all MLP params
@@ -246,8 +246,11 @@ class AmortizableMLP(nn.Module):
                 #print("nonlinear act ...........")
                 mlp_def["activations"].append(NONLINEARITIES[self.nonlinearity])
 
-    def initialize_uv_structure(self, mlp_def):
-            
+    def _initialize_uv_structure(self, mlp_def):
+        """
+        Private method to initialize UV structure of MLPs and contained linear transformations.
+        Adds additional information to the mlp_list or linear_highway MLP defs.
+        """  
         num_amortization_params=0
 
         max_ranks=[]

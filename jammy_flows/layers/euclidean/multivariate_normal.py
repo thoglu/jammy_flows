@@ -81,7 +81,7 @@ class mvn_block(euclidean_base.euclidean_base):
         self.init = False
 
         self.cov_type=cov_type
-        assert(self.cov_type=="unit_gaussian" or self.cov_type=="diagonal_symmetric" or self.cov_type=="diagonal" or self.cov_type=="full" ), (self.cov_type)
+        assert(self.cov_type=="identity" or self.cov_type=="diagonal_symmetric" or self.cov_type=="diagonal" or self.cov_type=="full" ), (self.cov_type)
         assert(lower_bound_for_widths>0.0)
 
         self.width_min=lower_bound_for_widths
@@ -189,7 +189,7 @@ class mvn_block(euclidean_base.euclidean_base):
         full_diagonal=None
         lower_triangular_entries=None
 
-        if(cov_type=="unit_gaussian"):
+        if(cov_type=="identity"):
             return None, None, None
 
         if(extra_inputs is not None):
@@ -228,7 +228,7 @@ class mvn_block(euclidean_base.euclidean_base):
         
         [z, log_det]=inputs
 
-        if(self.cov_type=="unit_gaussian"):
+        if(self.cov_type=="identity"):
             ## save time
             return z, log_det
 
@@ -246,7 +246,7 @@ class mvn_block(euclidean_base.euclidean_base):
 
         [x, log_det] = inputs
 
-        if(self.cov_type=="unit_gaussian"):
+        if(self.cov_type=="identity"):
             # save time
             return x, log_det
 
@@ -265,7 +265,7 @@ class mvn_block(euclidean_base.euclidean_base):
 
         ## householder params / means of kdes / log_widths of kdes / normalizations (if fit normalization)
 
-        if(self.cov_type=="unit_gaussian"):
+        if(self.cov_type=="identity"):
             return torch.empty(0)
 
         desired_param_vec=[]
@@ -309,7 +309,7 @@ class mvn_block(euclidean_base.euclidean_base):
         full_diagonal=None
         lower_triangular_entries=None
 
-        if(self.cov_type=="unit_gaussian"):
+        if(self.cov_type=="identity"):
             return 
 
         if(extra_inputs is not None):

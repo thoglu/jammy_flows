@@ -116,6 +116,7 @@ class euclidean_base(layer_base.layer_base):
 
     def _init_params(self, params):
         raise NotImplementedError
+        
     def _get_desired_init_parameters(self):
         raise NotImplementedError
 
