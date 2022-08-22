@@ -22,11 +22,10 @@ def seed_everything(seed_no):
 def check_conditional_pdf(num_kde, plot=False, index=0, dimensionality=3):
 
     extra_flow_defs=dict()
-    extra_flow_defs["flow_defs_detail"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["add_skewness"]=1
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["num_kde"]=num_kde
+    extra_flow_defs["options_overwrite"]=dict()
+    extra_flow_defs["options_overwrite"]["g"]=dict()
+    extra_flow_defs["options_overwrite"]["g"]["add_skewness"]=1
+    extra_flow_defs["options_overwrite"]["g"]["num_kde"]=num_kde
     extra_flow_defs["conditional_input_dim"]=2
 
     pdf=f.pdf("e1", "g", **extra_flow_defs)
@@ -54,11 +53,10 @@ def check_conditional_pdf(num_kde, plot=False, index=0, dimensionality=3):
 def check_skewness(num_kde, plot=False, index=0):
 
     extra_flow_defs=dict()
-    extra_flow_defs["flow_defs_detail"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]=dict()
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["add_skewness"]=1
-    extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["num_kde"]=num_kde
+    extra_flow_defs["options_overwrite"]=dict()
+    extra_flow_defs["options_overwrite"]["g"]=dict()
+    extra_flow_defs["options_overwrite"]["g"]["add_skewness"]=1
+    extra_flow_defs["options_overwrite"]["g"]["num_kde"]=num_kde
 
     pdf=f.pdf("e1", "g", **extra_flow_defs)
 

@@ -72,12 +72,12 @@ class Test(unittest.TestCase):
         
         pdf_def="e2"
         flow_def="ppp"
-        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":True,"skip_model_offset": 1}}} }
+        settings={ "options_overwrite": {"p":{"exact_mode":True,"skip_model_offset": 1}} }
 
         #self.flow_inits.append( [ [pdf_def, flow_def], dict()] )
         self.init_exact= [ [pdf_def, flow_def], settings] 
         
-        settings={ "flow_defs_detail": {"p":{"kwargs":{"exact_mode":False,"skip_model_offset": 1}}} }
+        settings={ "options_overwrite": {"p":{"exact_mode":False,"skip_model_offset": 1}} }
 
         self.init_numerical= [ [pdf_def, flow_def], settings] 
 
@@ -243,16 +243,19 @@ class Test(unittest.TestCase):
             ## we dont want normalization in the following for simplicity (in one we would need an extra transformation to apply manually)
             extra_flow_defs=dict()
             extra_flow_defs["g"]=dict()
-            extra_flow_defs["g"]["kwargs"]=dict()
-            extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=0
-            extra_flow_defs["g"]["kwargs"]["add_skewness"]=skew
+            
+            extra_flow_defs["g"]["regulate_normalization"]=0
+            extra_flow_defs["g"]["add_skewness"]=skew
+            extra_flow_defs["g"]["inverse_function_type"]="isigmoid"
+
             extra_flow_defs["h"]=dict()
-            extra_flow_defs["h"]["kwargs"]=dict()
-            extra_flow_defs["h"]["kwargs"]["regulate_normalization"]=0
-            extra_flow_defs["h"]["kwargs"]["add_skewness"]=skew
+            
+            extra_flow_defs["h"]["regulate_normalization"]=0
+            extra_flow_defs["h"]["add_skewness"]=skew
+            extra_flow_defs["h"]["inverse_function_type"]="isigmoid"
 
             seed_everything(1)
-            flow_exact=f.pdf("e2", "h", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "h", options_overwrite=extra_flow_defs)
             flow_exact.double()
 
             
@@ -271,7 +274,7 @@ class Test(unittest.TestCase):
             ## old fast
 
             seed_everything(1)
-            flow_exact=f.pdf("e2", "h", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "h", options_overwrite=extra_flow_defs)
             flow_exact.double()
 
             
@@ -290,7 +293,7 @@ class Test(unittest.TestCase):
            
         
             seed_everything(1)
-            flow_exact=f.pdf("e2", "g", flow_defs_detail=extra_flow_defs)
+            flow_exact=f.pdf("e2", "g", options_overwrite=extra_flow_defs)
             flow_exact.double()
 
             gf_layer=flow_exact.layer_list[0][0]
@@ -314,7 +317,7 @@ class Test(unittest.TestCase):
                     
                 ### old gaussianization flow
                 seed_everything(1)
-                flow_exact=f.pdf("e2", "h",flow_defs_detail=extra_flow_defs)
+                flow_exact=f.pdf("e2", "h",options_overwrite=extra_flow_defs)
                 flow_exact.double()
 
                 gf_layer=flow_exact.layer_list[0][0]
@@ -348,7 +351,7 @@ class Test(unittest.TestCase):
                 ##### new gaussianization flow
 
                 seed_everything(1)
-                flow_exact=f.pdf("e2", "g",flow_defs_detail=extra_flow_defs)
+                flow_exact=f.pdf("e2", "g",options_overwrite=extra_flow_defs)
                 flow_exact.double()
 
                 gf_layer=flow_exact.layer_list[0][0]

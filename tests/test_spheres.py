@@ -29,11 +29,10 @@ class Test(unittest.TestCase):
 
         extra_flow_defs=dict()
         extra_flow_defs["m"]=dict()
-        extra_flow_defs["m"]["kwargs"]=dict()
-        extra_flow_defs["m"]["kwargs"]["use_extra_householder"]=0
+        extra_flow_defs["m"]["use_extra_householder"]=0
 
 
-        this_flow=f.pdf("s1", "m", flow_defs_detail=extra_flow_defs)
+        this_flow=f.pdf("s1", "m", options_overwrite=extra_flow_defs)
         input=torch.from_numpy(numpy.array([0.0,numpy.pi*2.0])[:,None])
 
         ev,_,_=this_flow(input)
@@ -42,11 +41,11 @@ class Test(unittest.TestCase):
 
         extra_flow_defs=dict()
         extra_flow_defs["n"]=dict()
-        extra_flow_defs["n"]["kwargs"]=dict()
-        extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=0
-        extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=0
+       
+        extra_flow_defs["n"]["use_extra_householder"]=0
+        extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=0
 
-        this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
+        this_flow=f.pdf("s2", "n", options_overwrite=extra_flow_defs)
         test_input=torch.from_numpy(numpy.array([[0.0,0.0],[numpy.pi,0.0]]))
         
         ev,_,_=this_flow(test_input)
@@ -126,12 +125,12 @@ class Test(unittest.TestCase):
 
                 extra_flow_defs=dict()
                 extra_flow_defs["n"]=dict()
-                extra_flow_defs["n"]["kwargs"]=dict()
-                extra_flow_defs["n"]["kwargs"]["use_extra_householder"]=1
-                extra_flow_defs["n"]["kwargs"]["higher_order_cylinder_parametrization"]=cyl_para
-                extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]=zenith_layer_type
+                
+                extra_flow_defs["n"]["use_extra_householder"]=1
+                extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=cyl_para
+                extra_flow_defs["n"]["zenith_type_layers"]=zenith_layer_type
              
-                this_flow=f.pdf("s2", "n", flow_defs_detail=extra_flow_defs)
+                this_flow=f.pdf("s2", "n", options_overwrite=extra_flow_defs)
 
                 check_flow(this_flow)
 
@@ -140,20 +139,20 @@ class Test(unittest.TestCase):
 
         extra_flow_defs=dict()
         extra_flow_defs["v"]=dict()
-        extra_flow_defs["v"]["kwargs"]=dict()
-        extra_flow_defs["v"]["kwargs"]["natural_direction"]=0
+        
+        extra_flow_defs["v"]["natural_direction"]=0
 
-        this_flow=f.pdf("s2", "vv", flow_defs_detail=extra_flow_defs)
+        this_flow=f.pdf("s2", "vv", options_overwrite=extra_flow_defs)
         check_flow(this_flow)
 
         ##
 
         extra_flow_defs=dict()
         extra_flow_defs["v"]=dict()
-        extra_flow_defs["v"]["kwargs"]=dict()
-        extra_flow_defs["v"]["kwargs"]["natural_direction"]=1
+    
+        extra_flow_defs["v"]["natural_direction"]=1
 
-        this_flow=f.pdf("s2", "vv", flow_defs_detail=extra_flow_defs)
+        this_flow=f.pdf("s2", "vv", options_overwrite=extra_flow_defs)
         with torch.no_grad():
             check_flow(this_flow)
 
@@ -161,11 +160,11 @@ class Test(unittest.TestCase):
 
         extra_flow_defs=dict()
         extra_flow_defs["c"]=dict()
-        extra_flow_defs["c"]["kwargs"]=dict()
-        extra_flow_defs["c"]["kwargs"]["cnf_network_hidden_dims"]=""
-        extra_flow_defs["c"]["kwargs"]["num_charts"]=4
+       
+        extra_flow_defs["c"]["cnf_network_hidden_dims"]=""
+        extra_flow_defs["c"]["num_charts"]=4
 
-        this_flow=f.pdf("s2", "c", flow_defs_detail=extra_flow_defs)
+        this_flow=f.pdf("s2", "c", options_overwrite=extra_flow_defs)
         with torch.no_grad():
             check_flow(this_flow)
 

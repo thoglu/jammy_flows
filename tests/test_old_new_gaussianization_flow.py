@@ -88,19 +88,19 @@ class Test(unittest.TestCase):
             samplesize=100
             extra_flow_defs=dict()
             extra_flow_defs["g"]=dict()
-            extra_flow_defs["g"]["kwargs"]=dict()
-            extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=1
-            extra_flow_defs["g"]["kwargs"]["add_skewness"]=add_skew
+            
+            extra_flow_defs["g"]["regulate_normalization"]=1
+            extra_flow_defs["g"]["add_skewness"]=add_skew
             extra_flow_defs["h"]=dict()
-            extra_flow_defs["h"]["kwargs"]=dict()
-            extra_flow_defs["h"]["kwargs"]["regulate_normalization"]=1
-            extra_flow_defs["h"]["kwargs"]["add_skewness"]=add_skew
+            
+            extra_flow_defs["h"]["regulate_normalization"]=1
+            extra_flow_defs["h"]["add_skewness"]=add_skew
 
             seed_everything(1)
             z=torch.rand((samplesize,1), dtype=torch.double)
 
             seed_everything(1)
-            flow_old=f.pdf("e1" , "h", flow_defs_detail=extra_flow_defs)
+            flow_old=f.pdf("e1" , "h", options_overwrite=extra_flow_defs)
             flow_old.double()
             
 
@@ -109,7 +109,7 @@ class Test(unittest.TestCase):
             ###
 
             seed_everything(1)
-            flow_new=f.pdf("e1" , "g",flow_defs_detail=extra_flow_defs)
+            flow_new=f.pdf("e1" , "g",options_overwrite=extra_flow_defs)
             flow_new.double()
             
 

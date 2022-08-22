@@ -43,11 +43,11 @@ if __name__ == "__main__":
     ## define PDF
 
     extra_flow_defs=dict()
-    extra_flow_defs[1]=dict()
-    extra_flow_defs[1]["n"]=dict()
-    extra_flow_defs[1]["n"]["use_extra_householder"]=1
-    extra_flow_defs[1]["n"]["higher_order_cylinder_parametrization"]=0
-    extra_flow_defs[1]["n"]["zenith_type_layers"]="rr"
+    extra_flow_defs[0]=dict()
+    extra_flow_defs[0]["n"]=dict()
+    extra_flow_defs[0]["n"]["use_extra_householder"]=1
+    extra_flow_defs[0]["n"]["higher_order_cylinder_parametrization"]=0
+    extra_flow_defs[0]["n"]["zenith_type_layers"]="rr"
 
     extra_flow_defs["v"]=dict()
     #extra_flow_defs["v"]["kwargs"]["use_extra_householder"]=0
@@ -55,7 +55,7 @@ if __name__ == "__main__":
     extra_flow_defs["v"]["exp_map_type"]="nn"
     
 
-    test_pdf=jammy_flows.pdf("s2", args.layer_def, flow_defs_detail=extra_flow_defs)
+    test_pdf=jammy_flows.pdf("s2", args.layer_def, options_overwrite=extra_flow_defs)
 
     #res,_,_,_=test_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
 

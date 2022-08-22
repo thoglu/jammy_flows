@@ -250,8 +250,9 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
             #glob_dim_index+=2
         elif(this_type=="e"):
-            bounds.append([-12.0,12.0])
-            bounds.append([-12.0,12.0])
+            for ind in range(this_dim):
+                bounds.append([-12.0,12.0])
+            #bounds.append([-12.0,12.0])
 
         elif(this_type=="i"):
             bounds.append([0.0,1.0])
@@ -263,7 +264,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
             for ind in range(this_dim):
                 bounds.append([bmin,bmax])
 
-
+   
     logpz_max= scipy.stats.multivariate_normal.logpdf( dim*[0], mean=dim*[0])
     twice_pdf_diff=2*(logpz_max - base_pdf_res)
 
@@ -322,7 +323,7 @@ if __name__ == "__main__":
     ###
     parser = argparse.ArgumentParser('train_example')
 
-    parser.add_argument("-sentence", type=str, default="JAMMY FLOWS GREAT")
+    parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
     parser.add_argument("-pdf_def", type=str, default="e10")
     parser.add_argument("-layer_def", type=str, default="ggggg") 
     parser.add_argument("-use_conditional_pdf", type=int, default=1) 
@@ -349,38 +350,33 @@ if __name__ == "__main__":
 
     extra_flow_defs=dict()
     extra_flow_defs["n"]=dict()
-    extra_flow_defs["n"]["kwargs"]=dict()
-    extra_flow_defs["n"]["kwargs"]["zenith_type_layers"]="g"
-    extra_flow_defs["n"]["kwargs"]["rotation_mode"]="householder"
-    extra_flow_defs["n"]["kwargs"]["add_rotation"]=1
+    extra_flow_defs["n"]["zenith_type_layers"]="g"
+    extra_flow_defs["n"]["rotation_mode"]="householder"
+    extra_flow_defs["n"]["add_rotation"]=1
 
     extra_flow_defs["g"]=dict()
-    extra_flow_defs["g"]["kwargs"]=dict()
-    extra_flow_defs["g"]["kwargs"]["regulate_normalization"]=1
-    extra_flow_defs["g"]["kwargs"]["fit_normalization"]=1
-    extra_flow_defs["g"]["kwargs"]["add_skewness"]=0  
-    extra_flow_defs["g"]["kwargs"]["rotation_mode"]="angles"
-    extra_flow_defs["g"]["kwargs"]["nonlinear_stretch_type"]="classic" 
+    extra_flow_defs["g"]["regulate_normalization"]=1
+    extra_flow_defs["g"]["fit_normalization"]=1
+    extra_flow_defs["g"]["add_skewness"]=0  
+    extra_flow_defs["g"]["rotation_mode"]="angles"
+    extra_flow_defs["g"]["nonlinear_stretch_type"]="classic" 
 
     extra_flow_defs["t"]=dict()
-    extra_flow_defs["t"]["kwargs"]=dict()
-    extra_flow_defs["t"]["kwargs"]["cov_type"]="full"
+    extra_flow_defs["t"]["cov_type"]="full"
 
     extra_flow_defs["v"]=dict()
-    extra_flow_defs["v"]["kwargs"]=dict()
-    extra_flow_defs["v"]["kwargs"]["exp_map_type"]="splines"
-    extra_flow_defs["v"]["kwargs"]["num_components"]=10
-    extra_flow_defs["v"]["kwargs"]["natural_direction"]=1
+    extra_flow_defs["v"]["exp_map_type"]="splines"
+    extra_flow_defs["v"]["num_components"]=10
+    extra_flow_defs["v"]["natural_direction"]=1
 
     extra_flow_defs["c"]=dict()
-    extra_flow_defs["c"]["kwargs"]=dict()
-    extra_flow_defs["c"]["kwargs"]["cnf_network_highway_mode"]=4
-    extra_flow_defs["c"]["kwargs"]["cnf_network_hidden_dims"]="512-512"
+    extra_flow_defs["c"]["cnf_network_highway_mode"]=4
+    extra_flow_defs["c"]["cnf_network_hidden_dims"]="512-512"
 
     cinput=len(args.sentence.split(" "))
     if(args.use_conditional_pdf==0):
         cinput=None
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=cinput, hidden_mlp_dims_sub_pdfs="128",flow_defs_detail=extra_flow_defs, use_custom_low_rank_mlps=False,
+    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=cinput, hidden_mlp_dims_sub_pdfs="128",options_overwrite=extra_flow_defs, use_custom_low_rank_mlps=False,
         custom_mlp_highway_mode=4)
 
     word_pdf.count_parameters(verbose=True)

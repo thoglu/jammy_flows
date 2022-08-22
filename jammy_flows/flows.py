@@ -46,7 +46,7 @@ class pdf(nn.Module):
         self,
         pdf_defs, ## e1
         flow_defs, ## ggggg
-        flow_defs_detail=dict(),
+        options_overwrite=dict(),
         conditional_input_dim=None,
         data_summary_dim=None,
         input_encoder=None,
@@ -80,7 +80,7 @@ class pdf(nn.Module):
 
                 The mapping of layer abbreviation to a specific layer is implemented for some standard layers, but can be overridden.
 
-            flow_defs_detail (dict): Dictionary containing other flow definitions not defined as default or for overriding default flow definitions.
+            options_overwrite (dict): Dictionary containing other flow definitions not defined as default or for overriding default flow definitions.
 
             conditional_dim: (None/single integer/list of integers/Nones) Conditional dimension(s)
             Example: (1) f(z) , i.e. no conditional input, would be modeled by passing None. (2) f(z;x), where x is an n-dimensional input space can be modeled by n. Another option is to split the input up and model higher-order conditionals by passing [n1,n2], or [n1,n2,n3], where sum(n_i)=n
@@ -127,7 +127,7 @@ class pdf(nn.Module):
         ##################
 
 
-        self.read_model_definition(pdf_defs, flow_defs, flow_defs_detail, conditional_input_dim, used_data_summary_dim, used_input_encoder, hidden_mlp_dims_sub_pdfs, rank_of_mlp_mappings_sub_pdfs, hidden_mlp_dims_meta, conditional_manifold_input_embedding_overwrite=conditional_manifold_input_embedding_overwrite)
+        self.read_model_definition(pdf_defs, flow_defs, options_overwrite, conditional_input_dim, used_data_summary_dim, used_input_encoder, hidden_mlp_dims_sub_pdfs, rank_of_mlp_mappings_sub_pdfs, hidden_mlp_dims_meta, conditional_manifold_input_embedding_overwrite=conditional_manifold_input_embedding_overwrite)
 
         self.init_flow_structure()
 
@@ -155,7 +155,7 @@ class pdf(nn.Module):
         ## initialize with double precision
         self.double()
 
-    def read_model_definition(self, pdf_defs, flow_defs, flow_defs_detail,conditional_input_dim,
+    def read_model_definition(self, pdf_defs, flow_defs, options_overwrite,conditional_input_dim,
         data_summary_dim,
         input_encoder,
         hidden_mlp_dims_sub_pdfs,
@@ -176,7 +176,7 @@ class pdf(nn.Module):
                      5 convex moebius transformations to describe the flow PDF on s1. Each t is a "torus" layer on S2, so 5 t corresponds to 5 consecutive torus layers to describe the flow on the 2-sphere.
                     
 
-            flow_defs_detail (dict): Dictionary containing other flow definitions not defined as default or for overriding default flow definitions.
+            options_overwrite (dict): Dictionary containing other flow definitions not defined as default or for overriding default flow definitions.
                                      The mapping of layer abbreviation to a specific layer is implemented for some standard layers, but can be overridden using this dict.
 
             conditional_dim: (None/single integer/list of integers/Nones) Conditional dimension(s)
@@ -203,7 +203,7 @@ class pdf(nn.Module):
         ## dictionary holding the options used by the flows of this pdf
         self.flow_opts = dict()
 
-        #top_flow_def_keys=[k for k in flow_defs_detail.keys()]
+        #top_flow_def_keys=[k for k in options_overwrite.keys()]
 
         ## loop through flow defs and initialize sub-manifold specific options
         for ind, cur_flow_defs in enumerate(self.flow_defs_list):
@@ -222,7 +222,7 @@ class pdf(nn.Module):
                 for opt in self.flow_opts[ind][flow_abbrv].keys():
                     flow_options.check_flow_option(flow_abbrv, opt, self.flow_opts[ind][flow_abbrv][opt])
 
-                for k in flow_defs_detail.keys():
+                for k in options_overwrite.keys():
                     if(type(k)==int):
 
                         assert( (k>=0) and (k<len(self.flow_defs_list))), "Index of detailed options is outside allowed range of defined autoregressive structure."
@@ -230,50 +230,50 @@ class pdf(nn.Module):
                         if(k != ind):
                             continue
 
-                        for detail_abbrv in flow_defs_detail[k].keys():
+                        for detail_abbrv in options_overwrite[k].keys():
 
                             if(detail_abbrv == flow_abbrv):
 
-                                for detail_opt in flow_defs_detail[k][detail_abbrv].keys():
+                                for detail_opt in options_overwrite[k][detail_abbrv].keys():
 
-                                    flow_options.check_flow_option(flow_abbrv, detail_opt, flow_defs_detail[k][detail_abbrv][detail_opt])
+                                    flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
 
-                                    self.flow_opts[ind][flow_abbrv][detail_opt]=flow_defs_detail[k][detail_abbrv][detail_opt]
+                                    self.flow_opts[ind][flow_abbrv][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
                             
                     elif(k==flow_abbrv):
 
-                        for detail_opt in flow_defs_detail[k].keys():
+                        for detail_opt in options_overwrite[k].keys():
 
-                            flow_options.check_flow_option(flow_abbrv, detail_opt, flow_defs_detail[k][detail_opt])
+                            flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
 
-                            self.flow_opts[ind][flow_abbrv][detail_opt]=flow_defs_detail[k][detail_opt]
+                            self.flow_opts[ind][flow_abbrv][detail_opt]=options_overwrite[k][detail_opt]
                     
 
                     """
                     if k not in self.flow_opts.keys():
 
                         self.flow_opts[k] = dict()
-                        if "module" not in flow_defs_detail[k].keys():
+                        if "module" not in options_overwrite[k].keys():
                             raise Exception(
                                 "Flow defs of ",
                                 k,
                                 " do not contain the module object .. this is a requirement!",
                             )
                             
-                        self.flow_opts[k]["module"] = flow_defs_detail[k]["module"]
+                        self.flow_opts[k]["module"] = options_overwrite[k]["module"]
                         self.flow_opts[k]["kwargs"] = dict()
 
                     # copy kwargs if required
-                    if "kwargs" in flow_defs_detail[k].keys():
+                    if "kwargs" in options_overwrite[k].keys():
                         
-                        for kwarg in flow_defs_detail[k]["kwargs"].keys():
+                        for kwarg in options_overwrite[k]["kwargs"].keys():
 
                             if(kwarg not in self.flow_opts[k]["kwargs"].keys()):
                                 raise Exception("%s is an invalid kw argument for flow type %s" % (kwarg, k), "allowed: ", self.flow_opts[k]["kwargs"].keys())
 
-                            self.flow_opts[k]["kwargs"][kwarg] = flow_defs_detail[k]["kwargs"][kwarg]
+                            self.flow_opts[k]["kwargs"][kwarg] = options_overwrite[k]["kwargs"][kwarg]
 
-                            print(" ovewrite basic option ", kwarg, " with ", flow_defs_detail[k]["kwargs"][kwarg])
+                            print(" ovewrite basic option ", kwarg, " with ", options_overwrite[k]["kwargs"][kwarg])
                     """
 
 
@@ -581,12 +581,16 @@ class pdf(nn.Module):
 
 
                 ## overwrite permanent parameters if desired or necessary
-                if self.force_permanent_parameters_in_first_subpdf:
+                if(self.force_permanent_parameters_in_first_subpdf and (subflow_index==0)):
                     this_kwargs["use_permanent_parameters"] = 1
-                ## do not use permanent parameters for all later sub flows!
-                if(subflow_index>0):
+                else:
                     this_kwargs["use_permanent_parameters"] = 0
 
+                ## do not use permanent parameters for all later sub flows!
+                #if(subflow_index>0):
+                
+
+                
                 if("s" in subflow_description):
                     ## this flow is a spherical flow, so the first layer should also project from plane to sphere or vice versa
                     if(layer_ind==0 and self.use_as_passthrough_instead_of_pdf==False):

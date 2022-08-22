@@ -126,11 +126,9 @@ class Test(unittest.TestCase):
         ### s1 with splines
 
         extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["m"]=dict()
-        extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]=dict()
-        #extra_flow_defs["flow_defs_detail"]["m"]["kwargs"]["use_splines"]=1
-
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["m"]=dict()
+    
         self.flow_inits.append([ ["s1", "m"], extra_flow_defs])
 
         pdf_def="e1+e2+e2+s1"
@@ -139,19 +137,18 @@ class Test(unittest.TestCase):
         ## 3d rotation
 
         extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["g"]=dict()
-        extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["g"]["kwargs"]["rotation_mode"]="angles"
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["g"]=dict()
+        extra_flow_defs["options_overwrite"]["g"]["rotation_mode"]="angles"
 
         self.flow_inits.append([ ["e3", "gg"], extra_flow_defs])
 
 
   
-        #self.flow_inits.append( [ [pdf_def, flow_def], {"flow_defs_detail":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}}}] )
-        #self.flow_inits.append( [ [pdf_def, flow_def], {"flow_defs_detail":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}}}] )
-        #self.flow_inits.append( [ [pdf_def, flow_def], {"flow_defs_detail":{"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}}}] )
-        #self.flow_inits.append( [ [pdf_def, flow_def], {"flow_defs_detail":{"g":{"kwargs":{"inverse_function_type":"isigmoid"}}}}] )
+        #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}}}] )
+        #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}}}] )
+        #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}}}] )
+        #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"isigmoid"}}}}] )
 
         
         encoders=["passthrough"]
@@ -161,18 +158,18 @@ class Test(unittest.TestCase):
         low_rank_ranks=["2-10-1000"]
 
 
-        gf_settings=[{"g":{"kwargs":{"softplus_for_width":1}}},
-                     {"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}},
-                     {"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}},
-                     {"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}},
-                     {"g":{"kwargs":{"clamp_widths": 1}}},
-                     {"g":{"kwargs":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}}},
-                     {"g":{"kwargs":{"add_skewness": 1}}},
-                     {"g":{"kwargs":{"rotation_mode": "householder"}}},
-                     {"g":{"kwargs":{"rotation_mode": "angles"}}},
-                     {"g":{"kwargs":{"rotation_mode": "triangular_combination"}}},
-                     {"g":{"kwargs":{"rotation_mode": "cayley"}}},
-                     {"g":{"kwargs":{"nonlinear_stretch_type": "rq_splines"}}}
+        gf_settings=[{"g":{"softplus_for_width":1}},
+                     {"g":{"inverse_function_type":"inormal_partly_crude"}},
+                     {"g":{"inverse_function_type":"inormal_partly_precise"}},
+                     {"g":{"inverse_function_type":"inormal_full_pade"}},
+                     {"g":{"clamp_widths": 1}},
+                     {"g":{"upper_bound_for_widths":-1, "clamp_widths": 1, "width_smooth_saturation": 0}},
+                     {"g":{"add_skewness": 1}},
+                     {"g":{"rotation_mode": "householder"}},
+                     {"g":{"rotation_mode": "angles"}},
+                     {"g":{"rotation_mode": "triangular_combination"}},
+                     {"g":{"rotation_mode": "cayley"}},
+                     {"g":{"nonlinear_stretch_type": "rq_splines"}}
 
                      ]
 
@@ -190,7 +187,7 @@ class Test(unittest.TestCase):
                             d["hidden_mlp_dims_sub_pdfs"]=mlp_hidden
                             d["rank_of_mlp_mappings_sub_pdfs"]=lr_approx
                             d["use_custom_low_rank_mlps"]=use_rank
-                            d["flow_defs_detail"]=gf_setting
+                            d["options_overwrite"]=gf_setting
 
                             self.flow_inits.append([[pdf_def, flow_def], d])
 
@@ -200,24 +197,23 @@ class Test(unittest.TestCase):
             for setting in ["linear", "quadratic", "exponential", "splines"]:
                 ### exponential map
                 extra_flow_defs=dict()
-                extra_flow_defs["flow_defs_detail"]=dict()
-                extra_flow_defs["flow_defs_detail"]["v"]=dict()
-                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]=dict()
-                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["natural_direction"]=nat
-                extra_flow_defs["flow_defs_detail"]["v"]["kwargs"]["exp_map_type"]=setting
+                extra_flow_defs["options_overwrite"]=dict()
+                extra_flow_defs["options_overwrite"]["v"]=dict()
+                
+                extra_flow_defs["options_overwrite"]["v"]["natural_direction"]=nat
+                extra_flow_defs["options_overwrite"]["v"]["exp_map_type"]=setting
 
 
                 self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
 
         #### mvn 
 
-        for cov_type in ["full", "diagonal_symmetric", "diagonal", "unit_gaussian"]:
+        for cov_type in ["full", "diagonal_symmetric", "diagonal", "identity"]:
 
             extra_flow_defs=dict()
-            extra_flow_defs["flow_defs_detail"]=dict()
-            extra_flow_defs["flow_defs_detail"]["t"]=dict()
-            extra_flow_defs["flow_defs_detail"]["t"]["kwargs"]=dict()
-            extra_flow_defs["flow_defs_detail"]["t"]["kwargs"]["cov_type"]=cov_type
+            extra_flow_defs["options_overwrite"]=dict()
+            extra_flow_defs["options_overwrite"]["t"]=dict()
+            extra_flow_defs["options_overwrite"]["t"]["cov_type"]=cov_type
             extra_flow_defs["conditional_input_dim"]=2
         
             self.flow_inits.append([ ["e10", "t"], extra_flow_defs])
@@ -228,13 +224,13 @@ class Test(unittest.TestCase):
 
         """
         extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["c"]=dict()
-        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["natural_direction"]=1
-        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["solver"]="rk4"
-        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["cnf_network_hidden_dims"]=""
-        extra_flow_defs["flow_defs_detail"]["c"]["kwargs"]["num_charts"]=20
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["c"]=dict()
+        extra_flow_defs["options_overwrite"]["c"]["kwargs"]=dict()
+        extra_flow_defs["options_overwrite"]["c"]["kwargs"]["natural_direction"]=1
+        extra_flow_defs["options_overwrite"]["c"]["kwargs"]["solver"]="rk4"
+        extra_flow_defs["options_overwrite"]["c"]["kwargs"]["cnf_network_hidden_dims"]=""
+        extra_flow_defs["options_overwrite"]["c"]["kwargs"]["num_charts"]=20
         extra_flow_defs["conditional_input_dim"]=2
 
         self.flow_inits.append([ ["s2", "c"], extra_flow_defs])
@@ -254,12 +250,12 @@ class Test(unittest.TestCase):
 
         for z_layer in zenith_layers:
             extra_flow_defs=dict()
-            extra_flow_defs["flow_defs_detail"]=dict()
-            extra_flow_defs["flow_defs_detail"]["n"]=dict()
-            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]=dict()
-            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
-            #extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
-            extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["zenith_type_layers"]=z_layer
+            extra_flow_defs["options_overwrite"]=dict()
+            extra_flow_defs["options_overwrite"]["n"]=dict()
+         
+            extra_flow_defs["options_overwrite"]["n"]["use_extra_householder"]=1
+            #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
+            extra_flow_defs["options_overwrite"]["n"]["zenith_type_layers"]=z_layer
             ## all n-type flows
 
             pdf_def="s2"
@@ -270,11 +266,11 @@ class Test(unittest.TestCase):
         # more general flow
 
         extra_flow_defs=dict()
-        extra_flow_defs["flow_defs_detail"]=dict()
-        extra_flow_defs["flow_defs_detail"]["n"]=dict()
-        extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]=dict()
-        extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["use_extra_householder"]=1
-        #extra_flow_defs["flow_defs_detail"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["n"]=dict()
+      
+        extra_flow_defs["options_overwrite"]["n"]["use_extra_householder"]=1
+        #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
 
         ## general flow
         pdf_def="s2+e2+s1"
@@ -422,12 +418,11 @@ class Test(unittest.TestCase):
         ## h = old gf layer
         extra_flow_defs=dict()
         extra_flow_defs["h"]=dict()
-        extra_flow_defs["h"]["kwargs"]=dict()
-
-        extra_flow_defs["h"]["kwargs"]["inverse_function_type"]="inormal_partly_crude"
-        extra_flow_defs["h"]["kwargs"]["add_skewness"]=1
+       
+        extra_flow_defs["h"]["inverse_function_type"]="inormal_partly_crude"
+        extra_flow_defs["h"]["add_skewness"]=1
         
-        crude_flow=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
+        crude_flow=f.pdf("e1", "h", options_overwrite=extra_flow_defs)
 
         def fn_crude(x):
             b=crude_flow.layer_list[0][0]
@@ -439,12 +434,11 @@ class Test(unittest.TestCase):
             
             extra_flow_defs=dict()
             extra_flow_defs["h"]=dict()
-            extra_flow_defs["h"]["kwargs"]=dict()
+       
+            extra_flow_defs["h"]["inverse_function_type"]=icdf_approx
+            extra_flow_defs["h"]["add_skewness"]=1
 
-            extra_flow_defs["h"]["kwargs"]["inverse_function_type"]=icdf_approx
-            extra_flow_defs["h"]["kwargs"]["add_skewness"]=1
-
-            this_flow=f.pdf("e1", "h", flow_defs_detail=extra_flow_defs)
+            this_flow=f.pdf("e1", "h", options_overwrite=extra_flow_defs)
 
             for gf_layer in this_flow.layer_list[0]:
 

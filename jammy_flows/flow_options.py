@@ -38,7 +38,7 @@ opts_dict["g"]["kwargs"]["fit_normalization"] = (1,[0,1])
 #opts_dict["g"]["kwargs"]["use_permanent_parameters"]=(0, [0,1])
 opts_dict["g"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
 opts_dict["g"]["kwargs"]["num_kde"] = (10, lambda x: x>0)
-opts_dict["g"]["kwargs"]["inverse_function_type"] = ("inormal_full_pade", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
+opts_dict["g"]["kwargs"]["inverse_function_type"] = ("isigmoid", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
 opts_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=(1, [0,1])
 opts_dict["g"]["kwargs"]["skip_model_offset"]=(0, [0,1])
 opts_dict["g"]["kwargs"]["softplus_for_width"]=(0, [0,1]) # use softplus instead of exp to transform log_width -> width
@@ -59,18 +59,18 @@ opts_dict["h"]["type"] = "e"
 opts_dict["h"]["kwargs"] = dict()
 opts_dict["h"]["kwargs"]["fit_normalization"] = (1,[0,1])
 #opts_dict["g"]["kwargs"]["use_permanent_parameters"]=(0, [0,1])
-opts_dict["g"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
-opts_dict["g"]["kwargs"]["num_kde"] = (10, lambda x: x>0)
-opts_dict["g"]["kwargs"]["inverse_function_type"] = ("inormal_full_pade", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
-opts_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]=(1, [0,1])
-opts_dict["g"]["kwargs"]["skip_model_offset"]=(0, [0,1])
-opts_dict["g"]["kwargs"]["softplus_for_width"]=(0, [0,1]) # use softplus instead of exp to transform log_width -> width
-opts_dict["g"]["kwargs"]["upper_bound_for_widths"]=(100, lambda x: (x==-1) or x>0) # define an upper bound for the value of widths.. -1 = no upper bound
-opts_dict["g"]["kwargs"]["lower_bound_for_widths"]=(0.01, lambda x: x>0) # define a lower bound for the value of widths
-opts_dict["g"]["kwargs"]["clamp_widths"]=(0, [0,1])
-opts_dict["g"]["kwargs"]["width_smooth_saturation"]=(1, [0,1]) # 
-opts_dict["g"]["kwargs"]["regulate_normalization"]=(1, [0,1])
-opts_dict["g"]["kwargs"]["add_skewness"]=(0, [0,1])
+opts_dict["h"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
+opts_dict["h"]["kwargs"]["num_kde"] = (10, lambda x: x>0)
+opts_dict["h"]["kwargs"]["inverse_function_type"] = ("isigmoid", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
+opts_dict["h"]["kwargs"]["replace_first_sigmoid_with_icdf"]=(1, [0,1])
+opts_dict["h"]["kwargs"]["skip_model_offset"]=(0, [0,1])
+opts_dict["h"]["kwargs"]["softplus_for_width"]=(0, [0,1]) # use softplus instead of exp to transform log_width -> width
+opts_dict["h"]["kwargs"]["upper_bound_for_widths"]=(100, lambda x: (x==-1) or x>0) # define an upper bound for the value of widths.. -1 = no upper bound
+opts_dict["h"]["kwargs"]["lower_bound_for_widths"]=(0.01, lambda x: x>0) # define a lower bound for the value of widths
+opts_dict["h"]["kwargs"]["clamp_widths"]=(0, [0,1])
+opts_dict["h"]["kwargs"]["width_smooth_saturation"]=(1, [0,1]) # 
+opts_dict["h"]["kwargs"]["regulate_normalization"]=(1, [0,1])
+opts_dict["h"]["kwargs"]["add_skewness"]=(0, [0,1])
 
 # polynomial stretch flow
 opts_dict["p"] = dict()
@@ -142,7 +142,7 @@ opts_dict["n"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "ang
 #opts_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
 opts_dict["n"]["kwargs"]["num_basis_functions"] = (10, lambda x: x>0)
 opts_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
-opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: (len(list(set(x)))==1) and x[0] in ["r", "g", "p", "x"])
+opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: (len(list(set(x)))==1) and x[0] in ["r", "g", "p", "x", "z"])
 opts_dict["n"]["kwargs"]["max_rank"] = (-1, lambda x: (x==-1) or (x>0))
 
 # exponential map s2 flow
@@ -154,7 +154,7 @@ opts_dict["v"]["kwargs"] = dict()
 #opts_dict["v"]["kwargs"]["use_permanent_parameters"]=0
 #opts_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
 opts_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
-opts_dict["v"]["kwargs"]["exp_map_type"] = ("exponential", ["linear", "exponential"]) ## supported linear  / exponential
+opts_dict["v"]["kwargs"]["exp_map_type"] = ("exponential", ["linear", "quadratic", "splines", "exponential"]) ## supported linear  / exponential
 opts_dict["v"]["kwargs"]["num_components"] = (10, lambda x: x>0) ## number of components in convex superposition
 opts_dict["v"]["kwargs"]["natural_direction"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0
 

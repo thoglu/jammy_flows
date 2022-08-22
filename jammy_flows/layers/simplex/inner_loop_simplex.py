@@ -34,15 +34,14 @@ class inner_loop_simplex(simplex_base.simplex_base):
         flow_dict=dict()
         flow_dict["r"] = dict()
         
-        flow_dict["r"]["kwargs"] = dict()
-        flow_dict["r"]["kwargs"]["use_permanent_parameters"]=0
-        flow_dict["r"]["kwargs"]["num_basis_elements"]=10
+      
+        flow_dict["r"]["num_basis_elements"]=10
         #flow_dict["r"]["kwargs"]["low_boundary"] = 0.0
         #flow_dict["r"]["kwargs"]["high_boundary"] = 1.0
 
         
-        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension), "+".join(["rr"]*self.dimension) , flow_defs_detail=flow_dict,amortize_everything=True, use_custom_low_rank_mlps=True, use_as_passthrough_instead_of_pdf=True)
-        
+        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension), "+".join(["rr"]*self.dimension) , options_overwrite=flow_dict,amortize_everything=True, use_custom_low_rank_mlps=True, use_as_passthrough_instead_of_pdf=True)
+     
         self.total_num_inner_flow_params=self.inner_flow.total_number_amortizable_params
         self.total_param_num=self.total_num_inner_flow_params
 
