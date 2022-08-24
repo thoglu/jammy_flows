@@ -2007,8 +2007,8 @@ class pdf(nn.Module):
                                         these_params=torch.cat([these_params, torch.Tensor([log_lambda_init])])
 
                             ## custom low-rank MLPs - initialization is done inside the custom MLP class
-                            if(self.use_custom_low_rank_mlps):
-                                
+                            if(type(mlp_predictor)== amortizable_mlp.AmortizableMLP):
+                               
                                 if(self.amortize_everything):
                                     desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params)
                                     num_uvb_pars=mlp_predictor.num_amortization_params

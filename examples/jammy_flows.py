@@ -283,7 +283,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
         if(model.conditional_input_dim is None):
             cinput=None
 
-        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=20000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=2000, nsamples=1000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
