@@ -33,7 +33,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                  max_rank=20, 
                  hidden_dims="64", 
                  subspace_mapping="logistic", 
-                 higher_order_cylinder_parametrization=False):
+                 higher_order_cylinder_parametrization=False,
+                 highway_mode=0):
 
         super().__init__(dimension=dimension, 
                          euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, 
@@ -159,7 +160,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         #print("total eucl params to predict ,", self.total_euclidean_pars)
 
         if(self.total_euclidean_pars>0):
-            self.amortized_mlp=AmortizableMLP(2, hidden_dims, self.total_euclidean_pars, low_rank_approximations=max_rank, use_permanent_parameters=use_permanent_parameters,svd_mode="smart")
+            self.amortized_mlp=AmortizableMLP(2, hidden_dims, self.total_euclidean_pars, highway_mode=highway_mode, low_rank_approximations=max_rank, use_permanent_parameters=use_permanent_parameters,svd_mode="smart")
             self.num_mlp_params=self.amortized_mlp.num_amortization_params
             self.total_param_num+=self.num_mlp_params
         else:

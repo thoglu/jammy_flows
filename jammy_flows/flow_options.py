@@ -139,11 +139,14 @@ opts_dict["n"]["kwargs"] = dict()
 opts_dict["n"]["kwargs"]["use_extra_householder"] = (1, [0,1]) ###### TODO - remove deprecated 
 opts_dict["n"]["kwargs"]["add_rotation"] = (1, [0,1])
 opts_dict["n"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "angles"])
+opts_dict["n"]["kwargs"]["hidden_dims"] = ("64", lambda x: type(x)==str)
 #opts_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
 opts_dict["n"]["kwargs"]["num_basis_functions"] = (10, lambda x: x>0)
 opts_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
 opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: (len(list(set(x)))==1) and x[0] in ["r", "g", "p", "x", "z"])
 opts_dict["n"]["kwargs"]["max_rank"] = (-1, lambda x: (x==-1) or (x>0))
+opts_dict["n"]["kwargs"]["subspace_mapping"] = ("logistic", ["logistic"])
+opts_dict["n"]["kwargs"]["highway_mode"] = (0, [0,1,2,3,4])
 
 # exponential map s2 flow
 opts_dict["v"] = dict()
