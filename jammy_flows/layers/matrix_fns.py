@@ -6,7 +6,7 @@ def obtain_lower_triangular_matrix_and_logdet(dimension, single_log_diagonal_ent
     Obtain lower trinagular (cholesky) matrix. Diagonal entries have to be positive
     """
     ## all variances are the same
-    if(cov_type=="unit_gaussian"):
+    if(cov_type=="identity"):
 
         return torch.eye(dimension, dtype=torch.float64).unsqueeze(0), 0.0
 
@@ -59,7 +59,7 @@ def obtain_lower_triangular_matrix_and_logdet(dimension, single_log_diagonal_ent
 
 def obtain_inverse_lower_triangular_matrix_and_logdet(dimension, single_log_diagonal_entry=None, log_diagonal_entries=None, lower_triangular_entries=None, cov_type="full", upper_triangular=False):
 
-    if(cov_type=="unit_gaussian"):
+    if(cov_type=="identity"):
 
         return torch.eye(dimension, dtype=torch.float64).unsqueeze(0), 0.0
 

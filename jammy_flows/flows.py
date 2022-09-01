@@ -483,8 +483,7 @@ class pdf(nn.Module):
         usement_Flag (bool): True/False - 
         sub_pdf_index (int/None): The index in the layer_list that indices all flows in a certain sub-dimension.
         Sets a flag in all layers (or the layer column indexed by "column index") that determines if the target dimension is parametrized in intrinsic or embedding coordinates.
-        This has the effect that all manifold-based layers are either 
-        This has
+        Used only for testing right now.
         """
         assert( (usement_flag==True or usement_flag==False) )
 
@@ -1458,7 +1457,7 @@ class pdf(nn.Module):
 
         x=None
         log_gauss_evals=0.0
-        unit_gauss_samples=0.0
+        std_normal_samples=0.0
 
         if(predefined_target_input is not None):
 
@@ -1488,19 +1487,19 @@ class pdf(nn.Module):
             if(seed is not None):
                 numpy.random.seed(seed)
 
-            unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_base_dim))
+            std_normal = numpy.random.normal(size=(used_sample_size, self.total_base_dim))
 
-            unit_gauss_samples = (
-                torch.from_numpy(unit_gauss).type(data_type).to(used_device)
+            std_normal_samples = (
+                torch.from_numpy(std_normal).type(data_type).to(used_device)
             )
             log_gauss_evals = torch.distributions.MultivariateNormal(
                 torch.zeros(self.total_base_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_base_dim)
                 .type(data_type)
                 .to(used_device),
-            ).log_prob(unit_gauss_samples)
+            ).log_prob(std_normal_samples)
 
-            x = unit_gauss_samples
+            x = std_normal_samples
 
         log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
 
@@ -1786,7 +1785,7 @@ class pdf(nn.Module):
 
         x=None
         log_gauss_evals=0.0
-        unit_gauss_samples=0.0
+        std_normal_samples=0.0
 
         if(predefined_target_input is not None):
 
@@ -1816,26 +1815,26 @@ class pdf(nn.Module):
             if(seed is not None):
                 numpy.random.seed(seed)
 
-            unit_gauss = numpy.random.normal(size=(used_sample_size, self.total_base_dim))
+            std_normal = numpy.random.normal(size=(used_sample_size, self.total_base_dim))
 
-            unit_gauss_samples = (
-                torch.from_numpy(unit_gauss).type(data_type).to(used_device)
+            std_normal_samples = (
+                torch.from_numpy(std_normal).type(data_type).to(used_device)
             )
             log_gauss_evals = torch.distributions.MultivariateNormal(
                 torch.zeros(self.total_base_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_base_dim)
                 .type(data_type)
                 .to(used_device),
-            ).log_prob(unit_gauss_samples)
+            ).log_prob(std_normal_samples)
 
-            x = unit_gauss_samples
+            x = std_normal_samples
 
         log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
 
         new_targets, log_det=self.all_layer_forward(x, log_det, data_summary, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
         ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
-        return new_targets, unit_gauss_samples, -log_det + log_gauss_evals, log_gauss_evals
+        return new_targets, std_normal_samples, -log_det + log_gauss_evals, log_gauss_evals
 
     def get_total_embedding_dim(self):
         """
