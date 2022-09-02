@@ -788,10 +788,10 @@ def plot_joint_pdf(pdf,
         
 
         ## plot contours from samples
-        new_bounds = None
+        plotting_bounds = None
         if (contour_probs != [] and skip_plotting_samples==False):
             
-            new_bounds = show_sample_contours(ax,
+            plotting_bounds = show_sample_contours(ax,
                                               samples,
                                               bins=hist_bounds,
                                               color=contour_color,
@@ -799,10 +799,10 @@ def plot_joint_pdf(pdf,
                                               sin_zen_mask=sin_zen_mask)
             
        
-        if (bounds is not None):
-            new_bounds = bounds
-            
         
+
+
+
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
           
@@ -826,10 +826,9 @@ def plot_joint_pdf(pdf,
        
         ## adjust axis bounds
 
-        
-        if (new_bounds is not None):
-            ax.set_xlim(new_bounds[0][0], new_bounds[0][1])
-            ax.set_ylim(new_bounds[1][0], new_bounds[1][1]) 
+        if (plotting_bounds is not None):
+            ax.set_xlim(plotting_bounds[0][0], plotting_bounds[0][1])
+            ax.set_ylim(plotting_bounds[1][0], plotting_bounds[1][1]) 
         
         ### overwrite any bounds for spherical
         if(pdf.pdf_defs_list[0]=="s2"):
@@ -847,7 +846,28 @@ def plot_joint_pdf(pdf,
        
     else:
 
+        ## overwrite generic s2 bounds
+
+        plotting_bounds=None
+        if(bounds):
+            plotting_bounds=copy.deepcopy(bounds)
+
+            index_counter=0
+            for pdf_ind, pdf_def in enumerate(pdf.pdf_defs_list):
+                if(pdf=="s2"):
+
+                    if(s2_norm=="standard"):
+                        plotting_bounds[index_counter]=[0.0, numpy.pi]
+                        plotting_bounds[index_counter+1]=[0.0, 2*numpy.pi]
+                    else:
+                        plotting_bounds[index_counter]=[-2.0, 2.0]
+                        plotting_bounds[index_counter+1]=[-2.0, 2.0]
+
+                    index_counter+=2
+                else:   
+                    index_counter+=int(pdf_def[1:])
         
+        ###########
         if (subgridspec is None):
             
             subgridspec = gridspec.subgridspec(dim, dim)
@@ -889,8 +909,8 @@ def plot_joint_pdf(pdf,
                                   density=True,
                                   cmap=colormap)
 
-                    if (true_values is not None):
-                        ax.plot([true_values[ind2]], [true_values[ind1]],
+                    if (plotted_true_values is not None):
+                        ax.plot([plotted_true_values[ind2]], [plotted_true_values[ind1]],
                                 color="red",
                                 marker="o",
                                 ms=3.0)
@@ -899,22 +919,22 @@ def plot_joint_pdf(pdf,
                         [samples[:, ind2:ind2 + 1], samples[:, ind1:ind1 + 1]],
                         axis=1)
 
-                    new_bounds = None
+                    used_bounds = None
                     if (contour_probs != []):
-                        new_bounds = show_sample_contours(
+                        used_bounds = show_sample_contours(
                             ax,
                             new_samples,
                             bins=hist_bounds,
                             color=contour_color,
                             contour_probs=contour_probs)
 
-                    if (bounds is not None):
-                        new_bounds = [bounds[ind2], bounds[ind1]]
+                    if (plotting_bounds is not None):
+                        used_bounds = [plotting_bounds[ind2], plotting_bounds[ind1]]
 
-                    if (autoscale and new_bounds is not None):
+                    if (autoscale and used_bounds is not None):
 
-                        ax.set_xlim(new_bounds[0][0], new_bounds[0][1])
-                        ax.set_ylim(new_bounds[1][0], new_bounds[1][1])
+                        ax.set_xlim(used_bounds[0][0], used_bounds[0][1])
+                        ax.set_ylim(used_bounds[1][0], used_bounds[1][1])
 
                     if (hide_labels):
                         ax.set_yticklabels([])
@@ -922,6 +942,7 @@ def plot_joint_pdf(pdf,
 
                 elif (ind2 == ind1):
 
+                    ## looking for ax
                     found_ax=False
                     for ax in fig.get_axes():
                         ax_geometry=ax.get_geometry()
@@ -939,9 +960,10 @@ def plot_joint_pdf(pdf,
                     if(found_ax==False):
                         ax = fig.add_subplot(subgridspec[ind1, ind2])
 
-                  
+                    ##############
+
                     hist_bounds = 50
-                    if (bounds is not None):
+                    if (plotting_bounds is not None):
                         hist_bounds = numpy.linspace(bounds[ind2][0],
                                                      bounds[ind2][1], 50)
 
@@ -952,8 +974,9 @@ def plot_joint_pdf(pdf,
                         ax.axvline(true_values[ind1], color="red", lw=2.0)
 
                     if (autoscale):
-                        if (bounds is not None):
-                            ax.set_xlim(bounds[ind2][0], bounds[ind2][1])
+                        if (plotting_bounds is not None):
+                            ax.set_xlim(plotting_bounds[ind2][0], plotting_bounds[ind2][1])
+
                     if (hide_labels):
                         ax.set_yticklabels([])
                         ax.set_xticklabels([])
