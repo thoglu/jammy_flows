@@ -1022,7 +1022,7 @@ class pdf(nn.Module):
                                     nn_list.append(NONLINEARITIES["tanh"])
                                 else:
                                     ## initialize some weights
-
+                                    ## TODO.. change hard coded damping factor here
                                     nn_list[-1].weight.data/=1000.0
 
                                     nn_list[-1].bias.data[0]=-1.0
@@ -1414,6 +1414,8 @@ class pdf(nn.Module):
     def forward(self, x, conditional_input=None, debug=False, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
 
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf!"
+        if(conditional_input is not None):
+            assert(x.shape[0]==conditional_input.shape[0]), "Evaluating input x and condititional input shape must be similar!"
 
         tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
@@ -1908,7 +1910,7 @@ class pdf(nn.Module):
 
     ########
 
-    def init_params(self, data=None, name="test"):
+    def init_params(self, data=None, name="test", damping_factor=1000.0):
 
         global_amortization_init=None
         global_amortization_index=0
@@ -2009,11 +2011,11 @@ class pdf(nn.Module):
                             if(type(mlp_predictor)== amortizable_mlp.AmortizableMLP):
                                
                                 if(self.amortize_everything):
-                                    desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params)
+                                    desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params, prev_damping_factor=damping_factor)
                                     num_uvb_pars=mlp_predictor.num_amortization_params
                                     global_amortization_init[global_amortization_index:global_amortization_index+num_uvb_pars]=desired_uvb_params
                                 else:
-                                    mlp_predictor.initialize_uvbs(fix_final_bias=these_params)
+                                    mlp_predictor.initialize_uvbs(fix_final_bias=these_params, prev_damping_factor=damping_factor)
 
                             else:
                                 # initialize all layers
@@ -2029,8 +2031,8 @@ class pdf(nn.Module):
 
                                         nn.init.uniform_(internal_layer.bias.data, -bound, bound)
                                         
-                                        internal_layer.weight.data/=1000.0
-                                        internal_layer.bias.data/=1000.0
+                                        internal_layer.weight.data/=damping_factor
+                                        internal_layer.bias.data/=damping_factor
                                     
                                 # finally overwrite bias to be equivalent to desired parameters at initialization
                                 
@@ -2059,9 +2061,654 @@ class pdf(nn.Module):
 
         return global_amortization_init
 
+#### Experimental functions
+#### Some of these functions generalize existing functions and will replace them in future release.
+
+    def entropy(self, 
+                sub_manifolds=[-1], 
+                conditional_input=None,
+                force_embedding_coordinates=True, 
+                force_intrinsic_coordinates=False,
+                samplesize=100,
+                device=torch.device("cpu")):
+
+        data_type = torch.float64
+        data_summary = None
+        used_device=device
+
+        if(force_embedding_coordinates==False):
+            print("#### CAUTION: Calculating entropy without forcing embedding coordinates. This might lead to undesired and wrong entropies when using manifold PDFs!#############")
+            #raise Exception()
+        use_marginal_subdims=False
+        ## make sure the settings are self consistent
+        for subdim in sub_manifolds:
+            if(subdim!=-1):
+                assert(subdim>=0 and subdim < len(self.layer_list))
+                use_marginal_subdims=True
+
+        if conditional_input is not None:
+
+            assert(self.conditional_input_dim is not None)
+
+            data_summary=self._conditional_input_to_summary(conditional_input=conditional_input)
+            data_type = data_summary.dtype
+            used_device = data_summary.device
+            
+            # this behavior is a little differnet than in standard sample .. we sample for every conditional input multiple times
+            data_summary=data_summary.repeat_interleave(samplesize, dim=0)
+        else:
+            assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
+        #if(seed is not None):
+        #    numpy.random.seed(seed)
+
+        #std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device) if conditional_input is None else torch.randn(size=(data_summary.shape[0], self.total_base_dim), dtype=data_type, device=used_device)
+        std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device)
+        if(conditional_input is not None):
+            std_normal_samples=std_normal_samples.repeat(int(conditional_input.shape[0]), 1)
+
+        ## save the easy cases in dict
+        base_evals_dict=dict()
+
+        for mf_dim in sub_manifolds:
+            if(mf_dim>=1):
+                continue
+
+            if(mf_dim==-1):
+            
+                this_mask=slice(0, self.total_base_dim)
+                this_dim=self.total_base_dim
+
+            elif(mf_dim==0):
+
+                this_dim=self.base_dim_indices[mf_dim][1]-self.base_dim_indices[mf_dim][0]
+                this_mask=slice(0, this_dim)
+        
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(this_dim).type(data_type).to(used_device),
+                covariance_matrix=torch.eye(this_dim)
+                .type(data_type)
+                .to(used_device),
+            ).log_prob(std_normal_samples[:, this_mask])
+
+            if(mf_dim==-1):
+                base_evals_dict["total"]=log_gauss_evals
+            elif(mf_dim==0):
+                base_evals_dict[0]=log_gauss_evals
+
+        """
+        if(-1 in sub_manifolds):
+            for sub_manifold in sub_manifolds:
+
+                if(sub_manifold==-1):
+                    this_mask=slice(0, self.total_base_dim)
+                    this_dim=self.total_base_dim
+                else:
+                    this_mask=slice(self.base_dim_indices[sub_manifold][0], self.base_dim_indices[sub_manifold][1])
+                    this_dim=self.base_dim_indices[sub_manifold][1]-self.base_dim_indices[sub_manifold][0]
+
+
+            log_gauss_evals = torch.distributions.MultivariateNormal(
+                torch.zeros(this_dim).type(data_type).to(used_device),
+                covariance_matrix=torch.eye(this_dim)
+                .type(data_type)
+                .to(used_device),
+            ).log_prob(std_normal_samples[:, this_mask])
+
+            base_evals_dict["total"]=log_gauss_evals
+            else:
+                base_evals_dict[sub_manifold]=log_gauss_evals
+        """
+
+        
+     
+        entropy_dict=dict()
+
+        if(use_marginal_subdims==False):
+            ## just calculate normal entropy by summing over samples
+            
+            _, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            #print("first....")
+            #print((base_evals_dict["total"]-log_det_dict["total"]))
+            entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict["total"]).reshape(-1,samplesize).mean(dim=1)
+            
+        else:
+
+            ## make sure we go all the way to the end by including -1 if it is not there
+            sub_manifolds_here=sub_manifolds
+            if(-1 not in sub_manifolds):
+                sub_manifolds_here=[-1]+sub_manifolds
+
+            ## transform all base samples forward
+            targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+
+            for sub_mf in sub_manifolds:
+                ## also calculate total
+                if(-1 == sub_mf):
+                    
+                    entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict_fw["total"]).reshape(-1, samplesize).mean(dim=1)
+                elif(0==sub_mf):
+                 
+                    entropy_dict[0]=-(base_evals_dict[0]-log_det_dict_fw[0]).reshape(-1, samplesize).mean(dim=1)
+                else:
+
+                    max_target_first_index=0
+                    #print("MANIFOLD INDEX ", sub_mf)
+                    for lower_mf in range(sub_mf):
+
+                        if(force_embedding_coordinates):
+                            max_target_first_index+=self.target_dims_embedded[lower_mf]
+                        elif(force_intrinsic_coordinates):
+                            max_target_first_index+=self.target_dims_intrinsic[lower_mf]
+                        else:
+                            max_target_first_index+=self.target_dims[lower_mf]
+                    #print("MAX TARGET FIRST INDEX ", max_target_first_index)
+                    #print("raw targets ", targets[:, :max_target_first_index])
+                    #print(targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]])
+                        
+                    ## this construction correctly orders both cases of conditional input and no conditional input
+                    repeated_targets_first=targets[:, :max_target_first_index].unsqueeze(0).reshape(-1, samplesize, max_target_first_index).repeat(1,samplesize,1)
+                    repeated_targets_first=repeated_targets_first.reshape(-1, max_target_first_index)
+                    
+
+                    repeated_final=targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0]).repeat_interleave(samplesize, dim=1)
+                    repeated_final=repeated_final.reshape(-1, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0])
+                    ########################
+                    
+                    ### older calculation that only works without conditional input
+                    #repeated_targets_first=targets[:, :max_target_first_index].repeat(samplesize, 1)
+                    #repeated_final=targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].repeat_interleave(samplesize, dim=0)
+                    
+                    joint_repeated=torch.cat([repeated_targets_first, repeated_final], dim=1)
+                    #print("targets ", targets)
+                    #print("corresponding data summary", data_summary)
+                    fillup_difference=int(targets.shape[1])-int(joint_repeated.shape[1])
+                    #print("FILLUP DIFF", fillup_difference)
+                    filled_up=torch.cat([joint_repeated, torch.ones(joint_repeated.shape[0], fillup_difference).to(repeated_final)], dim=1)
+                    #print("FIL UP ", filled_up)
+                  
+                    #if(conditional_input is not None):
+                    #    print("rep data summary")
+                    #    print(data_summary.repeat_interleave(samplesize, dim=0))
+                       
+                    new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None if data_summary is None else data_summary.repeat_interleave(samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+
+
+                    #print("NEW base vals ", new_base_vals)
+                    this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
+
+                    log_gauss_evals_base = torch.distributions.MultivariateNormal(
+                        torch.zeros(this_base_dim).type(data_type).to(used_device),
+                        covariance_matrix=torch.eye(this_base_dim)
+                        .type(data_type)
+                        .to(used_device),
+                    ).log_prob(new_base_vals[:, self.base_dim_indices[sub_mf][0]:self.base_dim_indices[sub_mf][1]])
+                    #print("logdets")
+                    #print(log_det_dict_individual)
+                    #print("log gaus base", log_gauss_evals_base)
+
+                    #print((log_gauss_evals_base+log_det_dict_individual[sub_mf]))
+                    log_probs=(log_gauss_evals_base+log_det_dict_individual[sub_mf]).reshape(-1,samplesize, samplesize)
+                    #print(log_probs)
+                  
+                    log_probs=torch.logsumexp(log_probs, dim=-1)-numpy.log(float(samplesize))
+                    #print("log probs after logsumexp", log_probs)
+                    entropy_dict[sub_mf]=-log_probs.mean(dim=1)
+                    #print(entropy_dict[sub_mf])
+                    
+                 
 
 
 
 
-    
-    
+
+            
+
+            
+
+        return entropy_dict
+
+    def all_layer_inverse_individual_subdims(self, 
+                                             x, 
+                                             data_summary, 
+                                             amortization_parameters=None, 
+                                             force_embedding_coordinates=False, 
+                                             force_intrinsic_coordinates=False,
+                                             sub_manifolds=[-1]):
+
+
+        ## set maximum iter to last sub dimension
+        max_iter=0
+        log_det_dict=dict()
+        ## make sure the settings are self consistent
+        for subdim in sub_manifolds:
+            if(subdim!=-1):
+                
+                assert(subdim>=0 and subdim < len(self.layer_list))
+
+                if(subdim>max_iter):
+                    max_iter=subdim
+
+                log_det_dict[subdim]=0.0
+        
+        ## only go as far as required
+        if(-1 in sub_manifolds):
+            max_iter=len(self.layer_list)-1
+            log_det_dict["total"]=0.0
+
+
+        ## make sure we transform to default settings (potentially mixed) if we force embedding/intrinsic coordinates
+        if(force_embedding_coordinates):
+            assert(x.shape[1]==self.total_target_dim_embedded), (x.shape[1], self.total_target_dim_embedded)
+            assert(force_intrinsic_coordinates==False)
+
+            x, log_det=self.transform_target_space_individual_subdims(x, transform_from="embedding", transform_to="default")
+
+            for k in log_det_dict.keys():
+                log_det_dict[k]=log_det_dict[k]+log_det[k]
+
+        elif(force_intrinsic_coordinates):
+            assert(x.shape[1]==self.total_target_dim_intrinsic)
+            assert(force_embedding_coordinates==False)
+
+            x, log_det=self.transform_target_space_individual_subdims(x, transform_from="intrinsic", transform_to="default")
+
+            for k in log_det_dict.keys():
+                log_det_dict[k]=log_det_dict[k]+log_det[k]
+
+        else:
+            assert(x.shape[1]==self.total_target_dim), (x.shape[1], self.total_target_dim)
+
+        ## we shoould not be in default target dim mode
+        tot_remaining_dim=0
+        for pdf_index in range(max_iter+1):
+
+            tot_remaining_dim+=self.target_dims[pdf_index]
+        
+        x=x[:,:tot_remaining_dim]
+
+        extra_conditional_input=[]
+        base_targets=[]
+
+        individual_logdets=dict()
+        total_logdet=0.0
+
+        extra_params = None
+
+        if(amortization_parameters is not None):
+
+            assert(amortization_parameters.shape[1]==self.total_number_amortizable_params)
+            
+        amort_param_counter=0
+
+        for pdf_index, pdf_layers in enumerate(self.layer_list[:max_iter+1]):
+
+            extra_param_counter = 0
+            this_pdf_type=self.pdf_defs_list[pdf_index]
+
+            ## mlp preditors can be None for unresponsive layers like x/y
+            if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
+                
+                this_data_summary=data_summary
+                if(len(extra_conditional_input)>0):
+                    this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                
+                if(amortization_parameters is not None):
+                    num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
+
+                    extra_params=self.mlp_predictors[pdf_index](this_data_summary, extra_inputs=amortization_parameters[:,amort_param_counter:amort_param_counter+num_amortization_params])
+                    amort_param_counter+=num_amortization_params
+
+                else:
+                    extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+               
+            else:
+
+                if(self.mlp_predictors[pdf_index] is not None):
+                    if(len(extra_conditional_input)>0):
+                        this_data_summary=torch.cat(extra_conditional_input, dim=1)
+                        
+                        if(amortization_parameters is not None):
+                            num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
+
+                            extra_params=self.mlp_predictors[pdf_index](this_data_summary, extra_inputs=amortization_parameters[:,amort_param_counter:amort_param_counter+num_amortization_params])
+                            amort_param_counter+=num_amortization_params
+
+                        else:
+                            extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+                        
+                    else:
+                        raise Exception("FORWARD: extra conditional input is empty but required for encoding!")
+
+                else:
+                    ## we amortize everything with amortization_parameters .. including the first layer column if there is no encoder
+                    if(self.amortize_everything and pdf_index ==0):
+                        assert(amortization_parameters is not None)
+                        assert(amort_param_counter==0)
+
+                        tot_num_params=0
+                        for l in self.layer_list[0]:
+                            tot_num_params+=l.get_total_param_num()
+
+                        extra_params=amortization_parameters[:,:tot_num_params]
+
+                        if(self.predict_log_normalization and self.join_poisson_and_pdf_description):
+                            tot_num_params+=1
+
+                        amort_param_counter+=tot_num_params
+
+
+            if(self.predict_log_normalization):
+                if(pdf_index==0 and self.join_poisson_and_pdf_description and extra_params is not None):
+                    extra_params=extra_params[:,:-1]
+
+            this_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
+
+            this_subpdf_log_det=0.0
+
+            ## reverse mapping is required for pdf evaluation
+            for l, layer in reversed(list(enumerate(pdf_layers))):
+
+                this_extra_params = None
+
+                if extra_params is not None:
+
+                    if extra_param_counter == 0:
+                            this_extra_params = extra_params[:, -layer.total_param_num :]
+                    else:
+
+                        this_extra_params = extra_params[
+                            :,
+                            -extra_param_counter
+                            - layer.total_param_num : -extra_param_counter,
+                        ]
+
+ 
+                if(l==(len(pdf_layers)-1)):
+                    # force embedding or intrinsic coordinates in the layer that defines the target dimension
+                    this_target, this_layer_log_det = layer.inv_flow_mapping([this_target, 0.0], extra_inputs=this_extra_params)
+                else:
+
+                    this_target, this_layer_log_det = layer.inv_flow_mapping([this_target, 0.0], extra_inputs=this_extra_params)
+                
+                this_subpdf_log_det=this_subpdf_log_det+this_layer_log_det
+
+                extra_param_counter += layer.total_param_num
+
+            if("total" in log_det_dict.keys()):
+                log_det_dict["total"]=log_det_dict["total"]+this_subpdf_log_det
+
+            if(pdf_index in log_det_dict.keys()):
+                log_det_dict[pdf_index]=log_det_dict[pdf_index]+this_subpdf_log_det
+
+            base_targets.append(this_target)
+
+            prev_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
+            prev_target=pdf_layers[-1]._embedding_conditional_return(prev_target)
+
+            extra_conditional_input.append(prev_target)
+
+        base_pos=torch.cat(base_targets, dim=1)
+
+        return base_pos, log_det_dict
+
+    def all_layer_forward_individual_subdims(self, 
+                                       x,
+                                       data_summary,  
+                                       force_embedding_coordinates=False, 
+                                       force_intrinsic_coordinates=False,
+                                       sub_manifolds=[-1],
+                                       amortization_parameters=None
+                                       ):
+
+            
+
+            total_batch_size=x.shape[0]
+            if(force_embedding_coordinates):
+                assert(force_intrinsic_coordinates!=force_embedding_coordinates), "Embedding and intrinsic coordinates can not be used at the same time!"
+
+            ## set maximum iter to last sub dimension
+            max_iter=0
+
+            ## make sure the settings are self consistent
+            for subdim in sub_manifolds:
+                if(subdim!=-1):
+                    
+                    assert(subdim>=0 and subdim < len(self.layer_list))
+
+                    if(subdim>max_iter):
+                        max_iter=subdim
+            
+            ## only go as far as required
+            if(-1 in sub_manifolds):
+                max_iter=len(self.layer_list)-1
+
+            
+            extra_conditional_input=[]
+            new_targets=[]
+            logdet_per_manifold=dict()
+            tot_log_det=0.0
+
+            if(amortization_parameters is not None):
+
+                raise Exception("Currently only supported without full amortization")
+                #assert(amortization_parameters.shape[0]==x.shape[0]), ("batch size of x must agree with batch size of amortization_parameters")
+                assert(amortization_parameters.shape[1]==self.total_number_amortizable_params)
+
+            amort_param_counter=0
+
+            for pdf_index, pdf_layers in enumerate(self.layer_list):
+
+                this_pdf_type=self.pdf_defs_list[pdf_index]
+
+                extra_params = None
+                if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
+                   
+                    this_data_summary=data_summary
+                    if(len(extra_conditional_input)>0):
+                        this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+
+                    if(amortization_parameters is not None):
+                        num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
+
+                        extra_params=self.mlp_predictors[pdf_index](this_data_summary, extra_inputs=amortization_parameters[:,amort_param_counter:amort_param_counter+num_amortization_params])
+                        amort_param_counter+=num_amortization_params
+
+                    else:
+                        extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+                   
+
+                else:
+
+                    if(self.mlp_predictors[pdf_index] is not None):
+                        if(len(extra_conditional_input)>0):
+                            this_data_summary=torch.cat(extra_conditional_input, dim=1)
+                            
+                            if(amortization_parameters is not None):
+                                num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
+
+                                extra_params=self.mlp_predictors[pdf_index](this_data_summary, extra_inputs=amortization_parameters[:,amort_param_counter:amort_param_counter+num_amortization_params])
+                                amort_param_counter+=num_amortization_params
+
+                            else:
+                                extra_params=self.mlp_predictors[pdf_index](this_data_summary)
+
+                        else:
+                            raise Exception("SAMPLE: extra conditional input is empty but required for encoding!")
+
+                    else:
+                        ## we amortize everything with amortization_parameters .. including the first layer if there is no encoder
+                        if(self.amortize_everything and pdf_index ==0):
+                            assert(amortization_parameters is not None)
+                            assert(amort_param_counter==0)
+
+                            tot_num_params=0
+                            for l in self.layer_list[0]:
+                                tot_num_params+=l.get_total_param_num()
+
+                            if(self.predict_log_normalization and self.join_poisson_and_pdf_description):
+                                tot_num_params+=1
+
+                            extra_params=amortization_parameters[:,:tot_num_params]
+
+                            amort_param_counter+=tot_num_params
+
+
+         
+                if(self.predict_log_normalization):
+
+                    if(pdf_index==0 and self.join_poisson_and_pdf_description):
+                        extra_params=extra_params[:,:-1]
+
+                this_target=x[:,self.base_dim_indices[pdf_index][0]:self.base_dim_indices[pdf_index][1]]
+
+                ## loop through all layers in each pdf and transform "this_target"
+                
+                extra_param_counter = 0
+
+                ## holds either the marginal
+                logdet_this_manifold = 0.0
+
+                ## default all layer foward
+                for l, layer in list(enumerate(pdf_layers)):
+                   
+                    this_extra_params = None
+                    
+                    if extra_params is not None:
+                        
+                        this_extra_params = extra_params[:, extra_param_counter : extra_param_counter + layer.total_param_num]
+                  
+                    this_target, this_log_det = layer.flow_mapping([this_target, 0.0], extra_inputs=this_extra_params)
+                    
+                    extra_param_counter += layer.total_param_num
+
+                    logdet_this_manifold = logdet_this_manifold+this_log_det
+
+                # default joint logdet
+                if(-1 in sub_manifolds):
+                    tot_log_det=tot_log_det+logdet_this_manifold
+
+                ## save logdet factors for this subdimension in dict
+                logdet_per_manifold[pdf_index]=logdet_this_manifold
+
+                ## next one
+                new_targets.append(this_target)
+
+                prev_target=this_target
+               
+                prev_target=self.layer_list[pdf_index][-1]._embedding_conditional_return(prev_target)
+
+                extra_conditional_input.append(prev_target)
+
+                if(max_iter==pdf_index):
+                    #print("break out early ..", max_iter)
+                    break
+
+            # we want to the total logdet also
+            if(-1 in sub_manifolds):
+                logdet_per_manifold["total"]=tot_log_det
+
+            if (torch.isfinite(x) == 0).sum() > 0:
+                raise Exception("nonfinite samples generated .. this should never happen!")
+
+            res=torch.cat(new_targets, dim=1)
+
+            if(res.shape[1]<x.shape[1]):
+                #artificially increase shape
+                res=torch.cat([res, torch.zeros( (int(x.shape[0]), int(x.shape[1]-res.shape[1])), dtype=x.dtype, device=x.device)],dim=1)
+
+            ## transform to desired output space 
+            if(force_embedding_coordinates):
+
+                res, embedding_log_dets=self.transform_target_space_individual_subdims(res, transform_from="default", transform_to="embedding")
+                
+                tot_remaining_dim=0
+                for pdf_index in range(max_iter+1):
+
+                    tot_remaining_dim+=self.target_dims_embedded[pdf_index]
+
+                ## shorten res if necessary
+                res=res[:,:tot_remaining_dim]
+
+                ## copy logdet correction over 
+                for k in logdet_per_manifold.keys():
+                    logdet_per_manifold[k]=logdet_per_manifold[k]+embedding_log_dets[k]
+
+            elif(force_intrinsic_coordinates):
+                assert(x.shape[1]==self.total_target_dim_intrinsic)
+               
+                res, embedding_log_dets=self.transform_target_space_individual_subdims(res, transform_from="default", transform_to="intrinsic")
+                
+                tot_remaining_dim=0
+                for pdf_index in range(max_iter+1):
+
+                    tot_remaining_dim+=self.target_dims_intrinsic[pdf_index]
+                    
+                ## shorten res if necessary
+                res=res[:,:tot_remaining_dim]
+
+                ## copy logdet correction over 
+                for k in logdet_per_manifold.keys():
+                    logdet_per_manifold[k]=logdet_per_manifold[k]+embedding_log_dets[k]
+
+            return res, logdet_per_manifold
+
+    def transform_target_space_individual_subdims(self, target, transform_from="default", transform_to="embedding"):
+        """
+        Transform the destimation space of the PDF into a returnable param list (i.e. transform spherical angles into x/y/z pairs, so increase the dimensionality of spherical dimensions by 1)
+        """
+
+        new_target=target
+
+        if(len(target.shape)==1):
+            new_target=target.unsqueeze(0)
+
+        ## transforming only makes sense if input has correct target shape
+        if(transform_from=="default"):
+            assert(new_target.shape[1]==self.total_target_dim)
+        elif(transform_from=="intrinsic"):
+            assert(new_target.shape[1]==self.total_target_dim_intrinsic)
+        elif(transform_from=="embedding"):
+            assert(new_target.shape[1]==self.total_target_dim_embedded) 
+
+        potentially_transformed_vals=[]
+
+        index=0
+
+        individual_logdets=dict()
+        tot_logdet=0.0
+
+        for pdf_index, pdf_type in enumerate(self.pdf_defs_list):
+
+            if(transform_from=="default"):
+                this_dim=self.target_dims[pdf_index]
+            elif(transform_from=="intrinsic"):
+                this_dim=self.target_dims_intrinsic[pdf_index]
+            elif(transform_from=="embedding"):
+                this_dim=self.target_dims_embedded[pdf_index]
+            
+            this_target, this_log_det=self.layer_list[pdf_index][-1].transform_target_space(new_target[:,index:index+this_dim], log_det=0, transform_from=transform_from, transform_to=transform_to)
+            
+            potentially_transformed_vals.append(this_target)
+
+            index+=this_dim
+
+            individual_logdets[pdf_index]=this_log_det
+
+            tot_logdet=tot_logdet+this_log_det
+
+        individual_logdets["total"]=tot_logdet
+
+        potentially_transformed_vals=torch.cat(potentially_transformed_vals, dim=1)
+
+        if(transform_to=="default"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim)
+        elif(transform_to=="intrinsic"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim_intrinsic), (potentially_transformed_vals.shape, self.total_target_dim_intrinsic)
+        elif(transform_to=="embedding"):
+            assert(potentially_transformed_vals.shape[1]==self.total_target_dim_embedded), (new_target.shape[1], self.total_target_dim_embedded)  
+
+
+        if(len(target.shape)==1):
+            potentially_transformed_vals=potentially_transformed_vals.squeeze(0)
+
+        return potentially_transformed_vals, individual_logdets
