@@ -138,6 +138,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
   
     mask_inner = torch.ones(len(torch_positions)) == 1
 
+    ## check s2 or simplex visualization
     for ind, pdf_def in enumerate(model.pdf_defs_list):
        
         if (pdf_def == "s2" and s2_norm=="lambert"):
@@ -198,16 +199,6 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
           problematic_pars=spherical_to_cartesian_lambert(problematic_pars, fix_point=fix_point)
       flagged_coords=problematic_pars.detach().numpy()
 
-    """
-    lr_mask=numpy.exp(log_res)>1e4
-
-    print("############################# TEST")
-    bad_res,_,_=model(eval_positions[mask_inner][lr_mask][:1], conditional_input=None)
-    
-    print(bad_res)
-    
-    """
- 
     res = (-600.0)*torch.ones(len(torch_positions)).type_as(torch_positions)
     res[mask_inner] = log_res  #.exp()
    
@@ -331,8 +322,7 @@ def spherical_to_cartesian_lambert(spherical, fix_point=None):
     if(fix_point is not None):
       theta, phi_lambert = rotate_coords_to(theta, phi_lambert, fix_point)
 
-    #print(theta, phi_lambert)
-    ## first go to spherical lambert
+  
     r_lambert = 2 * torch.cos(theta / 2.0)
 
     x_l = r_lambert * torch.cos(phi_lambert)
@@ -388,20 +378,7 @@ def show_sample_contours(ax,
     yvals = 0.5 * (yedges[1:] + yedges[:-1])
     bw = (xedges[1] - xedges[0]) * (yedges[1] - yedges[0])
 
-    bin_volumes=bw#*numpy.ones_like(bin_fillings)
-
-    """
-    for ind, m in enumerate(sin_zen_mask):
-      if(m==1):
-        if(ind==0):
-          print("IND 0 ")
-          sin_zen=numpy.sin(0.5*(xedges[1:]+xedges[:-1]))
-          print(sin_zen)
-          bin_volumes*=sin_zen[:,None]
-        if(ind==1):
-          sin_zen=numpy.sin(0.5*(yedges[1:]+yedges[:-1]))
-          bin_volumes*=sin_zen[None,:]
-    """
+    bin_volumes=bw
     
     contour_values = calculate_contours(bin_fillings, bin_volumes, probs=contour_probs)
     ## reverse
@@ -847,26 +824,29 @@ def plot_joint_pdf(pdf,
     else:
 
         ## overwrite generic s2 bounds
-
+       
         plotting_bounds=None
         if(bounds):
             plotting_bounds=copy.deepcopy(bounds)
 
             index_counter=0
             for pdf_ind, pdf_def in enumerate(pdf.pdf_defs_list):
-                if(pdf=="s2"):
+                if(pdf_def=="s2"):
 
                     if(s2_norm=="standard"):
+                        
                         plotting_bounds[index_counter]=[0.0, numpy.pi]
                         plotting_bounds[index_counter+1]=[0.0, 2*numpy.pi]
                     else:
+                        
                         plotting_bounds[index_counter]=[-2.0, 2.0]
                         plotting_bounds[index_counter+1]=[-2.0, 2.0]
 
                     index_counter+=2
                 else:   
                     index_counter+=int(pdf_def[1:])
-        
+
+      
         ###########
         if (subgridspec is None):
             
@@ -964,14 +944,14 @@ def plot_joint_pdf(pdf,
 
                     hist_bounds = 50
                     if (plotting_bounds is not None):
-                        hist_bounds = numpy.linspace(bounds[ind2][0],
-                                                     bounds[ind2][1], 50)
+                        hist_bounds = numpy.linspace(plotting_bounds[ind2][0],
+                                                     plotting_bounds[ind2][1], 50)
 
                     
                     ax.hist(samples[:, ind1], bins=hist_bounds, density=True)
 
-                    if (true_values is not None):
-                        ax.axvline(true_values[ind1], color="red", lw=2.0)
+                    if (plotted_true_values is not None):
+                        ax.axvline(plotted_true_values[ind1], color="red", lw=2.0)
 
                     if (autoscale):
                         if (plotting_bounds is not None):
@@ -1007,7 +987,7 @@ def visualize_pdf(pdf,
                   s2_show_gridlines=True,
                   skip_plotting_samples=False,
                   var_names=[]):
-
+   
     with torch.no_grad():
       sample_conditional_input = conditional_input
       if (conditional_input is not None):
