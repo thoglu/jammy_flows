@@ -172,7 +172,7 @@ opts_dict["c"]["kwargs"] = dict()
 #opts_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
 opts_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
 opts_dict["c"]["kwargs"]["num_charts"] = (4, lambda x: x>0)
-opts_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = ("64-64", lambda x: type(x)==str) # hidden dims of cnf MLP network
+opts_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = ("32", lambda x: type(x)==str) # hidden dims of cnf MLP network
 opts_dict["c"]["kwargs"]["cnf_network_highway_mode"] = (0, [0,1,2,3,4]) # mlp highway dim - 0-4
 opts_dict["c"]["kwargs"]["cnf_network_rank"] = (-1, lambda x:  (x==-1) or x>0) # -1 means full rank
 opts_dict["c"]["kwargs"]["solver"] = ("rk4", ["rk4"]) ## 
