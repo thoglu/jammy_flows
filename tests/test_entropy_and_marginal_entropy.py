@@ -79,12 +79,19 @@ class Test(unittest.TestCase):
 
         self.flow_inits_numerical_comp=[]
 
-        for extra_def in [dict(), {"conditional_input_dim":2}]:
+        ## minimalistic options
+        modified_options=dict()
+        modified_options["g"]=dict()
+        modified_options["g"]["num_kde"]=2
+        modified_options["g"]["fit_normalization"]=0
+
+        for extra_def in [{"options_overwrite": modified_options}, {"conditional_input_dim":2, "options_overwrite": modified_options}]:
 
             self.flow_inits_numerical_comp.append([ ["e1", "g"], extra_def])
             
             self.flow_inits_numerical_comp.append([ ["e1+e1", "g+g"], extra_def])
 
+    
     def test_anumerical_entropy_and_grad(self):
 
         produce_plots=True
@@ -99,6 +106,7 @@ class Test(unittest.TestCase):
             tolerance=1e-7
 
             #seed_everything(0)
+            print("init ", init[1])
             this_flow=f.pdf(*init[0], **init[1])
             this_flow.double()
 
@@ -133,7 +141,7 @@ class Test(unittest.TestCase):
                     print("LOG PROB", log_prob)
                     entropy_numerical=-(log_prob.exp()*log_prob*bw).sum().unsqueeze(-1)
 
-                    entropy_analytic=this_flow.entropy(samplesize=10000)
+                    entropy_analytic=this_flow.entropy(samplesize=20000)
 
                 for name, p in this_flow.named_parameters():
                     print("par NAME", name)
@@ -149,7 +157,7 @@ class Test(unittest.TestCase):
                         grad_res=torch.autograd.grad(entropy_numerical[grad_index], p, allow_unused=False, retain_graph=True)
                         print(grad_res)
 
-                        grad_res_analytic=torch.autograd.grad(entropy_analytic["total"][grad_index], p, allow_unused=True, retain_graph=True)
+                        grad_res_analytic=torch.autograd.grad(entropy_analytic["total"][grad_index], p, allow_unused=False, retain_graph=True)
                         print(grad_res_analytic)
 
                         compare_two_arrays(grad_res[0], grad_res_analytic[0], "numerical_grad","analytic_grad", diff_value=1e-2)
@@ -176,7 +184,7 @@ class Test(unittest.TestCase):
                 for cur_marginal_option in [0,1]:
 
                     this_conditional_input=None
-
+                    print("cur marginal ..", cur_marginal_option)
                     if("conditional_input_dim" in init[1]):
                         
                         if(cur_marginal_option=="total"):
@@ -228,7 +236,7 @@ class Test(unittest.TestCase):
 
 
                                 ## integrate out y
-                                entropy_analytic=this_flow.entropy(samplesize=10000, sub_manifolds=[0])
+                                entropy_analytic=this_flow.entropy(samplesize=30000, sub_manifolds=[0])
                             else:
 
 
@@ -239,12 +247,14 @@ class Test(unittest.TestCase):
 
                             
                                 ## integrate out y
-                                entropy_analytic=this_flow.entropy(samplesize=1500, sub_manifolds=[1])
+                                entropy_analytic=this_flow.entropy(samplesize=500, sub_manifolds=[1])
 
 
                     diff_value_to_use=1e-2
+
+                    ### crank up the tolerance a little bit to handle marginal=1 case with less samples (500)
                     if(cur_marginal_option == 1):
-                        diff_value_to_use=5e-2
+                        diff_value_to_use=4e-2
                     for name, p in this_flow.named_parameters():
                         print("par NAME", name)
 
@@ -273,7 +283,7 @@ class Test(unittest.TestCase):
                     ###
 
                     compare_two_arrays(entropy_numerical[cur_marginal_option].detach(), entropy_analytic[cur_marginal_option].detach(), "numerical", "analytic", diff_value=diff_value_to_use)
-                 
+    
 
     
     def test_entropy_and_marginal_entropy(self):
@@ -408,7 +418,7 @@ class Test(unittest.TestCase):
             #compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
             #compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
             #compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
-
+    
     
 
 if __name__ == '__main__':
