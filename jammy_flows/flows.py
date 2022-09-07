@@ -243,7 +243,7 @@ class pdf(nn.Module):
                     elif(k==flow_abbrv):
 
                         for detail_opt in options_overwrite[k].keys():
-
+                            print("options overwrite ", detail_opt)
                             flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
 
                             self.flow_opts[ind][flow_abbrv][detail_opt]=options_overwrite[k][detail_opt]
@@ -2231,7 +2231,6 @@ class pdf(nn.Module):
                     #    print(data_summary.repeat_interleave(samplesize, dim=0))
                        
                     new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None if data_summary is None else data_summary.repeat_interleave(samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-
 
                     #print("NEW base vals ", new_base_vals)
                     this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
