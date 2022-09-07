@@ -147,7 +147,19 @@ class AmbientProjNN(nn.Module):
 
 class cnf_sphere_charts(sphere_base.sphere_base):
 
-    def __init__(self, dimension, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=False, cnf_network_hidden_dims="64-64", cnf_network_rank=0, cnf_network_highway_mode=1, num_charts=6, solver="rk4", higher_order_cylinder_parametrization=False):
+    def __init__(self, 
+        dimension, 
+        euclidean_to_sphere_as_first=False, 
+        use_extra_householder=False, 
+        use_permanent_parameters=False, 
+        cnf_network_hidden_dims="64-64", 
+        cnf_network_rank=0, 
+        cnf_network_highway_mode=1, 
+        num_charts=6, 
+        solver="rk4", 
+        atol=1e-7,
+        rtol=1e-7,
+        higher_order_cylinder_parametrization=False):
         """
         solvers: 
         """
@@ -186,8 +198,8 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         
         ## ODE specific options - default from original implementation
         self.solver = solver
-        self.atol = 1e-7
-        self.rtol = 1e-7
+        self.atol = atol
+        self.rtol = rtol
         self.solver_options = {'step_size': 1/16}
         self.man = sphere
         self.num_charts=num_charts
@@ -200,15 +212,7 @@ class cnf_sphere_charts(sphere_base.sphere_base):
             self.variables=find_parameters(parent)
         else:
             self.variables=None
-        
-        # add previous 
-    """
-    def forward(self, z, extra_inputs=None):
-        return self._forward(z, extra_inputs=extra_inputs)
-
-    def inverse(self, z, extra_inputs=None):
-        return self._forward(z, reverse=True,extra_inputs=extra_inputs)
-    """
+ 
     def _forward(self, z, reverse=False, charts=4, extra_inputs=None):
         integration_times = torch.tensor(
             [[i/charts, (i + 1)/charts] for i in range(charts)]
