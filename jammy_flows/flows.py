@@ -1357,7 +1357,7 @@ class pdf(nn.Module):
                     extra_params=extra_params[:,:-1]
 
             this_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
-
+            
             ## reverse mapping is required for pdf evaluation
             for l, layer in reversed(list(enumerate(pdf_layers))):
 
@@ -1399,7 +1399,7 @@ class pdf(nn.Module):
                 individual_logps["%.2d_%s_logdet" % (pdf_index, this_pdf_type)]=ind_logdet
                 individual_logps["%.2d_%s_base" % (pdf_index, this_pdf_type)]=ind_base_eval
 
-
+            
             base_targets.append(this_target)
 
             prev_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
@@ -2134,32 +2134,6 @@ class pdf(nn.Module):
                 base_evals_dict["total"]=log_gauss_evals
             elif(mf_dim==0):
                 base_evals_dict[0]=log_gauss_evals
-
-        """
-        if(-1 in sub_manifolds):
-            for sub_manifold in sub_manifolds:
-
-                if(sub_manifold==-1):
-                    this_mask=slice(0, self.total_base_dim)
-                    this_dim=self.total_base_dim
-                else:
-                    this_mask=slice(self.base_dim_indices[sub_manifold][0], self.base_dim_indices[sub_manifold][1])
-                    this_dim=self.base_dim_indices[sub_manifold][1]-self.base_dim_indices[sub_manifold][0]
-
-
-            log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(this_dim).type(data_type).to(used_device),
-                covariance_matrix=torch.eye(this_dim)
-                .type(data_type)
-                .to(used_device),
-            ).log_prob(std_normal_samples[:, this_mask])
-
-            base_evals_dict["total"]=log_gauss_evals
-            else:
-                base_evals_dict[sub_manifold]=log_gauss_evals
-        """
-
-        
      
         entropy_dict=dict()
 
@@ -2167,8 +2141,7 @@ class pdf(nn.Module):
             ## just calculate normal entropy by summing over samples
             
             _, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-            #print("first....")
-            #print((base_evals_dict["total"]-log_det_dict["total"]))
+           
             entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict["total"]).reshape(-1,samplesize).mean(dim=1)
             
         else:
@@ -2179,7 +2152,9 @@ class pdf(nn.Module):
                 sub_manifolds_here=[-1]+sub_manifolds
 
             ## transform all base samples forward
+            
             targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            
 
             for sub_mf in sub_manifolds:
                 ## also calculate total
@@ -2192,7 +2167,7 @@ class pdf(nn.Module):
                 else:
 
                     max_target_first_index=0
-                    #print("MANIFOLD INDEX ", sub_mf)
+                   
                     for lower_mf in range(sub_mf):
 
                         if(force_embedding_coordinates):
@@ -2201,38 +2176,32 @@ class pdf(nn.Module):
                             max_target_first_index+=self.target_dims_intrinsic[lower_mf]
                         else:
                             max_target_first_index+=self.target_dims[lower_mf]
-                    #print("MAX TARGET FIRST INDEX ", max_target_first_index)
-                    #print("raw targets ", targets[:, :max_target_first_index])
-                    #print(targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]])
-                        
+                 
                     ## this construction correctly orders both cases of conditional input and no conditional input
                     repeated_targets_first=targets[:, :max_target_first_index].unsqueeze(0).reshape(-1, samplesize, max_target_first_index).repeat(1,samplesize,1)
                     repeated_targets_first=repeated_targets_first.reshape(-1, max_target_first_index)
                     
-
-                    repeated_final=targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0]).repeat_interleave(samplesize, dim=1)
-                    repeated_final=repeated_final.reshape(-1, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0])
+                    if(force_embedding_coordinates):
+                        repeated_final=targets[:, self.target_dim_indices_embedded[sub_mf][0]:self.target_dim_indices_embedded[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices_embedded[sub_mf][1]-self.target_dim_indices_embedded[sub_mf][0]).repeat_interleave(samplesize, dim=1)
+                        repeated_final=repeated_final.reshape(-1, self.target_dim_indices_embedded[sub_mf][1]-self.target_dim_indices_embedded[sub_mf][0])
+                    elif(force_intrinsic_coordinates):
+                        repeated_final=targets[:, self.target_dim_indices_intrinsic[sub_mf][0]:self.target_dim_indices_intrinsic[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices_intrinsic[sub_mf][1]-self.target_dim_indices_intrinsic[sub_mf][0]).repeat_interleave(samplesize, dim=1)
+                        repeated_final=repeated_final.reshape(-1, self.target_dim_indices_intrinsic[sub_mf][1]-self.target_dim_indices_intrinsic[sub_mf][0])
+                    else:
+                        repeated_final=targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0]).repeat_interleave(samplesize, dim=1)
+                        repeated_final=repeated_final.reshape(-1, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0])
+                    
                     ########################
-                    
-                    ### older calculation that only works without conditional input
-                    #repeated_targets_first=targets[:, :max_target_first_index].repeat(samplesize, 1)
-                    #repeated_final=targets[:, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].repeat_interleave(samplesize, dim=0)
-                    
+                   
                     joint_repeated=torch.cat([repeated_targets_first, repeated_final], dim=1)
-                    #print("targets ", targets)
-                    #print("corresponding data summary", data_summary)
+
                     fillup_difference=int(targets.shape[1])-int(joint_repeated.shape[1])
-                    #print("FILLUP DIFF", fillup_difference)
+                    
                     filled_up=torch.cat([joint_repeated, torch.ones(joint_repeated.shape[0], fillup_difference).to(repeated_final)], dim=1)
-                    #print("FIL UP ", filled_up)
-                  
-                    #if(conditional_input is not None):
-                    #    print("rep data summary")
-                    #    print(data_summary.repeat_interleave(samplesize, dim=0))
-                       
+
                     new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None if data_summary is None else data_summary.repeat_interleave(samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
-                    #print("NEW base vals ", new_base_vals)
+
                     this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
 
                     log_gauss_evals_base = torch.distributions.MultivariateNormal(
@@ -2241,28 +2210,15 @@ class pdf(nn.Module):
                         .type(data_type)
                         .to(used_device),
                     ).log_prob(new_base_vals[:, self.base_dim_indices[sub_mf][0]:self.base_dim_indices[sub_mf][1]])
-                    #print("logdets")
-                    #print(log_det_dict_individual)
-                    #print("log gaus base", log_gauss_evals_base)
-
-                    #print((log_gauss_evals_base+log_det_dict_individual[sub_mf]))
+                    
+                    
                     log_probs=(log_gauss_evals_base+log_det_dict_individual[sub_mf]).reshape(-1,samplesize, samplesize)
-                    #print(log_probs)
+                    
                   
                     log_probs=torch.logsumexp(log_probs, dim=-1)-numpy.log(float(samplesize))
                     #print("log probs after logsumexp", log_probs)
                     entropy_dict[sub_mf]=-log_probs.mean(dim=1)
                     #print(entropy_dict[sub_mf])
-                    
-                 
-
-
-
-
-
-            
-
-            
 
         return entropy_dict
 
@@ -2294,7 +2250,7 @@ class pdf(nn.Module):
             max_iter=len(self.layer_list)-1
             log_det_dict["total"]=0.0
 
-
+        
         ## make sure we transform to default settings (potentially mixed) if we force embedding/intrinsic coordinates
         if(force_embedding_coordinates):
             assert(x.shape[1]==self.total_target_dim_embedded), (x.shape[1], self.total_target_dim_embedded)
@@ -2316,7 +2272,7 @@ class pdf(nn.Module):
 
         else:
             assert(x.shape[1]==self.total_target_dim), (x.shape[1], self.total_target_dim)
-
+        
         ## we shoould not be in default target dim mode
         tot_remaining_dim=0
         for pdf_index in range(max_iter+1):
@@ -2403,7 +2359,7 @@ class pdf(nn.Module):
             this_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
 
             this_subpdf_log_det=0.0
-
+            
             ## reverse mapping is required for pdf evaluation
             for l, layer in reversed(list(enumerate(pdf_layers))):
 
@@ -2439,8 +2395,10 @@ class pdf(nn.Module):
             if(pdf_index in log_det_dict.keys()):
                 log_det_dict[pdf_index]=log_det_dict[pdf_index]+this_subpdf_log_det
 
+         
             base_targets.append(this_target)
 
+            ## we are back in "default target mode", so need to transform target for next layer if necessary
             prev_target=x[:,self.target_dim_indices[pdf_index][0]:self.target_dim_indices[pdf_index][1]]
             prev_target=pdf_layers[-1]._embedding_conditional_return(prev_target)
 

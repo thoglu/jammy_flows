@@ -175,8 +175,9 @@ opts_dict["c"]["kwargs"]["num_charts"] = (4, lambda x: x>0)
 opts_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = ("32", lambda x: type(x)==str) # hidden dims of cnf MLP network
 opts_dict["c"]["kwargs"]["cnf_network_highway_mode"] = (0, [0,1,2,3,4]) # mlp highway dim - 0-4
 opts_dict["c"]["kwargs"]["cnf_network_rank"] = (-1, lambda x:  (x==-1) or x>0) # -1 means full rank
-opts_dict["c"]["kwargs"]["solver"] = ("rk4", ["rk4"]) ## 
-
+opts_dict["c"]["kwargs"]["solver"] = ("dopri5", ["rk4", "dopri5", "dopri8", "bosh3", "fehlberg2", "adaptive_heun", "euler", "midpoint"]) ## 
+opts_dict["c"]["kwargs"]["rtol"] = (1e-7, lambda x: (x>0) & (x<1)) ## 
+opts_dict["c"]["kwargs"]["atol"] = (1e-7, lambda x: (x>0) & (x<1)) ## 
 
 """
 Interval flows
