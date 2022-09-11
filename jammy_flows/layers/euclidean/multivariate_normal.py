@@ -67,15 +67,19 @@ class mvn_block(euclidean_base.euclidean_base):
                  softplus_for_width=0,
                  clamp_widths=0):
         """
-        Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
-        to use reparametrization trick for VAEs due to Newton iterations.
+        Affine flow (Multivariate Normal Distribution) - Symbol "t"
+
         Parameters:
-        dimension (int): dimension of the PDF
-        num_kde (int): number of KDE s in the one-dimensional PDF
-        num_householder_iter (int): if <=0, no householder transformation is performed. If positive, it defines the number of parameters in householder transformations.
-        use_permanent_parameters (float): If permantent parameters are used (no depnendence on other input), or if input is used to define the parameters (conditional pdf).
-        mapping_approximation (str): One of "partly_crude", "partly_precise", "full_pade". Partly_pade_crude is implemented in the original repository, but has numerical issues.
-        It is recommended to use "partly_precise" or "full_pade".
+
+            dimension (int): Dimension of the PDF. Set by *jammy_flows.pdf*.
+            cov_type (str): One of ["full", "diagonal", "diagonal_symmetric", "identity"]. "diagonal_symmetric" means one shared covariance parameter for all dimensions.
+            model_offset (int): Model offset. Set by *jammy_flows.pdf*.
+            use_permanent_parameters (int): Set by *jammy_flows.pdf*.
+            width_smooth_saturation (int): If set, uses smooth function also for lower end to describe log-width of variance-like parameters.
+            lower_bound_for_widths (float): Lower bound for the variance-like parameters.
+            upper_bound_for_widths (float): Upper bound for the variance-like parameters.
+            softplus_for_width (int): If set, uses softplus instead of exponential to enforce positivity on variance-like parameters.
+            clamp_widths (int): If set, clamps widths.
         """
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
         self.init = False

@@ -29,10 +29,17 @@ def obtain_bounded_variable_fn(min_val=0, max_val=1):
     return fn
 
 class psf_block(euclidean_base.euclidean_base):
-    def __init__(self, dimension, num_transforms=3, num_householder_iter=-1, use_permanent_parameters=False, model_offset=0, exact_mode=True):
-        """
-        Modified version of official implementation in https:/github .. fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
-        to use reparametrization trick for VAEs due to Newton iterations
+    def __init__(self, 
+                 dimension, 
+                 num_transforms=3, 
+                 num_householder_iter=-1, 
+                 use_permanent_parameters=False, 
+                 model_offset=0, 
+                 exact_mode=True):
+        """ 
+        Polynomial stretch flow - Symbol: "p"
+
+        A polynomial flow that uses *abs(x)* to make arbitrary polynomials work as flow-mappings. Has interesting structure but does not seem to work very well in practice.
         """
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
 

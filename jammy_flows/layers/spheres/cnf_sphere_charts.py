@@ -18,13 +18,6 @@ import copy
 import torch.autograd
 
 
-"""
-Code implementation of "Neural manifold ordinary differential equations" (https://arxiv.org/abs/2006.10254), 
-mostly adapted from https://github.com/CUAI/Neural-Manifold-Ordinary-Differential-Equations. This implemenation
-of manifold flows involves multiple charts that stick together and together form a global diffeomophism by repeated projection and flow operations.
-
-"""
-
 
 def find_parameters(module):
 
@@ -150,7 +143,6 @@ class cnf_sphere_charts(sphere_base.sphere_base):
     def __init__(self, 
         dimension, 
         euclidean_to_sphere_as_first=False, 
-        use_extra_householder=False, 
         use_permanent_parameters=False, 
         cnf_network_hidden_dims="64-64", 
         cnf_network_rank=0, 
@@ -158,12 +150,28 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         num_charts=6, 
         solver="rk4", 
         atol=1e-7,
-        rtol=1e-7,
-        higher_order_cylinder_parametrization=False):
+        rtol=1e-7):
+
         """
-        solvers: 
+        Continuous manifold normalizing flow - Symbol: "c"
+
+        Code implementation of "Neural manifold ordinary differential equations" (https://arxiv.org/abs/2006.10254).
+        Mostly adapted from https://github.com/CUAI/Neural-Manifold-Ordinary-Differential-Equations.
+        
+        Parameters:
+
+            cnf_network_hidden_dims (str/int/list(int)): Hidden dim structure of MLP.
+            cnf_network_rank: (int, list(int)): Low rank structure of MLP.
+            cnf_network_highway_mode (int): Highway connectivity mode of MLP.
+            num_charts (int): How many charts to use.
+            solver (str): One of ["rk4", "dopri5", "dopri8", "bosh3", "fehlberg2", "adaptive_heun", "euler", "midpoint"].
+            atol (float): Absolute tolerance.
+            rtol (float): Relative tolerance.
+
         """
-        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
+
+        
+        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False)
         
         if(dimension!=2):
             raise Exception("The sphere CNF should be used for dimension 2!")
@@ -180,15 +188,6 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         self.cnf_network=AmortizableMLP(4, cnf_network_hidden_dims, 3, use_permanent_parameters=use_permanent_parameters, low_rank_approximations=cnf_network_rank, highway_mode=cnf_network_highway_mode)
     
         self.num_nn_pars=self.cnf_network.num_amortization_params
-       
-        """
-        desired=torch.zeros(self.num_nn_pars, dtype=torch.float64)
-        tot_index=0
-        for p in prev_net.parameters():
-            this_num=p.numel()
-            desired[tot_index:tot_index+this_num]=p.flatten()
-            tot_index=tot_index+this_num
-        """
     
         #self.cnf_network.initialize_uvbs(fix_total=desired)
         

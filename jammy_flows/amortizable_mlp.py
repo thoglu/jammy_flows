@@ -8,17 +8,40 @@ from .extra_functions import NONLINEARITIES, list_from_str
 
 class AmortizableMLP(nn.Module):
 
-    def __init__(self, input_dim, hidden_dims, output_dim, highway_mode=0, low_rank_approximations=0, nonlinearity="tanh",  use_permanent_parameters=True, svd_mode="smart", precise_mlp_structure=dict()):
-        """
-        input dim: input dimension of the MLP
-        output dim: output dimension of the MLP
-        hidden_dims: depending on "extended" mode, defines hidden dimensions
-        highway_mode: 0 - like a normal MLP
-                       1 - An extra Linear function is added to the final result, adding effectively a skip connection from input to output with additionaly weight multiplication
-                       2 - Hidden dimensions define hidden dims of 1-hidden layer MLPs that are interleaved and always added to the previous layer. They depend on the previous layer and the first layer input,
-                           and likely perform better when output_dim < input_dim. 
+    def __init__(self, 
+                 input_dim, 
+                 hidden_dims, 
+                 output_dim, 
+                 highway_mode=0, 
+                 low_rank_approximations=0, 
+                 nonlinearity="tanh",  
+                 use_permanent_parameters=True, 
+                 svd_mode="smart", 
+                 precise_mlp_structure=dict()):
 
-                       3 - 
+        """
+        MLP class that allows for amortization of all of its parameters.
+        Supports low-rank approximations to weight matrices and 5 different settings of connectivity ("highway modes").
+
+        Parameters:
+            input dim (int): Input dimension of the overall module.
+            hidden_dims (str/int/list(int)): Defines hidden dimension structure of all MLPs, depending on *highway_mode* how they are used. Hidden dimensionality is given by integers, separated by dash. I.e. 64-64.
+            output dim (int): Output dimension of the overall module.
+            highway_mode (int): Defines connectivity structure.
+
+                                | **0**: Default MLP with a given number of hidden layers defined by *hidden_dims*.
+                                | **1**: Like mode 0 but with an extra skip connection using a linear matrix connecting input and output.
+                                | **2**: Like mode 1 but multiple one-hidden-layer MLPs that all connect from input to output instead of the single MLP. Each hidden layer of those MLPs is defined by *hidden_dims*.
+                                | **3**: Like mode 2 but the 2nd to nth MLP connects from the previous output to the next output, instead of input to output. Additionally, there are skip connections between all stages.
+                                | **4**: Like mode 3, but the 2nd to nth MLP connections from a union of [input,previous output] to next output. Additionally, there are skip connections between all stages.
+
+            low_rank_approximation (int/list(int)): Defines low-rank approximation of all matrices. If 0 or smaller, full rank is assumed.
+            nonlinearity (str): Nonlinearity used.
+            use_permanent_parameters (bool): If False, is used in amortization mode, i.e. all parameters are input in *foward* as *extra_inputs*.
+            svd_mode (str): One of ["naive", "smart"]. Smart takes a full normal matrix if the rank is its max rank, then a naive low-rank approximation is less parameter efficient. Naive just always makes a SVD based low-rank approximation, which can be less efficient sometimes.
+            precise_mlp_structure (dict): Allows to pass a dict with similar structure as *sub_mlp_structures* (see code), in order to have more customization, i.e. per-matrix varying low-ranks etc.
+
+
         """             
         super(AmortizableMLP, self).__init__()
 
@@ -352,7 +375,17 @@ class AmortizableMLP(nn.Module):
         return num_amortization_params
 
     def obtain_default_init_tensor(self, fix_final_bias=None, prev_damping_factor=1000.0):
-        
+        """
+        Obtains a tensor that fits the shape of the AmortizableMLP parrameters according to standard kaiman init rules taken from pytorch.
+
+        Parameters:
+            fix_final_bias (Tensor/None): If given, the final bias is fixed to a specific output Tensor given by *fix_final_bias*. If None, standard initialization applies.
+            prev_damping_factor (float): If *fix_final_bias* is set, determines a damping factor that applies to all weights/biases before final bias, in order to reduce dependency on them.
+
+        Returns:
+            Tensor
+                The final initialization tensor that is desired for the AmortizableMLP.
+        """
         init_tensor=torch.randn(self.num_amortization_params, dtype=torch.float64).unsqueeze(0)
     
         index=0
@@ -430,13 +463,17 @@ class AmortizableMLP(nn.Module):
 
     def initialize_uvbs(self, fix_total=None, fix_final_bias=None, prev_damping_factor=1000.0):
         """ 
-        Initialize the parameters of the MLPs. Either all parameters are initialized similar to default procedures in pytorch,
-        or all parameters are handed over (fix_total), or the final bias vector is handed over (fix_final_bias).
+        Initialize the parameters of the MLPs. Either all parameters are initialized similar to default procedures in pytorch (fix_total and fix_final_bias None),
+        or all parameters are handed over (fix_total given), or the final bias vector is handed over (fix_final_bias given).
+    
+        Parameters:
 
-        fix_total (None/Tensor): If not None, has to be of size *u_v_b_pars* to initialize all params of all MLPs.
-        fix_final_offset(None/Tensor): If not None, has to be of size of the target dimension (final bias) to set the final bias vector.
+            fix_total (None/Tensor): If not None, has to be of size of all AmortizableMLP params to initialize all params of all MLPs.
+            fix_final_bias (None/Tensor): If not None, has to be of size of the target dimension (final bias) to set the final bias vector.
+            prev_damping_factor (float): Used to dampen previous weights/biases of init tensor when *fix_final_bias* is given.
+
         """
-        assert(self.use_permanent_parameters), "Initialization of uvb tensor only makes sense for permanent parameters. Use 'obtain_init_tensor' instead to obtain parameter vector."
+        assert(self.use_permanent_parameters), "Initialization of uvb tensor only makes sense for permanent parameters. Use 'obtain_default_init_tensor' instead to obtain parameter vector."
 
         if(fix_total is not None):
             self.u_v_b_pars.data[0,...]=fix_total
@@ -468,7 +505,7 @@ class AmortizableMLP(nn.Module):
         """
         return ret
 
-    def apply_amortized_mlp(self, mlp_def, prev_argument, params):
+    def _apply_amortized_mlp(self, mlp_def, prev_argument, params):
 
         amortization_params=params
         prev=prev_argument
@@ -490,17 +527,14 @@ class AmortizableMLP(nn.Module):
                 ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product
                 if(mlp_def["full_weight_matrix_flags"][ind]):
                     # no svd decomposition, the whole weight matrix is stored in the "u" vector
-
-                 
                     A=this_u.view(-1, mlp_def["outputs"][ind], mlp_def["inputs"][ind])
                     
                   
                     nonlinear=self._adaptive_matmul(A, prev)
 
                 else:
-                    #print("ADVANCED MAT")
+                   
                     ## we do the standard svd decomposition (without proper normalization) .. normalization is implicit in the u/v definition
-
 
                     this_u=this_u.view(this_u.shape[0],  int(this_u.shape[1]/this_rank), this_rank) # U
                     this_v=this_v.view(this_v.shape[0], this_rank, int(this_v.shape[1]/this_rank)) # V^T
@@ -531,23 +565,31 @@ class AmortizableMLP(nn.Module):
             ## add bias
 
             if(mlp_def["num_b_s"][ind]>0):
-                #print("have bias")
+              
                 bias_broadcast=nonlinear.dim()-this_b.dim()
                 assert (bias_broadcast >= 0)
 
                 slices=[slice(None,None)]+[None]*bias_broadcast+[slice(None,None)]
                 nonlinear=nonlinear+this_b[slices]
             #else:
-                #print("NO BIAS", mlp_def)
+               
             prev=mlp_def["activations"][ind](nonlinear)
-
-        #print(amortization_params.shape)
 
         return prev, amortization_params
 
 
     def forward(self, i, extra_inputs=None):
+        """
+        Applies the AmortizableMLP to target.
 
+        Parameters:
+            i (Tensor): Input tensor of shape (B, D)
+            extra_inputs (Tensor/None): If given, amortizes all parameters of the AmortizableMLP. 
+
+        Returns:
+            Tensor
+                Output of the AmortizableMLP.
+        """
         amortization_params=self.u_v_b_pars.to(i)
 
         if(extra_inputs is not None):
@@ -575,7 +617,7 @@ class AmortizableMLP(nn.Module):
             linear_amortization_params=amortization_params[:,-linear_def["num_params"]:]
             amortization_params=amortization_params[:,:-linear_def["num_params"]]
 
-            linear_result, _= self.apply_amortized_mlp(linear_def, i, linear_amortization_params)
+            linear_result, _= self._apply_amortized_mlp(linear_def, i, linear_amortization_params)
             #print("FINISHED LINEAR APPLICATION ....")
             assert(_.shape[1]==0)
 
@@ -589,7 +631,7 @@ class AmortizableMLP(nn.Module):
                 ## only when hidden dims are given is the mlp_list filled
                 mlp_def=self.sub_mlp_structures["mlp_list"][0]
                
-                nonlinear, amortization_params=self.apply_amortized_mlp(mlp_def, i, amortization_params)
+                nonlinear, amortization_params=self._apply_amortized_mlp(mlp_def, i, amortization_params)
                 
                 prev=prev+nonlinear
         else:
@@ -599,7 +641,7 @@ class AmortizableMLP(nn.Module):
             if(len(self.sub_mlp_structures["mlp_list"]) > 0):
                 first_mlp=self.sub_mlp_structures["mlp_list"][0]
                 #print("applying the first MLP ", first_mlp)
-                nonlinear, amortization_params=self.apply_amortized_mlp(first_mlp, i, amortization_params)
+                nonlinear, amortization_params=self._apply_amortized_mlp(first_mlp, i, amortization_params)
 
                 if(self.highway_mode==2):
                     
@@ -616,7 +658,7 @@ class AmortizableMLP(nn.Module):
                 ## the other MLP's inputs depend on the type of highway_mode
                 for mlp_def in self.sub_mlp_structures["mlp_list"][1:]:
                     #print("OTHER ", )
-                    nonlinear, amortization_params=self.apply_amortized_mlp(mlp_def, next_input, amortization_params)
+                    nonlinear, amortization_params=self._apply_amortized_mlp(mlp_def, next_input, amortization_params)
 
                     ## set next input
                     if(self.highway_mode==2):

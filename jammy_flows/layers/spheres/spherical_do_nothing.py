@@ -7,8 +7,8 @@ from ..bisection_n_newton import inverse_bisection_n_newton
 
 class spherical_do_nothing(sphere_base.sphere_base):
     def __init__(self, dimension, euclidean_to_sphere_as_first=False, use_permanent_parameters=True):
-
-        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, use_extra_householder=False)
+        """ Spherical identity mapping: Symbol "y" """
+        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, add_rotation=False)
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
 

@@ -29,19 +29,22 @@ class sphere_base(layer_base.layer_base):
 
     def __init__(self, 
                  dimension=1, 
-                 euclidean_to_sphere_as_first=True, 
-                 use_extra_householder=False, 
+                 euclidean_to_sphere_as_first=True,  
                  use_permanent_parameters=False, 
                  rotation_mode="householder",
                  add_rotation=False,
                  higher_order_cylinder_parametrization=False):
+        """
+        Base class for all spherical flow layers. Inherits from layer_base.
     
+        dimension (int): Dimension of the flow. Set by parent.
+        add_rotation (int): If set, adds an additional rotation as an additional "flow".
+        rotation_mode (str): One of ["angles", "householder"]. *Angles* involves Givens Rotations, and *householder* householder rotations.
+
+        """
         super().__init__(dimension=dimension)
 
         self.euclidean_to_sphere_as_first=euclidean_to_sphere_as_first
-
-        ### DEPRECATED parameter - superseeded by add_rotation
-        #self.use_extra_householder=use_extra_householder
 
         self.use_permanent_parameters=use_permanent_parameters
 
@@ -77,9 +80,6 @@ class sphere_base(layer_base.layer_base):
 
             else:
                 self.num_householder_params=0
-                #self.use_extra_householder=True
-
-                #if(self.use_extra_householder):
 
                 self.num_householder_params=(dimension+1)*(dimension+1)
                 self.total_param_num+=self.num_householder_params
@@ -501,32 +501,10 @@ class sphere_base(layer_base.layer_base):
         return x, log_det, sf_extra
 
     ## inverse flow mapping
-    def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
+    def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True):
         
         [x, log_det] = inputs
-        """
-        ## check if we force embedding coordinates
-        if(force_embedding_coordinates):
-
-            assert(force_intrinsic_coordinates==False)
-            assert(x.shape[1]==(self.dimension+1))
-            ## check if we are in base simplex, if so embed in canonical simplex because it is forced
-            if(self.always_parametrize_in_embedding_space==False):
-                # typically this flow takes intrinsic coordinates, but we overwrite this here...
-                x, log_det=self.eucl_to_spherical_embedding([x, log_det])
-
-        elif(force_intrinsic_coordinates):
-            assert(x.shape[1]==self.dimension)
-            ## check if we are in canonical simplex, if so project to base simplex because it is forced
-            if(self.always_parametrize_in_embedding_space):
-                x, log_det=self.spherical_to_eucl_embedding([x, log_det])
-        else:
-
-            if(self.always_parametrize_in_embedding_space):
-                assert(x.shape[1]==(self.dimension+1))
-            else:
-                assert(x.shape[1]==self.dimension)
-        """
+       
         ## (1) apply inverse householder rotation if desired
 
         if(self.add_rotation):
@@ -585,7 +563,7 @@ class sphere_base(layer_base.layer_base):
         return x, log_det
 
     ## flow mapping (sampling pass)
-    def flow_mapping(self,inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
+    def flow_mapping(self,inputs, extra_inputs=None):
       
         [x, log_det] = inputs
 
@@ -629,23 +607,6 @@ class sphere_base(layer_base.layer_base):
            
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
-
-        """
-        if(force_embedding_coordinates):
-
-            assert(force_intrinsic_coordinates==False)
-
-            ## check if we are in intrinsic .. if so embedd
-            if(x.shape[1]==self.dimension):
-                x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-
-        elif(force_intrinsic_coordinates):
-
-            ## check if we are embedded, if so go to instrinsic
-            if(res.shape[1]==(self.dimension+1)):
-                x, log_det=self.eucl_to_spherical_embedding(x, log_det)
-            
-        """
 
         return x,log_det
 

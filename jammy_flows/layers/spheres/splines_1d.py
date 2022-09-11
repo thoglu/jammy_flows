@@ -11,12 +11,17 @@ from ..spline_fns import rational_quadratic_spline
 class spline_1d(sphere_base.sphere_base):
     def __init__(self, dimension=1, 
                        euclidean_to_sphere_as_first=True, 
-                       use_extra_householder=True, 
+                       add_rotation=0,
                        natural_direction=0, 
                        use_permanent_parameters=False,  
                        num_basis_functions=5):
+        """
+        A circular spline variant. Symbol: "o"
 
-        super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters)
+        Follows https://arxiv.org/abs/2002.02428. Still experimental and has not really been tested.
+    
+        """
+        super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, add_rotation=add_rotation, use_permanent_parameters=use_permanent_parameters)
         
         if(dimension!=1):
             raise Exception("The moebius flow is defined for dimension 1, but dimension %d is handed over" % (dimension))

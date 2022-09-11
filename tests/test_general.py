@@ -151,8 +151,7 @@ class Test(unittest.TestCase):
         #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"isigmoid"}}}}] )
 
         
-        encoders=["passthrough"]
-
+       
         mlp_hidden_dims=["64-30"]
         use_low_rank_option=[False, True]
         low_rank_ranks=["2-10-1000"]
@@ -174,22 +173,22 @@ class Test(unittest.TestCase):
                      ]
 
         
-        for enc in encoders:
-            for mlp_hidden in mlp_hidden_dims:
-                for use_rank in use_low_rank_option:
-                    for lr_approx in low_rank_ranks:
-                        for gf_setting in gf_settings:
-                            d=dict()
-                            
-                            d["conditional_input_dim"]=2
-                            d["data_summary_dim"]=2
-                            d["input_encoder"]=enc
-                            d["hidden_mlp_dims_sub_pdfs"]=mlp_hidden
-                            d["rank_of_mlp_mappings_sub_pdfs"]=lr_approx
-                            d["use_custom_low_rank_mlps"]=use_rank
-                            d["options_overwrite"]=gf_setting
+      
+        for mlp_hidden in mlp_hidden_dims:
+            for use_rank in use_low_rank_option:
+                for lr_approx in low_rank_ranks:
+                    for gf_setting in gf_settings:
+                        d=dict()
+                        
+                        d["conditional_input_dim"]=2
+                        
+                       
+                        d["hidden_mlp_dims_sub_pdfs"]=mlp_hidden
+                        d["rank_of_mlp_mappings_sub_pdfs"]=lr_approx
+                        d["use_custom_low_rank_mlps"]=use_rank
+                        d["options_overwrite"]=gf_setting
 
-                            self.flow_inits.append([[pdf_def, flow_def], d])
+                        self.flow_inits.append([[pdf_def, flow_def], d])
 
         # exponential map flow variations
 
@@ -253,7 +252,7 @@ class Test(unittest.TestCase):
             extra_flow_defs["options_overwrite"]=dict()
             extra_flow_defs["options_overwrite"]["n"]=dict()
          
-            extra_flow_defs["options_overwrite"]["n"]["use_extra_householder"]=1
+            extra_flow_defs["options_overwrite"]["n"]["add_rotation"]=1
             #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
             extra_flow_defs["options_overwrite"]["n"]["zenith_type_layers"]=z_layer
             ## all n-type flows
@@ -269,7 +268,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["options_overwrite"]=dict()
         extra_flow_defs["options_overwrite"]["n"]=dict()
       
-        extra_flow_defs["options_overwrite"]["n"]["use_extra_householder"]=1
+        extra_flow_defs["options_overwrite"]["n"]["add_rotation"]=1
         #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
 
         ## general flow

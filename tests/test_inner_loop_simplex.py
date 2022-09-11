@@ -49,7 +49,7 @@ if __name__ == '__main__':
     
     seed_everything(0)
 
-    pdf=f.pdf("c1", "w")
+    pdf=f.pdf("a1", "w")
 
     samp,_,_,_=pdf.sample(samplesize=100000)
 
@@ -95,7 +95,7 @@ if __name__ == '__main__':
     ##############################################
     ##############################################
 
-    pdf=f.pdf("c2", "w")
+    pdf=f.pdf("a2", "w")
     
     samp,_,_,_=pdf.sample(samplesize=100000)
 

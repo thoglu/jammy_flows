@@ -72,9 +72,26 @@ def generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_no
 
 class exponential_map_s2(sphere_base.sphere_base):
 
-    def __init__(self, dimension, euclidean_to_sphere_as_first=False, use_extra_householder=False, use_permanent_parameters=False, exp_map_type="linear", natural_direction=0, num_components=10, higher_order_cylinder_parametrization=False):
+    def __init__(self, 
+                 dimension, 
+                 euclidean_to_sphere_as_first=False, 
+                 use_permanent_parameters=False, 
+                 exp_map_type="linear", 
+                 natural_direction=0, 
+                 num_components=10):
+        """
+        Uses the spherical exponential map. Symbol: "v"
 
-        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=higher_order_cylinder_parametrization)
+        Uses linear and quadratic potential as described in https://arxiv.org/abs/0906.0874, and exponential potential as described in https://arxiv.org/abs/2002.02428.
+        Additionally added a spline-based potential.
+
+        Parameters:
+        
+            exp_map_type (str): Defines the potential of the exponential map. One of ["linear", "quadratic", "exponential", "splines"].
+            natural_direction (int). If 0, log-probability evaluation is faster. If 1, sampling is faster.
+            num_components (int): How many components to sum over in the exponential map.
+        """
+        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False)
         
         if(dimension!=2):
             raise Exception("The moebius flow should be used for dimension 2!")
@@ -837,27 +854,17 @@ class exponential_map_s2(sphere_base.sphere_base):
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
 
-        #if(self.higher_order_cylinder_parametrization):
-        #    print("extra params MLP", extra_inputs[0,self.num_mlp_params-self.total_euclidean_pars:self.num_mlp_params])
-        ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
         [x,log_det]=inputs
         
        
         potential_pars=self.potential_pars.to(x)
         if(extra_inputs is not None):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
-        """
-        def f(tt):
-
-            return inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.all_vs, self.basic_exponential_map, tt, potential_pars[1:2] )
-        """
+      
 
         if(self.always_parametrize_in_embedding_space==False):
-            # embedding to intrinsic
-            #print("converting to spherical .. ", x)
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
            
-            #print("after ... ", x)
         if(self.natural_direction):
 
 
@@ -872,24 +879,11 @@ class exponential_map_s2(sphere_base.sphere_base):
 
             result, new_projected, new_standard,_=self.get_exp_map_and_jacobian(x, potential_pars)
 
-    
-         
-            #print(old_projected-new_projected)
             _,ld_res=torch.slogdet(new_projected)
                 
             log_det_update=0.5*ld_res
 
             log_det=log_det+log_det_update
-           
-            """
-
-            explicit_res, ld_update_explicit,_=self.get_explicit_formula_result(x, potential_pars)
-
-            assert(torch.abs((explicit_res-result)).sum()<1e-10),torch.abs((explicit_res-result)).sum()
-
-           
-            assert( torch.abs((ld_update_explicit-0.5*ld_res)).sum()<1e-8)
-            """
 
         if(self.always_parametrize_in_embedding_space==False):
             # embedding to intrinsic

@@ -15,8 +15,7 @@ normal_dist=tdist.Normal(0, 1)
 class euclidean_do_nothing(euclidean_base.euclidean_base):
     def __init__(self, dimension, use_permanent_parameters=True):
         """
-        Modified version of official implementation in https:/github .. fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
-        to use reparametrization trick for VAEs due to Newton iterations
+        Identitiy transformation. Symbol "x"
         """
 
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=0)

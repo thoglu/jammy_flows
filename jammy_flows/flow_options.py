@@ -20,7 +20,7 @@ from .layers.simplex.gumbel_softmax import gumbel_softmax
 
 """
 Contains default inititialization options for the various flow layers. Default options can
-be overwritten by passing *flow_defs_detail* to the pdf class.
+be overwritten by passing *options_overwrite* to the pdf class.
 """
 
 opts_dict=dict()
@@ -35,7 +35,6 @@ opts_dict["g"]["module"] = gf_block
 opts_dict["g"]["type"] = "e"
 opts_dict["g"]["kwargs"] = dict()
 opts_dict["g"]["kwargs"]["fit_normalization"] = (1,[0,1])
-#opts_dict["g"]["kwargs"]["use_permanent_parameters"]=(0, [0,1])
 opts_dict["g"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
 opts_dict["g"]["kwargs"]["num_kde"] = (10, lambda x: x>0)
 opts_dict["g"]["kwargs"]["inverse_function_type"] = ("isigmoid", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
@@ -58,7 +57,6 @@ opts_dict["h"]["module"] = gf_block_old
 opts_dict["h"]["type"] = "e"
 opts_dict["h"]["kwargs"] = dict()
 opts_dict["h"]["kwargs"]["fit_normalization"] = (1,[0,1])
-#opts_dict["g"]["kwargs"]["use_permanent_parameters"]=(0, [0,1])
 opts_dict["h"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
 opts_dict["h"]["kwargs"]["num_kde"] = (10, lambda x: x>0)
 opts_dict["h"]["kwargs"]["inverse_function_type"] = ("isigmoid", ["isigmoid", "inormal_partly_precise", "inormal_full_pade", "inormal_partly_crude"])
@@ -77,7 +75,6 @@ opts_dict["p"] = dict()
 opts_dict["p"]["module"] = psf_block
 opts_dict["p"]["type"] = "e"
 opts_dict["p"]["kwargs"] = dict()
-#opts_dict["p"]["kwargs"]["use_permanent_parameters"]=0
 opts_dict["p"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
 opts_dict["p"]["kwargs"]["num_transforms"] = (1, lambda x: x>0)
 opts_dict["p"]["kwargs"]["exact_mode"] = (True, [True, False])
@@ -88,7 +85,6 @@ opts_dict["t"] = dict()
 opts_dict["t"]["module"] = mvn_block
 opts_dict["t"]["type"] = "e"
 opts_dict["t"]["kwargs"] = dict()
-#opts_dict["t"]["kwargs"]["use_permanent_parameters"]=0
 opts_dict["t"]["kwargs"]["skip_model_offset"]=(0, [0,1])
 opts_dict["t"]["kwargs"]["softplus_for_width"]=(0, [0,1]) # use softplus instead of exp to transform log_width -> width
 opts_dict["t"]["kwargs"]["upper_bound_for_widths"]=(100, lambda x: (x==-1) or x>0) # define an upper bound for the value of widths.. -1 = no upper bound
@@ -108,9 +104,7 @@ opts_dict["m"] = dict()
 opts_dict["m"]["module"] = moebius
 opts_dict["m"]["type"] = "s"
 opts_dict["m"]["kwargs"] = dict()
-#opts_dict["m"]["kwargs"]["use_permanent_parameters"]=0
-opts_dict["m"]["kwargs"]["use_extra_householder"] = (0, [0,1])
-#opts_dict["m"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
+opts_dict["m"]["kwargs"]["add_rotation"] = (0, [0,1])
 opts_dict["m"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
 opts_dict["m"]["kwargs"]["natural_direction"] = (0, [0,1])
 
@@ -119,9 +113,7 @@ opts_dict["o"] = dict()
 opts_dict["o"]["module"] = sphere_spline_1d
 opts_dict["o"]["type"] = "s"
 opts_dict["o"]["kwargs"] = dict()
-#opts_dict["o"]["kwargs"]["use_permanent_parameters"]=0
-opts_dict["o"]["kwargs"]["use_extra_householder"] = (0, [0,1])
-#opts_dict["o"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
+opts_dict["o"]["kwargs"]["add_rotation"] = (0, [0,1])
 opts_dict["o"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
 opts_dict["o"]["kwargs"]["natural_direction"] = (0, [0,1])
 
@@ -135,12 +127,9 @@ opts_dict["n"] = dict()
 opts_dict["n"]["module"] = segmented_sphere_nd
 opts_dict["n"]["type"] = "s"
 opts_dict["n"]["kwargs"] = dict()
-#opts_dict["n"]["kwargs"]["use_permanent_parameters"]=0
-opts_dict["n"]["kwargs"]["use_extra_householder"] = (1, [0,1]) ###### TODO - remove deprecated 
 opts_dict["n"]["kwargs"]["add_rotation"] = (1, [0,1])
 opts_dict["n"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "angles"])
 opts_dict["n"]["kwargs"]["hidden_dims"] = ("64", lambda x: type(x)==str)
-#opts_dict["n"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
 opts_dict["n"]["kwargs"]["num_basis_functions"] = (10, lambda x: x>0)
 opts_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
 opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: (len(list(set(x)))==1) and x[0] in ["r", "g", "p", "x", "z"])
@@ -153,24 +142,15 @@ opts_dict["v"] = dict()
 opts_dict["v"]["module"] = exponential_map_s2
 opts_dict["v"]["type"] = "s"
 opts_dict["v"]["kwargs"] = dict()
-#opts_dict["v"]["kwargs"]["use_extra_householder"] = 0
-#opts_dict["v"]["kwargs"]["use_permanent_parameters"]=0
-#opts_dict["v"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-opts_dict["v"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
 opts_dict["v"]["kwargs"]["exp_map_type"] = ("exponential", ["linear", "quadratic", "splines", "exponential"]) ## supported linear  / exponential
 opts_dict["v"]["kwargs"]["num_components"] = (10, lambda x: x>0) ## number of components in convex superposition
-opts_dict["v"]["kwargs"]["natural_direction"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0
+opts_dict["v"]["kwargs"]["natural_direction"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
 
 # Manifold Continuous normalizing flow
 opts_dict["c"] = dict()
 opts_dict["c"]["module"] = cnf_sphere_charts
 opts_dict["c"]["type"] = "s"
 opts_dict["c"]["kwargs"] = dict()
-#opts_dict["c"]["kwargs"]["use_extra_householder"] = 0
-#opts_dict["c"]["kwargs"]["add_rotation"] = (0, [0])
-#opts_dict["c"]["kwargs"]["use_permanent_parameters"]=0
-#opts_dict["c"]["kwargs"]["euclidean_to_sphere_as_first"] = 0
-opts_dict["c"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
 opts_dict["c"]["kwargs"]["num_charts"] = (4, lambda x: x>0)
 opts_dict["c"]["kwargs"]["cnf_network_hidden_dims"] = ("32", lambda x: type(x)==str) # hidden dims of cnf MLP network
 opts_dict["c"]["kwargs"]["cnf_network_highway_mode"] = (0, [0,1,2,3,4]) # mlp highway dim - 0-4
@@ -188,8 +168,6 @@ opts_dict["r"] = dict()
 opts_dict["r"]["module"] = rational_quadratic_spline
 opts_dict["r"]["type"] = "i"
 opts_dict["r"]["kwargs"] = dict()
-#opts_dict["r"]["kwargs"]["use_permanent_parameters"]=0
-#opts_dict["r"]["kwargs"]["euclidean_to_interval_as_first"] = 0
 opts_dict["r"]["kwargs"]["num_basis_elements"] = (10, lambda x: x>0)
 
 """
@@ -199,25 +177,19 @@ Simplex flows
 ## gumbel softmax
 opts_dict["u"] = dict()
 opts_dict["u"]["module"] = gumbel_softmax
-opts_dict["u"]["type"] = "c"
+opts_dict["u"]["type"] = "a"
 opts_dict["u"]["kwargs"] = dict()
-
-#opts_dict["u"]["kwargs"]["use_permanent_parameters"]=0
-#opts_dict["u"]["kwargs"]["always_parametrize_in_embedding_space"]=0
-#opts_dict["u"]["kwargs"]["project_from_gauss_to_simplex"]=0
-
 
 ## generic simplex flow
 opts_dict["w"] = dict()
 opts_dict["w"]["module"] = inner_loop_simplex
-opts_dict["w"]["type"] = "c"
+opts_dict["w"]["type"] = "a"
 opts_dict["w"]["kwargs"] = dict()
-#opts_dict["w"]["kwargs"]["use_permanent_parameters"]=0
-#opts_dict["w"]["kwargs"]["always_parametrize_in_embedding_space"]=0
-#opts_dict["w"]["kwargs"]["project_from_gauss_to_simplex"]=0
+
 """
 Spherical/Euclidean/Interval flows that do nothing
 """
+
 opts_dict["x"] = dict()
 opts_dict["x"]["module"] = euclidean_do_nothing
 opts_dict["x"]["type"] = "e"
@@ -236,6 +208,14 @@ opts_dict["z"]["kwargs"] = dict()
 def obtain_default_options(flow_abbrevation):
     """
     Obtains a dictionary with default options for a given flow.
+    For a complete list of possible options, have a look in *flow_options.py*.
+
+    Parameters:
+        flow_abbreviation (str): The character specifying a particular flow layer.
+
+    Returns:
+        dict
+            Dictionary containing the default options.
     """
     assert(flow_abbrevation in opts_dict.keys()), "Unknown flow abbreviation for default options: %s" % flow_abbrevation
         
@@ -244,7 +224,7 @@ def obtain_default_options(flow_abbrevation):
 
 def check_flow_option(flow_abbrevation, opt_name, opt_val):
     """
-    Makes sure configured option is allowed.
+    Makes sure configured option is allowed. Used internally.
     """
     assert(flow_abbrevation in opts_dict.keys()), ("flow abbreviation %s not found in options dict" % flow_abbrevation)
     assert(opt_name in opts_dict[flow_abbrevation]["kwargs"].keys()), ("option name %s not found in defined options for flow %s" % (opt_name, flow_abbrevation))
@@ -261,7 +241,7 @@ def check_flow_option(flow_abbrevation, opt_name, opt_val):
 
 def obtain_overall_flow_info():
     """
-    Obtains module and type information of all flows in a dict.
+    Obtains module and type information of all flows in a dict. Used internally.
     """
     info_object=dict()
     for k in opts_dict.keys():

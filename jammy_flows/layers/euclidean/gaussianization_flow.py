@@ -66,15 +66,34 @@ class gf_block(euclidean_base.euclidean_base):
                  add_skewness=0,
                  rotation_mode="householder"):
         """
-        Modified version of official implementation in hhttps://github.com/chenlin9/Gaussianization_Flows (https://arxiv.org/abs/2003.01941). Fixes numerical issues with bisection inversion due to more efficient newton iterations, added offsets, and allows 
-        to use reparametrization trick for VAEs due to Newton iterations.
+        Gaussianization flow: Symbol "g"
+
+        Implements https://arxiv.org/abs/2003.01941 as a modified version of the official implementation in https://github.com/chenlin9/Gaussianization_Flows. Fixes numerical issues with bisection inversion due to more efficient newton iterations, which also makes samples differentiable + fixes numerical issues with inverse CDF parametrization. Also allows 
+        for amortization (the original implementation is meant only for non-conditional PDFs). Further adds multiple rotation parametrizations, logistic skewness option, and an rq-spline option for the non-linear mapping.
+
         Parameters:
-        dimension (int): dimension of the PDF
-        num_kde (int): number of KDE s in the one-dimensional PDF
-        num_householder_iter (int): if <=0, no householder transformation is performed. If positive, it defines the number of parameters in householder transformations.
-        use_permanent_parameters (float): If permantent parameters are used (no depnendence on other input), or if input is used to define the parameters (conditional pdf).
-        mapping_approximation (str): One of "partly_crude", "partly_precise", "full_pade". Partly_pade_crude is implemented in the original repository, but has numerical issues.
-        It is recommended to use "partly_precise" or "full_pade".
+
+            dimension (int): Dimension of the PDF. Set by *jammy_flows.pdf*.
+            nonlinear_stretch_type (str): One of ["classic", "rq_splines"]. Default is classic, but also allows to replace non-linear mapping with rational quadratic splines.
+            num_kde (int): Number of KDE Kernels in each one-dimensional transformation.
+            num_householder_iter (int): if <=0, no householder transformation is performed. If positive, it defines the number of parameters in householder transformations.
+            fit_normalization (int): If set, also fits the normalization.
+            inverse_function_type (str): One of ["partly_crude", "partly_precise", "full_pade", "isgimoid"]. "Partly_crude" is implemented in the original repository (https://github.com/chenlin9/Gaussianization_Flows), but has numerical issues. The option "isigmoid" "is an easier inverse CDF that looses exact CDF identification but gains some speed and is numerically stable. It is recommended to use "isigmoid" or "partly_precise".
+            model_offset (int): Set by *jammy_flows.pdf*.
+            softplus_for_width (int): If set, uses *soft_plus* to predict width. Otherwhise exponential function.
+            width_smooth_saturaiton (int): If set, saturates the width symmetrically at the lower and upper end.
+            lower_bound_for_widths (float): Determines the lower width bound.
+            upper_bound_for_widths (float): Determines the upper width bound.
+            clamp_widths (int): If set, clamps widths above threshold.
+            regulate_normalization (int): If set, regulates with a lower bound of 1 and upper bound of 100 (fixed) similar to width regulation.
+            add_skewness (int): If set, adds skewness to the basis functions in order to make flow more flexible.
+            rotation_mode (str): One of different rotation parametrizations:
+
+                    | - **householder**: Default implementation from the original paper.
+                    | - **angles**: Parametrized via "Givens rotation"
+                    | - **triangular_combination**: Parametrization of an upper and lower triangular matrix.
+                    | - **cayley**: "Cayley representation" of rotations.
+
         """
         super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=model_offset)
         self.init = False
@@ -1316,26 +1335,14 @@ def get_loss_fn(target_matrix, num_householder_iter=-1):
     return compute_matching_distance
 
         
-def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="random", name="test"):
+def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="random"):
 
     ## given an input *data_inits*, this function tries to initialize the gf block parameters
     ## to best match the data intis
     
     cur_data=data
 
-    """
-    cur_data[:,0]*=0.05
-
-    cx=numpy.cos(0.8)
-    cy=numpy.sin(0.8)
-
-    rotation_matrix=torch.Tensor([[cx,-cy],[cy,cx]]).unsqueeze(0).type_as(data)
-    rotation_matrix=rotation_matrix.repeat(cur_data.shape[0], 1,1)
-
-    cur_data=torch.bmm(rotation_matrix, cur_data.unsqueeze(-1)).squeeze(-1)
-
-    cur_data[:,0]+=100.0
-    """
+   
     dim=data.shape[1]
 
     all_layers_params=[]
@@ -1346,22 +1353,7 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
             ## param order .. householder / means / width / normaliaztion
             param_list=[]
-            """
-            fig=pylab.figure()
-
-            xs=cur_data[:,0]
-            ys=cur_data[:,1]
-
-            pylab.plot(xs,ys, color="k", lw=0.0, marker="o", ms=3.0)
-            exact_normal_pts=numpy.random.normal(size=cur_data.shape)
-            pylab.plot(exact_normal_pts[:,0], exact_normal_pts[:,1], color="red", lw=.0, marker="o", ms=3.0)
-            pylab.savefig("layer_large_%s_%d.png" % (name, layer_ind))
-
-            pylab.gca().set_xlim(-4,4)
-            pylab.gca().set_ylim(-4,4)
-
-            pylab.savefig("layer_small_%s_%d.png" % (name, layer_ind))
-            """
+            
             ## subtract means first if necessary
 
             if(cur_layer.model_offset):

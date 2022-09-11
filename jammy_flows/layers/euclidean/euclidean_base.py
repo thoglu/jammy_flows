@@ -6,8 +6,15 @@ import numpy
 from .. import layer_base
 
 class euclidean_base(layer_base.layer_base):
-    def __init__(self, dimension=1, use_permanent_parameters=False, model_offset=0):
-    
+    def __init__(self, dimension=1, 
+                       use_permanent_parameters=False, 
+                       model_offset=0):
+        """
+        Base class for all Euclidean flow layers. Inherits from layer_base.
+
+        Parameters:
+            model_offset (int): If set, models an extra offset for the Euclidean flow. Will be done automatically by *jammy_flows* pdf class. Only makes sense for the last flow layer in a sequence of Euclidean flows.
+        """
         super().__init__(dimension=dimension)
 
         self.use_permanent_parameters=use_permanent_parameters
@@ -25,7 +32,7 @@ class euclidean_base(layer_base.layer_base):
             
 
     def inv_flow_mapping(self, inputs, extra_inputs=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False):
-        
+
         if(self.model_offset):
 
             [x,logdet]=inputs

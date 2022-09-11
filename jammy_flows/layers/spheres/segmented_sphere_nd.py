@@ -17,13 +17,10 @@ import sys
 import os
 import copy
 
-#sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '../..')))
-
 class segmented_sphere_nd(sphere_base.sphere_base):
     def __init__(self, 
                  dimension, 
                  euclidean_to_sphere_as_first=True, 
-                 use_extra_householder=True, 
                  add_rotation=1,
                  rotation_mode="householder",
                  use_permanent_parameters=False, 
@@ -32,13 +29,29 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                  zenith_type_layers="g", 
                  max_rank=20, 
                  hidden_dims="64", 
-                 subspace_mapping="logistic", 
+                 subspace_mapping="logistic", ## ONLY one option at the moment
                  higher_order_cylinder_parametrization=False,
                  highway_mode=0):
 
+        """
+        A segmented conditional flow that models a flow on the torus and then maps to the sphere. Symbol "n"
+
+        Follows https://arxiv.org/abs/2002.02428. Seems to be stable when non-conditional, but can be unstable in certain configurations in conditional mode.
+        Slight modification, in that instead of the torus one can also choose an infinite torus, whose z-axis is modeled via a Euclidean flow instead of an interval flow.
+        
+        Parameters:
+        
+            rotation_mode (str): One of ["angles, "householder"]
+            use_moebius_xyz_parametreization (bool): Two different parametrizations for the Moebius part.
+            num_basis_functions (int): Number of Moebius basis functions.
+            zenith_type_layers (str): Either "g" or multiple "gg" (Gaussianization flows) for infinite torus parametrization, or "r" or multiple "rr" (Rational-Quadratic Spline) for torus parametrization.
+            max_rank (int): Max rank of the MLP that maps from azimuth to zenith dimension.
+            hidden_dims (str/int/list(int)): Hidden dims of MLP that maps from azimuth to zenith dimension.
+            higher_order_cylinder_parametrization (bool): Slightly different parametrization which allows some simplifications in intermedate steps. Default False (makes it hard to combine spherical flows).
+        """
+
         super().__init__(dimension=dimension, 
                          euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, 
-                         use_extra_householder=use_extra_householder, 
                          add_rotation=add_rotation,
                          rotation_mode=rotation_mode,
                          use_permanent_parameters=use_permanent_parameters, 
@@ -55,8 +68,8 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         #if(higher_order_cylinder_parametrization==False):
        #     raise Exception("Cylinder parametrization is required! Switching it off is legacy behavior and less stable.")
 
-        ## a moebius layer
-        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, use_extra_householder=False, natural_direction=0, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_basis_functions=num_basis_functions)
+        ## a moebius layer: TODO - optioally replace with circular spline layer
+        self.moebius_trafo=moebius_1d.moebius(1, euclidean_to_sphere_as_first=False, add_rotation=0, natural_direction=0, use_permanent_parameters=use_permanent_parameters, use_moebius_xyz_parametrization=use_moebius_xyz_parametrization, num_basis_functions=num_basis_functions)
         self.num_s1_pars=self.moebius_trafo.total_param_num
         self.total_param_num+=self.num_s1_pars
 

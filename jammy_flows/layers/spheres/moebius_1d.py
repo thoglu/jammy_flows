@@ -11,13 +11,24 @@ from ..spline_fns import rational_quadratic_spline
 class moebius(sphere_base.sphere_base):
     def __init__(self, dimension=1, 
                        euclidean_to_sphere_as_first=True, 
-                       use_extra_householder=True, 
+                       add_rotation=0, 
                        natural_direction=0, 
                        use_permanent_parameters=False, 
                        use_moebius_xyz_parametrization=True, 
                        num_basis_functions=5):
+        """
+        Moebius transformations on the circle. Symbol "m"
 
-        super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_extra_householder=use_extra_householder, use_permanent_parameters=use_permanent_parameters)
+        Follows https://arxiv.org/abs/2002.02428. Parametrization seems to be slightly unstable sometimes.
+    
+        Parameters:
+
+            natural_direction (int): If set to 0, log-probability is faster than sampling. Otherwise reversed.
+            use_moebius_xyz_parametreization (bool): Two different paramerizations.
+            num_basis_functions (int): Number of moebius basis functions.
+
+        """
+        super().__init__(dimension=1, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, add_rotation=add_rotation, use_permanent_parameters=use_permanent_parameters)
         
         if(dimension!=1):
             raise Exception("The moebius flow is defined for dimension 1, but dimension %d is handed over" % (dimension))
@@ -148,8 +159,6 @@ class moebius(sphere_base.sphere_base):
         #print("shape log_length", log_length_par.shape)
 
         lse_cat=torch.cat( (torch.zeros_like(log_length_par), -log_length_par),dim=2)
-
-        #print(lse_cat.shape)
 
         denom=torch.logsumexp(lse_cat, dim=2, keepdims=True)
         
