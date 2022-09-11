@@ -29,7 +29,7 @@ class Test(unittest.TestCase):
 
         extra_flow_defs=dict()
         extra_flow_defs["m"]=dict()
-        extra_flow_defs["m"]["use_extra_householder"]=0
+        extra_flow_defs["m"]["add_rotation"]=0
 
 
         this_flow=f.pdf("s1", "m", options_overwrite=extra_flow_defs)
@@ -42,7 +42,7 @@ class Test(unittest.TestCase):
         extra_flow_defs=dict()
         extra_flow_defs["n"]=dict()
        
-        extra_flow_defs["n"]["use_extra_householder"]=0
+        extra_flow_defs["n"]["add_rotation"]=0
         extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=0
 
         this_flow=f.pdf("s2", "n", options_overwrite=extra_flow_defs)
@@ -126,7 +126,7 @@ class Test(unittest.TestCase):
                 extra_flow_defs=dict()
                 extra_flow_defs["n"]=dict()
                 
-                extra_flow_defs["n"]["use_extra_householder"]=1
+                extra_flow_defs["n"]["add_rotation"]=1
                 extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=cyl_para
                 extra_flow_defs["n"]["zenith_type_layers"]=zenith_layer_type
              
