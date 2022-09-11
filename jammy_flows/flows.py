@@ -1575,9 +1575,9 @@ class pdf(nn.Module):
 
                 if(gf_init):
                     if(layer_type=="g"):
-                        params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
+                        params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
                     elif(layer_type=="h"):
-                        params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random",name=name)
+                        params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
                     
                     params_list.append(params.type(torch.float64))
 
