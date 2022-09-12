@@ -41,25 +41,25 @@
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="#main-class">Main class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.extra_functions">Main class</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#amortizable-mlp">Amortizable MLP</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#numerical-inversion">Numerical inversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.bisection_n_newton">Numerical inversion</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-jammy_flows.layers.layer_base">Layers</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#euclidean-flow-layers">Euclidean flow layers</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.euclidean_base">Euclidean Base</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#identity-layer-x">Identity layer (“x”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.euclidean_do_nothing">Identity layer (“x”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#multivariate-normal-t">Multivariate Normal (“t”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#gaussianization-flow-g">Gaussianization flow (“g”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#polynomial-stretch-flow-p">Polynomial stretch flow (“p”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.polynomial_stretch_flow">Polynomial stretch flow (“p”)</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.spheres.sphere_base">Spherical flow layers</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#identity-layer-y">Identity layer (“y”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#moebius-1-d-circle-flow-m">Moebius 1-d circle flow (“m”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#circular-1-d-spline-flow-o">Circular 1-d spline flow (“o”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.spherical_do_nothing">Identity layer (“y”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.moebius_1d">Moebius 1-d circle flow (“m”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.splines_1d">Circular 1-d spline flow (“o”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#segmented-2-d-sphere-flow-n">Segmented 2-d sphere flow (“n”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#exponential-map-2-d-sphere-flow-v">Exponential map 2-d sphere flow (“v”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#chart-based-continuous-2-d-sphere-flow-c">Chart-based continuous 2-d sphere flow (“c”)</a></li>
@@ -101,14 +101,118 @@
 <h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
 <div class="section" id="general">
 <h2>General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="main-class">
-<h3>Main class<a class="headerlink" href="#main-class" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.extra_functions">
+<span id="main-class"></span><h3>Main class<a class="headerlink" href="#module-jammy_flows.extra_functions" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="jammy_flows.extra_functions.log_one_plus_exp_x_to_a_minus_1">
+<code class="sig-prename descclassname">jammy_flows.extra_functions.</code><code class="sig-name descname">log_one_plus_exp_x_to_a_minus_1</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">a</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.extra_functions.log_one_plus_exp_x_to_a_minus_1" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates the logarithm of ((1+exp(x))**a - 1) / ((1+exp(x))**a)</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>x</strong> (<em>Tensor</em>) – Size (B,D)</p></li>
+<li><p><strong>a</strong> (<em>Tensor</em>) – Size (B,1)</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>Result</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
 </div>
 <div class="section" id="amortizable-mlp">
 <h3>Amortizable MLP<a class="headerlink" href="#amortizable-mlp" title="Permalink to this headline">¶</a></h3>
 </div>
-<div class="section" id="numerical-inversion">
-<h3>Numerical inversion<a class="headerlink" href="#numerical-inversion" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.layers.bisection_n_newton">
+<span id="numerical-inversion"></span><h3>Numerical inversion<a class="headerlink" href="#module-jammy_flows.layers.bisection_n_newton" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton">
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">grad_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em>, <em class="sig-param">newton_tolerance=1e-14</em>, <em class="sig-param">verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
+Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
+<li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
+<li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
+<li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
+<li><p><strong>num_bisection_iter</strong> (<em>int</em>) – Number of bisection iterations.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_joint_func_and_grad">
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_joint_func_and_grad</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">joint_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em>, <em class="sig-param">newton_tolerance=1e-14</em>, <em class="sig-param">verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_joint_func_and_grad" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
+Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
+<li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
+<li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
+<li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
+<li><p><strong>num_bisection_iter</strong> (<em>int</em>) – Number of bisection iterations.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_slow">
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_slow</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">grad_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_slow" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
+Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
+<li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
+<li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
+<li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
+<li><p><strong>num_bisection_iter</strong> (<em>int</em>) – Number of bisection iterations.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="function">
+<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere">
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_sphere</code><span class="sig-paren">(</span><em class="sig-param">combined_func</em>, <em class="sig-param">find_tangent_func</em>, <em class="sig-param">basic_exponential_map_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">num_newton_iter=25</em>, <em class="sig-param">visualize=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
+In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
+Distributing the points randomly on the sphere dosnt really help, so every point is initialized just at (0,0,1).
+In order for this to work properly, the function has to be globally dipheomorphic.
+We follow <a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a> (“A Jacobian inequality for gradient maps on the sphere and its application to directional statistics”),
+in particular the implementation suggested in <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a> (“Normalizing Flows on Tori and Spheres”) to get this requirement satisfied for “exponential_map_flows”.</p>
+</dd></dl>
+
 </div>
 <div class="section" id="helper-functions">
 <h3>Helper Functions<a class="headerlink" href="#helper-functions" title="Permalink to this headline">¶</a></h3>
@@ -214,8 +318,19 @@ Must be implemented by subclass.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="identity-layer-x">
-<h4>Identity layer (“x”)<a class="headerlink" href="#identity-layer-x" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.euclidean.euclidean_do_nothing">
+<span id="identity-layer-x"></span><h4>Identity layer (“x”)<a class="headerlink" href="#module-jammy_flows.layers.euclidean.euclidean_do_nothing" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.euclidean.euclidean_do_nothing.euclidean_do_nothing">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.euclidean.euclidean_do_nothing.</code><code class="sig-name descname">euclidean_do_nothing</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">use_permanent_parameters=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.euclidean_do_nothing.euclidean_do_nothing" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.euclidean.euclidean_do_nothing.euclidean_do_nothing.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">use_permanent_parameters=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.euclidean_do_nothing.euclidean_do_nothing.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Identitiy transformation. Symbol “x”</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="multivariate-normal-t">
 <h4>Multivariate Normal (“t”)<a class="headerlink" href="#multivariate-normal-t" title="Permalink to this headline">¶</a></h4>
@@ -223,8 +338,20 @@ Must be implemented by subclass.</p>
 <div class="section" id="gaussianization-flow-g">
 <h4>Gaussianization flow (“g”)<a class="headerlink" href="#gaussianization-flow-g" title="Permalink to this headline">¶</a></h4>
 </div>
-<div class="section" id="polynomial-stretch-flow-p">
-<h4>Polynomial stretch flow (“p”)<a class="headerlink" href="#polynomial-stretch-flow-p" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.euclidean.polynomial_stretch_flow">
+<span id="polynomial-stretch-flow-p"></span><h4>Polynomial stretch flow (“p”)<a class="headerlink" href="#module-jammy_flows.layers.euclidean.polynomial_stretch_flow" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.euclidean.polynomial_stretch_flow.psf_block">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.euclidean.polynomial_stretch_flow.</code><code class="sig-name descname">psf_block</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">num_transforms=3</em>, <em class="sig-param">num_householder_iter=-1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">exact_mode=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.polynomial_stretch_flow.psf_block" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.euclidean.polynomial_stretch_flow.psf_block.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">num_transforms=3</em>, <em class="sig-param">num_householder_iter=-1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">exact_mode=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.polynomial_stretch_flow.psf_block.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Polynomial stretch flow - Symbol: “p”</p>
+<p>A polynomial flow that uses <em>abs(x)</em> to make arbitrary polynomials work as flow-mappings. Has interesting structure but does not seem to work very well in practice.</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 </div>
 <div class="section" id="module-jammy_flows.layers.spheres.sphere_base">
@@ -243,14 +370,58 @@ rotation_mode (str): One of [“angles”, “householder”]. <em>Angles</em> i
 
 </dd></dl>
 
-<div class="section" id="identity-layer-y">
-<h4>Identity layer (“y”)<a class="headerlink" href="#identity-layer-y" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.spheres.spherical_do_nothing">
+<span id="identity-layer-y"></span><h4>Identity layer (“y”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.spherical_do_nothing" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.spherical_do_nothing.spherical_do_nothing">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.spherical_do_nothing.</code><code class="sig-name descname">spherical_do_nothing</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.spherical_do_nothing.spherical_do_nothing" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.spherical_do_nothing.spherical_do_nothing.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.spherical_do_nothing.spherical_do_nothing.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Spherical identity mapping: Symbol “y”</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
-<div class="section" id="moebius-1-d-circle-flow-m">
-<h4>Moebius 1-d circle flow (“m”)<a class="headerlink" href="#moebius-1-d-circle-flow-m" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.spheres.moebius_1d">
+<span id="moebius-1-d-circle-flow-m"></span><h4>Moebius 1-d circle flow (“m”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.moebius_1d" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.moebius_1d.moebius">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.moebius_1d.</code><code class="sig-name descname">moebius</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.moebius_1d.moebius" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.moebius_1d.moebius.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.moebius_1d.moebius.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Moebius transformations on the circle. Symbol “m”</p>
+<p>Follows <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>. Parametrization seems to be slightly unstable sometimes.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>natural_direction</strong> (<em>int</em>) – If set to 0, log-probability is faster than sampling. Otherwise reversed.</p></li>
+<li><p><strong>use_moebius_xyz_parametreization</strong> (<em>bool</em>) – Two different paramerizations.</p></li>
+<li><p><strong>num_basis_functions</strong> (<em>int</em>) – Number of moebius basis functions.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
-<div class="section" id="circular-1-d-spline-flow-o">
-<h4>Circular 1-d spline flow (“o”)<a class="headerlink" href="#circular-1-d-spline-flow-o" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.spheres.splines_1d">
+<span id="circular-1-d-spline-flow-o"></span><h4>Circular 1-d spline flow (“o”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.splines_1d" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.splines_1d.spline_1d">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.splines_1d.</code><code class="sig-name descname">spline_1d</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">num_basis_functions=5</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.splines_1d.spline_1d" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.splines_1d.spline_1d.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">num_basis_functions=5</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.splines_1d.spline_1d.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>A circular spline variant. Symbol: “o”</p>
+<p>Follows <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>. Still experimental and has not really been tested.</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="segmented-2-d-sphere-flow-n">
 <h4>Segmented 2-d sphere flow (“n”)<a class="headerlink" href="#segmented-2-d-sphere-flow-n" title="Permalink to this headline">¶</a></h4>
@@ -279,6 +450,11 @@ Must be implemented by subclass.</p>
 <span class="target" id="module-jammy_flows.layers.intervals.interval_do_nothing"></span><dl class="class">
 <dt id="jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.interval_do_nothing.</code><code class="sig-name descname">interval_do_nothing</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<span class="target" id="module-jammy_flows.layers.intervals.rational_quadratic_spline"></span><dl class="class">
+<dt id="jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.rational_quadratic_spline.</code><code class="sig-name descname">rational_quadratic_spline</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">num_basis_elements=10</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=0</em>, <em class="sig-param">low_boundary=0</em>, <em class="sig-param">high_boundary=1.0</em>, <em class="sig-param">min_width=0.0001</em>, <em class="sig-param">min_height=0.0001</em>, <em class="sig-param">min_derivative=0.0001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline" title="Permalink to this definition">¶</a></dt>
 <dd></dd></dl>
 
 </div>
