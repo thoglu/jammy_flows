@@ -18,7 +18,7 @@ jobs:
     - uses: actions/checkout@v3
     - uses: ammaraskar/sphinx-action@master
       with:
-        pre-build-command: "python -m pip install sphinx_rtd_theme torch numpy matplotlib"
+        pre-build-command: "python -m pip install sphinx_rtd_theme torch numpy matplotlib scipy"
         docs-folder: "docs/"
         
      # - uses: actions/upload-artifact@v1
