@@ -71,10 +71,7 @@ class mvn_block(euclidean_base.euclidean_base):
 
         Parameters:
 
-            dimension (int): Dimension of the PDF. Set by *jammy_flows.pdf*.
             cov_type (str): One of ["full", "diagonal", "diagonal_symmetric", "identity"]. "diagonal_symmetric" means one shared covariance parameter for all dimensions.
-            model_offset (int): Model offset. Set by *jammy_flows.pdf*.
-            use_permanent_parameters (int): Set by *jammy_flows.pdf*.
             width_smooth_saturation (int): If set, uses smooth function also for lower end to describe log-width of variance-like parameters.
             lower_bound_for_widths (float): Lower bound for the variance-like parameters.
             upper_bound_for_widths (float): Upper bound for the variance-like parameters.

@@ -132,7 +132,7 @@ Exponential map 2-d sphere flow ("v")
     :exclude-members: generate_normalization_function, basic_exponential_map, basic_logarithmic_map, get_exp_map_and_jacobian
 
 Chart-based continuous 2-d sphere flow ("c")
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: jammy_flows.layers.spheres.cnf_sphere_charts
     :members:
