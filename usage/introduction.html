@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Introduction &mdash; jammy_flows master documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API Documentation" href="api.html" />
+    <link rel="prev" title="Installation" href="installation.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> jammy_flows
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Introduction</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#initialization">Initialization</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#evaluation">Evaluation</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#sampling">Sampling</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">jammy_flows</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Introduction</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/thoglu/jammy_flows/blob/main/docs/source/usage/introduction.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="introduction">
+<h1>Introduction<a class="headerlink" href="#introduction" title="Permalink to this headline">¶</a></h1>
+<p>Jammy Flows (<strong>J</strong> oint <strong>A</strong> utoregressive <strong>M</strong> anifold ( <strong>MY</strong> ) Normalizing <strong>Flows</strong>) implements normalizing flow PDFs that can be defined to describe joint distributions over an arbitrary number of multiple manifolds and grew out of work described in .</p>
+<p>The manifolds are connected via (inverse) autoregressive connections, where the connectivity is akin to the one described in the paper <em>Improving Variational Inference with Inverse Autoregressive Flow</em> (<em>https://arxiv.org/abs/1606.04934</em>). There are two major differences to the IAF implementation. The first difference is that the autoregressive connections in <em>jammy_flows</em> are explicitly linking different manifold flows, not each individual dimension. This allows to describe distributions defined jointly over multiple manifolds, e.g. a Euclidean manifold and a sphere. The second difference is that the coupling layers are not affine (i.e. linear couplings that describe Gaussian distributions), but general nonlinear couplings that can describe any normalizing flow distribution. As such, the autoregressive connections map to any desired normalizing flow implemented in the package.</p>
+<p>The autoregressive routing is automatically handled in the background, and the user can get started to define a PDF with a simple syntax.</p>
+<div class="section" id="initialization">
+<h2>Initialization<a class="headerlink" href="#initialization" title="Permalink to this headline">¶</a></h2>
+<p>For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
+
+<span class="n">flow_pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e2+s2&quot;</span><span class="p">,</span> <span class="s2">&quot;ggg+n&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The first argument <code class="docutils literal notranslate"><span class="pre">&quot;e2+s2&quot;</span></code> defines the manifold structure, e.g. a 2-d Euclidean PDF (<code class="docutils literal notranslate"><span class="pre">e2</span></code>), autoregressively linked to a 2-sphere PDF (<code class="docutils literal notranslate"><span class="pre">s2</span></code>). The second argument defines the individual flow layers for each manifold. In this case there are three Gaussianization flow layers (<code class="docutils literal notranslate"><span class="pre">ggg</span></code>), which means the flow function for the Euclidean part is a composite function of three Gaussianization Flow layers as <span class="math notranslate nohighlight">\(f_{tot}(x)=f_{g,1}(f_{g,2}(f_{g,3}(x)))\)</span>. The spherical part is a segmented-sphere flow, which is applied once and abbreviated with <code class="docutils literal notranslate"><span class="pre">n</span></code>.
+A list of supported manifolds and respective flow abbreviations for each manifold is given in the API.</p>
+<p>Since Autoregressive structure imposes an ordering, the above example is slightly different than</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
+
+<span class="n">flow_pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;s2+e2&quot;</span><span class="p">,</span> <span class="s2">&quot;n+ggg&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="evaluation">
+<h2>Evaluation<a class="headerlink" href="#evaluation" title="Permalink to this headline">¶</a></h2>
+<p>Once a PDF is defined, one can evaluate it. Let’s look at the first example again:</p>
+<p>To evaluate, one can just call it like</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">torch</span>
+<span class="kn">import</span> <span class="nn">jammy_flows</span>
+
+<span class="n">flow_pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e2+s2&quot;</span><span class="p">,</span> <span class="s2">&quot;ggg+n&quot;</span><span class="p">)</span>
+
+<span class="c1"># by default the pdf is in double precision, so we feed it a double tensor</span>
+<span class="c1"># the last two coordinates are spherical coordinates between (0,pi) and (0,2pi), respectively</span>
+<span class="n">target</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">DoubleTensor</span><span class="p">([</span><span class="mf">2.4</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mi">2</span><span class="o">*</span><span class="n">pi</span><span class="p">])</span>
+
+
+<span class="c1"># evaluating at target gives 3 return values</span>
+<span class="n">log_prob_target</span><span class="p">,</span> <span class="n">log_prob_base</span><span class="p">,</span> <span class="n">value_base</span><span class="o">=</span><span class="n">flow_pdf</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The first return value is the log-probability at the target position. The second is the log-probability at the base distribution.
+The third is the position in the base space.</p>
+<p>This evaluation will actually treat the spherical dimension as not being a manifold, i.e. not embedded in some higher dimensional space. Normally, it is desired to evaluate it as a true spherical PDF.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># the same target expressed with the spherical coordinates now in embedding space</span>
+<span class="n">target</span><span class="o">=</span><span class="n">torch</span><span class="o">.</span><span class="n">DoubleTensor</span><span class="p">([</span><span class="mf">2.4</span><span class="p">,</span> <span class="mf">2.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span>
+
+<span class="c1"># evaluating at embedding coordinates</span>
+<span class="n">log_prob_target</span><span class="p">,</span> <span class="n">log_prob_base</span><span class="p">,</span> <span class="n">value_base</span><span class="o">=</span><span class="n">flow_pdf</span><span class="p">(</span><span class="n">target</span><span class="p">,</span> <span class="n">force_embedding_coordinates</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>The log-probability obtained will now contain the extra log-det factor to properly account for the curvature of the sphere.</p>
+<ul class="simple">
+<li><p>Evaluation</p></li>
+</ul>
+</div>
+<div class="section" id="sampling">
+<h2>Sampling<a class="headerlink" href="#sampling" title="Permalink to this headline">¶</a></h2>
+<p>All layers inherit from the base class</p>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="installation.html" class="btn btn-neutral float-left" title="Installation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="API Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
