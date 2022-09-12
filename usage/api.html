@@ -49,14 +49,14 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-jammy_flows.layers.layer_base">Layers</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#euclidean-flow-layers">Euclidean flow layers</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="#euclidean-base">Euclidean Base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.euclidean_base">Euclidean Base</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#identity-layer-x">Identity layer (“x”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#multivariate-normal-t">Multivariate Normal (“t”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#gaussianization-flow-g">Gaussianization flow (“g”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#polynomial-stretch-flow-p">Polynomial stretch flow (“p”)</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#spherical-flow-layers">Spherical flow layers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.spheres.sphere_base">Spherical flow layers</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#identity-layer-y">Identity layer (“y”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#moebius-1-d-circle-flow-m">Moebius 1-d circle flow (“m”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#circular-1-d-spline-flow-o">Circular 1-d spline flow (“o”)</a></li>
@@ -65,8 +65,8 @@
 <li class="toctree-l4"><a class="reference internal" href="#chart-based-continuous-2-d-sphere-flow-c">Chart-based continuous 2-d sphere flow (“c”)</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#interval-flow-layers">Interval flow layers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#simplex-flow-layers">Simplex flow layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.intervals.interval_base">Interval flow layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.simplex.simplex_base">Simplex flow layers</a></li>
 </ul>
 </li>
 </ul>
@@ -195,8 +195,24 @@ Must be implemented by subclass.</p>
 
 <div class="section" id="euclidean-flow-layers">
 <h3>Euclidean flow layers<a class="headerlink" href="#euclidean-flow-layers" title="Permalink to this headline">¶</a></h3>
-<div class="section" id="euclidean-base">
-<h4>Euclidean Base<a class="headerlink" href="#euclidean-base" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.euclidean.euclidean_base">
+<span id="euclidean-base"></span><h4>Euclidean Base<a class="headerlink" href="#module-jammy_flows.layers.euclidean.euclidean_base" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.euclidean.euclidean_base.euclidean_base">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.euclidean.euclidean_base.</code><code class="sig-name descname">euclidean_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.euclidean_base.euclidean_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.euclidean.euclidean_base.euclidean_base.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.euclidean_base.euclidean_base.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all Euclidean flow layers. Inherits from layer_base.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>model_offset</strong> (<em>int</em>) – If set, models an extra offset for the Euclidean flow. Will be done automatically by <em>jammy_flows</em> pdf class. Only makes sense for the last flow layer in a sequence of Euclidean flows.</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="identity-layer-x">
 <h4>Identity layer (“x”)<a class="headerlink" href="#identity-layer-x" title="Permalink to this headline">¶</a></h4>
@@ -211,8 +227,22 @@ Must be implemented by subclass.</p>
 <h4>Polynomial stretch flow (“p”)<a class="headerlink" href="#polynomial-stretch-flow-p" title="Permalink to this headline">¶</a></h4>
 </div>
 </div>
-<div class="section" id="spherical-flow-layers">
-<h3>Spherical flow layers<a class="headerlink" href="#spherical-flow-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.layers.spheres.sphere_base">
+<span id="spherical-flow-layers"></span><h3>Spherical flow layers<a class="headerlink" href="#module-jammy_flows.layers.spheres.sphere_base" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.sphere_base.sphere_base">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.sphere_base.</code><code class="sig-name descname">sphere_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">add_rotation=False</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.sphere_base.sphere_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.sphere_base.sphere_base.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">add_rotation=False</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.sphere_base.sphere_base.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all spherical flow layers. Inherits from layer_base.</p>
+<p>dimension (int): Dimension of the flow. Set by parent.
+add_rotation (int): If set, adds an additional rotation as an additional “flow”.
+rotation_mode (str): One of [“angles”, “householder”]. <em>Angles</em> involves Givens Rotations, and <em>householder</em> householder rotations.</p>
+</dd></dl>
+
+</dd></dl>
+
 <div class="section" id="identity-layer-y">
 <h4>Identity layer (“y”)<a class="headerlink" href="#identity-layer-y" title="Permalink to this headline">¶</a></h4>
 </div>
@@ -232,11 +262,59 @@ Must be implemented by subclass.</p>
 <h4>Chart-based continuous 2-d sphere flow (“c”)<a class="headerlink" href="#chart-based-continuous-2-d-sphere-flow-c" title="Permalink to this headline">¶</a></h4>
 </div>
 </div>
-<div class="section" id="interval-flow-layers">
-<h3>Interval flow layers<a class="headerlink" href="#interval-flow-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.layers.intervals.interval_base">
+<span id="interval-flow-layers"></span><h3>Interval flow layers<a class="headerlink" href="#module-jammy_flows.layers.intervals.interval_base" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="jammy_flows.layers.intervals.interval_base.interval_base">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.interval_base.</code><code class="sig-name descname">interval_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_base.interval_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.intervals.interval_base.interval_base.transform_target_space">
+<code class="sig-name descname">transform_target_space</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">log_det=0.0</em>, <em class="sig-param">transform_from='default'</em>, <em class="sig-param">transform_to='embedding'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_base.interval_base.transform_target_space" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transforms the target vector from a given parametrization to another parametrization.
+Must be implemented by subclass.</p>
+</dd></dl>
+
+</dd></dl>
+
+<span class="target" id="module-jammy_flows.layers.intervals.interval_do_nothing"></span><dl class="class">
+<dt id="jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.interval_do_nothing.</code><code class="sig-name descname">interval_do_nothing</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
 </div>
-<div class="section" id="simplex-flow-layers">
-<h3>Simplex flow layers<a class="headerlink" href="#simplex-flow-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.layers.simplex.simplex_base">
+<span id="simplex-flow-layers"></span><h3>Simplex flow layers<a class="headerlink" href="#module-jammy_flows.layers.simplex.simplex_base" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="jammy_flows.layers.simplex.simplex_base.simplex_base">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.simplex.simplex_base.</code><code class="sig-name descname">simplex_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">always_parametrize_in_embedding_space=0</em>, <em class="sig-param">project_from_gauss_to_simplex=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.simplex_base.simplex_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.simplex.simplex_base.simplex_base.base_simplex_to_non_uniform_box">
+<code class="sig-name descname">base_simplex_to_non_uniform_box</code><span class="sig-paren">(</span><em class="sig-param">inputs</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.simplex_base.simplex_base.base_simplex_to_non_uniform_box" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transform from the base simplex to box. This is not the canonical standard simplex. In 4-d, e.g. this base simplex is bounded by the vertices
+(0,0,0,0), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1),</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.simplex.simplex_base.simplex_base.gauss_to_non_uniform_box">
+<code class="sig-name descname">gauss_to_non_uniform_box</code><span class="sig-paren">(</span><em class="sig-param">inputs</em>, <em class="sig-param">use_gauss_projection=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.simplex_base.simplex_base.gauss_to_non_uniform_box" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.simplex.simplex_base.simplex_base.non_uniform_box_to_base_simplex">
+<code class="sig-name descname">non_uniform_box_to_base_simplex</code><span class="sig-paren">(</span><em class="sig-param">inputs</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.simplex_base.simplex_base.non_uniform_box_to_base_simplex" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transform from box to the (base) simplex aligned with the coordinate axes. This is not the canonical standard simplex. In 4-d, e.g. this base simplex is bounded by the vertices
+(0,0,0,0), (1,0,0,0), (0,1,0,0), (0,0,1,0), (0,0,0,1),</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.simplex.simplex_base.simplex_base.transform_target_space">
+<code class="sig-name descname">transform_target_space</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">log_det=0.0</em>, <em class="sig-param">transform_from='default'</em>, <em class="sig-param">transform_to='embedding'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.simplex_base.simplex_base.transform_target_space" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transforms the target vector from a given parametrization to another parametrization.
+Must be implemented by subclass.</p>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 </div>
 </div>
