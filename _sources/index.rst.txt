@@ -13,15 +13,7 @@ Documentation test
    
    usage/installation
    usage/introduction
-   usage/supported_layers
    usage/api
-
-
-
-
-
-
-
 
 Indices and tables
 =============================
