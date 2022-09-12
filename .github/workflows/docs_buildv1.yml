@@ -27,6 +27,7 @@ jobs:
         
     - name: Commit documentation changes
       run: |
+        pip install sphinx_rtd_theme
         git clone https://github.com/thoglu/jammy_flows.git --branch gh-pages --single-branch gh-pages
         cp -r docs/build/html/* gh-pages/
         cd gh-pages
