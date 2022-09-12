@@ -37,7 +37,6 @@ class sphere_base(layer_base.layer_base):
         """
         Base class for all spherical flow layers. Inherits from layer_base.
     
-        dimension (int): Dimension of the flow. Set by parent.
         add_rotation (int): If set, adds an additional rotation as an additional "flow".
         rotation_mode (str): One of ["angles", "householder"]. *Angles* involves Givens Rotations, and *householder* householder rotations.
 

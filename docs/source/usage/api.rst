@@ -157,6 +157,11 @@ Simplex flow layers
 
 .. automodule:: jammy_flows.layers.simplex.simplex_base
     :members:
-    :exclude-members: flow_mapping, get_desired_init_parameters, init_params, inv_flow_mapping, obtain_layer_param_structure, 
+    :special-members: __init__
+    :exclude-members: flow_mapping, get_desired_init_parameters, init_params, inv_flow_mapping, obtain_layer_param_structure, base_simplex_to_non_uniform_box, gauss_to_non_uniform_box, non_uniform_box_to_base_simplex, transform_target_space
 
+
+.. automodule:: jammy_flows.layers.simplex.inner_loop_simplex
+    :members:
+    :special-members: __init__
 

@@ -6,8 +6,14 @@ import numpy
 from .. import layer_base
 
 class simplex_base(layer_base.layer_base):
-    def __init__(self, dimension=1, use_permanent_parameters=False, always_parametrize_in_embedding_space=0, project_from_gauss_to_simplex=0):
-        
+    def __init__(self, 
+                 dimension=1, 
+                 use_permanent_parameters=False, 
+                 always_parametrize_in_embedding_space=0, 
+                 project_from_gauss_to_simplex=0):
+        """ 
+        Base class for all simplex flow layers. Inherits from layer_base.
+        """
         super().__init__(dimension=dimension, always_parametrize_in_embedding_space=always_parametrize_in_embedding_space)
 
         self.use_permanent_parameters=use_permanent_parameters

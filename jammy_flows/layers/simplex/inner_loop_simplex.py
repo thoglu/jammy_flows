@@ -17,30 +17,29 @@ class inner_loop_simplex(simplex_base.simplex_base):
                  use_permanent_parameters=False,
                  always_parametrize_in_embedding_space=0,
                  project_from_gauss_to_simplex=0):
-        
+        """
+        Iterative simplex flow. Symbol: "w"
+
+        Construction suggested in https://arxiv.org/pdf/2008.05456.pdf.
+        """
         super().__init__(dimension=dimension, 
                          use_permanent_parameters=use_permanent_parameters,
                          always_parametrize_in_embedding_space=always_parametrize_in_embedding_space,
                          project_from_gauss_to_simplex=project_from_gauss_to_simplex)
 
 
-        #if(use_permanent_parameters):
-        #    self.log_tau = nn.Parameter(torch.randn(1).type(torch.double).unsqueeze(0))
-
-        #if(use_permanent_parameters):
-        #    self.log_probs=nn.Parameter(torch.randn(self.dimension+1).type(torch.double).unsqueeze(0))
-
-        #self.total_param_num+=dimension+2
         flow_dict=dict()
         flow_dict["r"] = dict()
         
-      
+        # hard coded 10 basis elements at the moment
         flow_dict["r"]["num_basis_elements"]=10
-        #flow_dict["r"]["kwargs"]["low_boundary"] = 0.0
-        #flow_dict["r"]["kwargs"]["high_boundary"] = 1.0
-
-        
-        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension), "+".join(["rr"]*self.dimension) , options_overwrite=flow_dict,amortize_everything=True, use_custom_low_rank_mlps=True, use_as_passthrough_instead_of_pdf=True)
+      
+        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension),
+                                  "+".join(["rr"]*self.dimension), 
+                                  options_overwrite=flow_dict,
+                                  amortize_everything=True,
+                                  use_custom_low_rank_mlps=True, 
+                                  use_as_passthrough_instead_of_pdf=True)
      
         self.total_num_inner_flow_params=self.inner_flow.total_number_amortizable_params
         self.total_param_num=self.total_num_inner_flow_params
