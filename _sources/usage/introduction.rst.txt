@@ -13,6 +13,15 @@ The autoregressive routing is automatically handled in the background, and the u
 Initialization
 ----------------
 
+There are currently 4 different manifolds supported by *jammy_flows. 
+    * Euclidean ("e")
+    * spherical ("s")
+    * interval ("i")
+    * simplex ("a")
+    
+The abbreviations are important, because they are used by *jammy_flows* to construct a tensor product of manifolds on which the PDF will live. For each manifold, there are manifold-specific normalzing flows defined on them. Each of those flows also is abbreviated by its own letter. For a list of flows and respective letter abbreviations, have a look in the API documentation.
+
+Now lets see how to use this abbreviation logic in practice.
 For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write
 
 ..  code-block:: python

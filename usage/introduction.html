@@ -79,7 +79,18 @@
 <p>The autoregressive routing is automatically handled in the background, and the user can get started to define a PDF with a simple syntax.</p>
 <div class="section" id="initialization">
 <h2>Initialization<a class="headerlink" href="#initialization" title="Permalink to this headline">¶</a></h2>
-<p>For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write</p>
+<dl class="simple">
+<dt>There are currently 4 different manifolds supported by <a href="#id1"><span class="problematic" id="id2">*</span></a>jammy_flows.</dt><dd><ul class="simple">
+<li><p>Euclidean (“e”)</p></li>
+<li><p>spherical (“s”)</p></li>
+<li><p>interval (“i”)</p></li>
+<li><p>simplex (“a”)</p></li>
+</ul>
+</dd>
+</dl>
+<p>The abbreviations are important, because they are used by <em>jammy_flows</em> to construct a tensor product of manifolds on which the PDF will live. For each manifold, there are manifold-specific normalzing flows defined on them. Each of those flows also is abbreviated by its own letter. For a list of flows and respective letter abbreviations, have a look in the API documentation.</p>
+<p>Now lets see how to use this abbreviation logic in practice.
+For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
 
 <span class="n">flow_pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e2+s2&quot;</span><span class="p">,</span> <span class="s2">&quot;ggg+n&quot;</span><span class="p">)</span>
