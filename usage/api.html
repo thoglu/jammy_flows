@@ -47,7 +47,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
 </ul>
 </li>
-<li class="toctree-l2"><a class="reference internal" href="#layers">Layers</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#module-jammy_flows.layers.layer_base">Layers</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#euclidean-flow-layers">Euclidean flow layers</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#euclidean-base">Euclidean Base</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#identity-layer-x">Identity layer (“x”)</a></li>
@@ -114,8 +114,85 @@
 <h3>Helper Functions<a class="headerlink" href="#helper-functions" title="Permalink to this headline">¶</a></h3>
 </div>
 </div>
-<div class="section" id="layers">
-<h2>Layers<a class="headerlink" href="#layers" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="module-jammy_flows.layers.layer_base">
+<span id="layers"></span><h2>Layers<a class="headerlink" href="#module-jammy_flows.layers.layer_base" title="Permalink to this headline">¶</a></h2>
+<dl class="class">
+<dt id="jammy_flows.layers.layer_base.layer_base">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.layer_base.</code><code class="sig-name descname">layer_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">always_parametrize_in_embedding_space=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">always_parametrize_in_embedding_space=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Base class for all flow layers.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dimension</strong> (<em>int</em>) – The intrinsic dimension of the flow.</p></li>
+<li><p><strong>always_parametrize_in_embedding_space</strong> (<em>int</em>) – Required for subclasses to make decisions for embedding transformations.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base._embedding_conditional_return">
+<code class="sig-name descname">_embedding_conditional_return</code><span class="sig-paren">(</span><em class="sig-param">x</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base._embedding_conditional_return" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transforms a vector into embedded space. Is flow specific and must be implemented by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base._embedding_conditional_return_num">
+<code class="sig-name descname">_embedding_conditional_return_num</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base._embedding_conditional_return_num" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns the number of embedding space dimensions for this flow. Must be implemented by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.flow_mapping">
+<code class="sig-name descname">flow_mapping</code><span class="sig-paren">(</span><em class="sig-param">input</em>, <em class="sig-param">extra_inputs=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.flow_mapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implements the flow forward mapping, which is required for sampling.
+Must be overwritten by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.get_desired_init_parameters">
+<code class="sig-name descname">get_desired_init_parameters</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.get_desired_init_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns desired init parameters for given flow.
+Should be overwritten by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.init_params">
+<code class="sig-name descname">init_params</code><span class="sig-paren">(</span><em class="sig-param">params</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.init_params" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initializes permanent params. Can only be invoked when PDF is non-conditional.
+Must be overwritten by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.inv_flow_mapping">
+<code class="sig-name descname">inv_flow_mapping</code><span class="sig-paren">(</span><em class="sig-param">input</em>, <em class="sig-param">extra_inputs=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.inv_flow_mapping" title="Permalink to this definition">¶</a></dt>
+<dd><p>Implements the flow inverse mapping, which is required for evaluation.
+Must be overwritten by subclass.</p>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.obtain_layer_param_structure">
+<code class="sig-name descname">obtain_layer_param_structure</code><span class="sig-paren">(</span><em class="sig-param">param_dict</em>, <em class="sig-param">extra_inputs=None</em>, <em class="sig-param">previous_x=None</em>, <em class="sig-param">extra_prefix=''</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.obtain_layer_param_structure" title="Permalink to this definition">¶</a></dt>
+<dd><p>Useful for debugging purposes. Must be overwritten by subclass.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>param_dict</strong> (<em>dict</em>) – Is handed over from <em>jammy_flows.pdf</em> class and filled in this function with current values via param_dict[<em>par_name</em>]=*par_value*.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.layers.layer_base.layer_base.transform_target_space">
+<code class="sig-name descname">transform_target_space</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">log_det=0.0</em>, <em class="sig-param">trafo_from='default'</em>, <em class="sig-param">trafo_to='embedding'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.layer_base.layer_base.transform_target_space" title="Permalink to this definition">¶</a></dt>
+<dd><p>Transforms the target vector from a given parametrization to another parametrization.
+Must be implemented by subclass.</p>
+</dd></dl>
+
+</dd></dl>
+
 <div class="section" id="euclidean-flow-layers">
 <h3>Euclidean flow layers<a class="headerlink" href="#euclidean-flow-layers" title="Permalink to this headline">¶</a></h3>
 <div class="section" id="euclidean-base">
