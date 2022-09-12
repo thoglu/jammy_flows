@@ -6,13 +6,14 @@
 Documentation test
 **************************
 
-
 .. toctree::
    :maxdepth: 2
    :caption: Contents:
 
-   usage/overview
+   
    usage/installation
+   usage/introduction
+   usage/supported_layers
    usage/api
 
 

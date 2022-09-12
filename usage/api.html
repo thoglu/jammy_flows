@@ -1,116 +1,197 @@
-
 <!DOCTYPE html>
-
-<html xmlns="http://www.w3.org/1999/xhtml">
-  <head>
-    <meta charset="utf-8" />
-    <title>API Documentation &#8212; flow_collection 0.1 documentation</title>
-    <link rel="stylesheet" href="../_static/alabaster.css" type="text/css" />
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>API Documentation &mdash; jammy_flows 0.1 documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
     <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
-    <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
-    <script src="../_static/jquery.js"></script>
-    <script src="../_static/underscore.js"></script>
-    <script src="../_static/doctools.js"></script>
-    <script src="../_static/language_data.js"></script>
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="Installation" href="installation.html" />
-   
-  <link rel="stylesheet" href="../_static/custom.css" type="text/css" />
-  
-  
-  <meta name="viewport" content="width=device-width, initial-scale=0.9, maximum-scale=0.9" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
 
-  </head><body>
-  
-
-    <div class="document">
-      <div class="documentwrapper">
-        <div class="bodywrapper">
-          
-
-          <div class="body" role="main">
-            
-  <div class="section" id="api-documentation">
-<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
-<div class="section" id="different-flow-layers">
-<h2>Different flow layers<a class="headerlink" href="#different-flow-layers" title="Permalink to this headline">¶</a></h2>
-<div class="section" id="general-functions-and-base-classes">
-<h3>General Functions and base classes<a class="headerlink" href="#general-functions-and-base-classes" title="Permalink to this headline">¶</a></h3>
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> jammy_flows
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
 </div>
-<div class="section" id="euclidean-flow-layers">
-<h3>Euclidean flow layers<a class="headerlink" href="#euclidean-flow-layers" title="Permalink to this headline">¶</a></h3>
-</div>
-<div class="section" id="spherical-flow-layers">
-<h3>Spherical flow layers<a class="headerlink" href="#spherical-flow-layers" title="Permalink to this headline">¶</a></h3>
-</div>
-</div>
-<div class="section" id="helper-functions">
-<h2>Helper Functions<a class="headerlink" href="#helper-functions" title="Permalink to this headline">¶</a></h2>
-</div>
-</div>
-
-
-          </div>
-          
-        </div>
-      </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
-        <div class="sphinxsidebarwrapper">
-<h3><a href="../index.html">Table of Contents</a></h3>
-<p class="caption"><span class="caption-text">Contents:</span></p>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="overview.html">Overview</a></li>
 <li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#different-flow-layers">Different flow layers</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#main-class">Main class</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#amortizable-mlp">Amortizable MLP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#numerical-inversion">Numerical inversion</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#layers">Layers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#euclidean-flow-layers">Euclidean flow layers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#euclidean-base">Euclidean Base</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#identity-layer-x">Identity layer (“x”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#multivariate-normal-t">Multivariate Normal (“t”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#gaussianization-flow-g">Gaussianization flow (“g”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#polynomial-stretch-flow-p">Polynomial stretch flow (“p”)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#spherical-flow-layers">Spherical flow layers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#identity-layer-y">Identity layer (“y”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#moebius-1-d-circle-flow-m">Moebius 1-d circle flow (“m”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#circular-1-d-spline-flow-o">Circular 1-d spline flow (“o”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#segmented-2-d-sphere-flow-n">Segmented 2-d sphere flow (“n”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#exponential-map-2-d-sphere-flow-v">Exponential map 2-d sphere flow (“v”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#chart-based-continuous-2-d-sphere-flow-c">Chart-based continuous 2-d sphere flow (“c”)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#interval-flow-layers">Interval flow layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#simplex-flow-layers">Simplex flow layers</a></li>
 </ul>
 </li>
 </ul>
-<div class="relations">
-<h3>Related Topics</h3>
-<ul>
-  <li><a href="../index.html">Documentation overview</a><ul>
-      <li>Previous: <a href="installation.html" title="previous chapter">Installation</a></li>
-  </ul></li>
+</li>
 </ul>
-</div>
-  <div role="note" aria-label="source link">
-    <h3>This Page</h3>
-    <ul class="this-page-menu">
-      <li><a href="../_sources/usage/api.rst.txt"
-            rel="nofollow">Show Source</a></li>
-    </ul>
-   </div>
-<div id="searchbox" style="display: none" role="search">
-  <h3 id="searchlabel">Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" />
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</div>
-<script>$('#searchbox').show(0);</script>
+
         </div>
       </div>
-      <div class="clearer"></div>
-    </div>
-    <div class="footer">
-      &copy;2020, Thorsten Glüsenkamp.
-      
-      |
-      Powered by <a href="http://sphinx-doc.org/">Sphinx 2.4.4</a>
-      &amp; <a href="https://github.com/bitprophet/alabaster">Alabaster 0.7.12</a>
-      
-      |
-      <a href="../_sources/usage/api.rst.txt"
-          rel="nofollow">Page source</a>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">jammy_flows</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>API Documentation</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/thoglu/jammy_flows/blob/main/docs/source/usage/api.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="api-documentation">
+<h1>API Documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="general">
+<h2>General<a class="headerlink" href="#general" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="main-class">
+<h3>Main class<a class="headerlink" href="#main-class" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="amortizable-mlp">
+<h3>Amortizable MLP<a class="headerlink" href="#amortizable-mlp" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="numerical-inversion">
+<h3>Numerical inversion<a class="headerlink" href="#numerical-inversion" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="helper-functions">
+<h3>Helper Functions<a class="headerlink" href="#helper-functions" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+<div class="section" id="layers">
+<h2>Layers<a class="headerlink" href="#layers" title="Permalink to this headline">¶</a></h2>
+<div class="section" id="euclidean-flow-layers">
+<h3>Euclidean flow layers<a class="headerlink" href="#euclidean-flow-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="euclidean-base">
+<h4>Euclidean Base<a class="headerlink" href="#euclidean-base" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="identity-layer-x">
+<h4>Identity layer (“x”)<a class="headerlink" href="#identity-layer-x" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="multivariate-normal-t">
+<h4>Multivariate Normal (“t”)<a class="headerlink" href="#multivariate-normal-t" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="gaussianization-flow-g">
+<h4>Gaussianization flow (“g”)<a class="headerlink" href="#gaussianization-flow-g" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="polynomial-stretch-flow-p">
+<h4>Polynomial stretch flow (“p”)<a class="headerlink" href="#polynomial-stretch-flow-p" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+<div class="section" id="spherical-flow-layers">
+<h3>Spherical flow layers<a class="headerlink" href="#spherical-flow-layers" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="identity-layer-y">
+<h4>Identity layer (“y”)<a class="headerlink" href="#identity-layer-y" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="moebius-1-d-circle-flow-m">
+<h4>Moebius 1-d circle flow (“m”)<a class="headerlink" href="#moebius-1-d-circle-flow-m" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="circular-1-d-spline-flow-o">
+<h4>Circular 1-d spline flow (“o”)<a class="headerlink" href="#circular-1-d-spline-flow-o" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="segmented-2-d-sphere-flow-n">
+<h4>Segmented 2-d sphere flow (“n”)<a class="headerlink" href="#segmented-2-d-sphere-flow-n" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="exponential-map-2-d-sphere-flow-v">
+<h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#exponential-map-2-d-sphere-flow-v" title="Permalink to this headline">¶</a></h4>
+</div>
+<div class="section" id="chart-based-continuous-2-d-sphere-flow-c">
+<h4>Chart-based continuous 2-d sphere flow (“c”)<a class="headerlink" href="#chart-based-continuous-2-d-sphere-flow-c" title="Permalink to this headline">¶</a></h4>
+</div>
+</div>
+<div class="section" id="interval-flow-layers">
+<h3>Interval flow layers<a class="headerlink" href="#interval-flow-layers" title="Permalink to this headline">¶</a></h3>
+</div>
+<div class="section" id="simplex-flow-layers">
+<h3>Simplex flow layers<a class="headerlink" href="#simplex-flow-layers" title="Permalink to this headline">¶</a></h3>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
-    
+  <hr/>
 
-    
-  </body>
+  <div role="contentinfo">
+    <p>&#169; Copyright .</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
 </html>
