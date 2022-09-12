@@ -1,4 +1,4 @@
-simport torch
+import torch
 from torch import nn
 import collections
 import numpy
@@ -9,7 +9,7 @@ import torch.distributions as tdist
 
 normal_dist=tdist.Normal(0, 1)
 
-### Note: This was experimental and does not actually fit into the package due to the non-mappable nature.
+### Note: This implementation was experimental and does not actually fit into the package due to the non-mappable nature.
 
 class gumbel_softmax(simplex_base.simplex_base):
     def __init__(self, 
