@@ -42,7 +42,7 @@
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.extra_functions">Main class</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#amortizable-mlp">Amortizable MLP</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.amortizable_mlp">Amortizable MLP</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.bisection_n_newton">Numerical inversion</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
 </ul>
@@ -51,8 +51,8 @@
 <li class="toctree-l3"><a class="reference internal" href="#euclidean-flow-layers">Euclidean flow layers</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.euclidean_base">Euclidean Base</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.euclidean_do_nothing">Identity layer (“x”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#multivariate-normal-t">Multivariate Normal (“t”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#gaussianization-flow-g">Gaussianization flow (“g”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.multivariate_normal">Multivariate Normal (“t”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.gaussianization_flow">Gaussianization flow (“g”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.euclidean.polynomial_stretch_flow">Polynomial stretch flow (“p”)</a></li>
 </ul>
 </li>
@@ -60,8 +60,8 @@
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.spherical_do_nothing">Identity layer (“y”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.moebius_1d">Moebius 1-d circle flow (“m”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.splines_1d">Circular 1-d spline flow (“o”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#segmented-2-d-sphere-flow-n">Segmented 2-d sphere flow (“n”)</a></li>
-<li class="toctree-l4"><a class="reference internal" href="#exponential-map-2-d-sphere-flow-v">Exponential map 2-d sphere flow (“v”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.segmented_sphere_nd">Segmented 2-d sphere flow (“n”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.exponential_map_s2">Exponential map 2-d sphere flow (“v”)</a></li>
 <li class="toctree-l4"><a class="reference internal" href="#chart-based-continuous-2-d-sphere-flow-c">Chart-based continuous 2-d sphere flow (“c”)</a></li>
 </ul>
 </li>
@@ -125,8 +125,101 @@
 </dd></dl>
 
 </div>
-<div class="section" id="amortizable-mlp">
-<h3>Amortizable MLP<a class="headerlink" href="#amortizable-mlp" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.amortizable_mlp">
+<span id="amortizable-mlp"></span><h3>Amortizable MLP<a class="headerlink" href="#module-jammy_flows.amortizable_mlp" title="Permalink to this headline">¶</a></h3>
+<dl class="class">
+<dt id="jammy_flows.amortizable_mlp.AmortizableMLP">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.amortizable_mlp.</code><code class="sig-name descname">AmortizableMLP</code><span class="sig-paren">(</span><em class="sig-param">input_dim</em>, <em class="sig-param">hidden_dims</em>, <em class="sig-param">output_dim</em>, <em class="sig-param">highway_mode=0</em>, <em class="sig-param">low_rank_approximations=0</em>, <em class="sig-param">nonlinearity='tanh'</em>, <em class="sig-param">use_permanent_parameters=True</em>, <em class="sig-param">svd_mode='smart'</em>, <em class="sig-param">precise_mlp_structure={}</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.amortizable_mlp.AmortizableMLP" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.amortizable_mlp.AmortizableMLP.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">input_dim</em>, <em class="sig-param">hidden_dims</em>, <em class="sig-param">output_dim</em>, <em class="sig-param">highway_mode=0</em>, <em class="sig-param">low_rank_approximations=0</em>, <em class="sig-param">nonlinearity='tanh'</em>, <em class="sig-param">use_permanent_parameters=True</em>, <em class="sig-param">svd_mode='smart'</em>, <em class="sig-param">precise_mlp_structure={}</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.amortizable_mlp.AmortizableMLP.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>MLP class that allows for amortization of all of its parameters.
+Supports low-rank approximations to weight matrices and 5 different settings of connectivity (“highway modes”).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dim</strong> (<em>output</em>) – Input dimension of the overall module.</p></li>
+<li><p><strong>hidden_dims</strong> (<em>str/int/list</em><em>(</em><em>int</em><em>)</em>) – Defines hidden dimension structure of all MLPs, depending on <em>highway_mode</em> how they are used. Hidden dimensionality is given by integers, separated by dash. I.e. 64-64.</p></li>
+<li><p><strong>dim</strong> – Output dimension of the overall module.</p></li>
+<li><p><strong>highway_mode</strong> (<em>int</em>) – <p>Defines connectivity structure.</p>
+<div class="line-block">
+<div class="line"><strong>0</strong>: Default MLP with a given number of hidden layers defined by <em>hidden_dims</em>.</div>
+<div class="line"><strong>1</strong>: Like mode 0 but with an extra skip connection using a linear matrix connecting input and output.</div>
+<div class="line"><strong>2</strong>: Like mode 1 but multiple one-hidden-layer MLPs that all connect from input to output instead of the single MLP. Each hidden layer of those MLPs is defined by <em>hidden_dims</em>.</div>
+<div class="line"><strong>3</strong>: Like mode 2 but the 2nd to nth MLP connects from the previous output to the next output, instead of input to output. Additionally, there are skip connections between all stages.</div>
+<div class="line"><strong>4</strong>: Like mode 3, but the 2nd to nth MLP connections from a union of [input,previous output] to next output. Additionally, there are skip connections between all stages.</div>
+</div>
+</p></li>
+<li><p><strong>low_rank_approximation</strong> (<em>int/list</em><em>(</em><em>int</em><em>)</em>) – Defines low-rank approximation of all matrices. If 0 or smaller, full rank is assumed.</p></li>
+<li><p><strong>nonlinearity</strong> (<em>str</em>) – Nonlinearity used.</p></li>
+<li><p><strong>use_permanent_parameters</strong> (<em>bool</em>) – If False, is used in amortization mode, i.e. all parameters are input in <em>foward</em> as <em>extra_inputs</em>.</p></li>
+<li><p><strong>svd_mode</strong> (<em>str</em>) – One of [“naive”, “smart”]. Smart takes a full normal matrix if the rank is its max rank, then a naive low-rank approximation is less parameter efficient. Naive just always makes a SVD based low-rank approximation, which can be less efficient sometimes.</p></li>
+<li><p><strong>precise_mlp_structure</strong> (<em>dict</em>) – Allows to pass a dict with similar structure as <em>sub_mlp_structures</em> (see code), in order to have more customization, i.e. per-matrix varying low-ranks etc.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.amortizable_mlp.AmortizableMLP.forward">
+<code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">i</em>, <em class="sig-param">extra_inputs=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.amortizable_mlp.AmortizableMLP.forward" title="Permalink to this definition">¶</a></dt>
+<dd><p>Applies the AmortizableMLP to target.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>i</strong> (<em>Tensor</em>) – Input tensor of shape (B, D)</p></li>
+<li><p><strong>extra_inputs</strong> (<em>Tensor/None</em>) – If given, amortizes all parameters of the AmortizableMLP.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>Output of the AmortizableMLP.</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.amortizable_mlp.AmortizableMLP.initialize_uvbs">
+<code class="sig-name descname">initialize_uvbs</code><span class="sig-paren">(</span><em class="sig-param">fix_total=None</em>, <em class="sig-param">fix_final_bias=None</em>, <em class="sig-param">prev_damping_factor=1000.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.amortizable_mlp.AmortizableMLP.initialize_uvbs" title="Permalink to this definition">¶</a></dt>
+<dd><p>Initialize the parameters of the MLPs. Either all parameters are initialized similar to default procedures in pytorch (fix_total and fix_final_bias None),
+or all parameters are handed over (fix_total given), or the final bias vector is handed over (fix_final_bias given).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fix_total</strong> (<em>None/Tensor</em>) – If not None, has to be of size of all AmortizableMLP params to initialize all params of all MLPs.</p></li>
+<li><p><strong>fix_final_bias</strong> (<em>None/Tensor</em>) – If not None, has to be of size of the target dimension (final bias) to set the final bias vector.</p></li>
+<li><p><strong>prev_damping_factor</strong> (<em>float</em>) – Used to dampen previous weights/biases of init tensor when <em>fix_final_bias</em> is given.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.amortizable_mlp.AmortizableMLP.obtain_default_init_tensor">
+<code class="sig-name descname">obtain_default_init_tensor</code><span class="sig-paren">(</span><em class="sig-param">fix_final_bias=None</em>, <em class="sig-param">prev_damping_factor=1000.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.amortizable_mlp.AmortizableMLP.obtain_default_init_tensor" title="Permalink to this definition">¶</a></dt>
+<dd><p>Obtains a tensor that fits the shape of the AmortizableMLP parrameters according to standard kaiman init rules taken from pytorch.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>fix_final_bias</strong> (<em>Tensor/None</em>) – If given, the final bias is fixed to a specific output Tensor given by <em>fix_final_bias</em>. If None, standard initialization applies.</p></li>
+<li><p><strong>prev_damping_factor</strong> (<em>float</em>) – If <em>fix_final_bias</em> is set, determines a damping factor that applies to all weights/biases before final bias, in order to reduce dependency on them.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>The final initialization tensor that is desired for the AmortizableMLP.</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="module-jammy_flows.layers.bisection_n_newton">
 <span id="numerical-inversion"></span><h3>Numerical inversion<a class="headerlink" href="#module-jammy_flows.layers.bisection_n_newton" title="Permalink to this headline">¶</a></h3>
@@ -332,11 +425,75 @@ Must be implemented by subclass.</p>
 </dd></dl>
 
 </div>
-<div class="section" id="multivariate-normal-t">
-<h4>Multivariate Normal (“t”)<a class="headerlink" href="#multivariate-normal-t" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.euclidean.multivariate_normal">
+<span id="multivariate-normal-t"></span><h4>Multivariate Normal (“t”)<a class="headerlink" href="#module-jammy_flows.layers.euclidean.multivariate_normal" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.euclidean.multivariate_normal.mvn_block">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.euclidean.multivariate_normal.</code><code class="sig-name descname">mvn_block</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">cov_type='full'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">width_smooth_saturation=1</em>, <em class="sig-param">lower_bound_for_widths=0.01</em>, <em class="sig-param">upper_bound_for_widths=100</em>, <em class="sig-param">softplus_for_width=0</em>, <em class="sig-param">clamp_widths=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.multivariate_normal.mvn_block" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.euclidean.multivariate_normal.mvn_block.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">cov_type='full'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">width_smooth_saturation=1</em>, <em class="sig-param">lower_bound_for_widths=0.01</em>, <em class="sig-param">upper_bound_for_widths=100</em>, <em class="sig-param">softplus_for_width=0</em>, <em class="sig-param">clamp_widths=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.multivariate_normal.mvn_block.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Affine flow (Multivariate Normal Distribution) - Symbol “t”</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>cov_type</strong> (<em>str</em>) – One of [“full”, “diagonal”, “diagonal_symmetric”, “identity”]. “diagonal_symmetric” means one shared covariance parameter for all dimensions.</p></li>
+<li><p><strong>width_smooth_saturation</strong> (<em>int</em>) – If set, uses smooth function also for lower end to describe log-width of variance-like parameters.</p></li>
+<li><p><strong>lower_bound_for_widths</strong> (<em>float</em>) – Lower bound for the variance-like parameters.</p></li>
+<li><p><strong>upper_bound_for_widths</strong> (<em>float</em>) – Upper bound for the variance-like parameters.</p></li>
+<li><p><strong>softplus_for_width</strong> (<em>int</em>) – If set, uses softplus instead of exponential to enforce positivity on variance-like parameters.</p></li>
+<li><p><strong>clamp_widths</strong> (<em>int</em>) – If set, clamps widths.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
-<div class="section" id="gaussianization-flow-g">
-<h4>Gaussianization flow (“g”)<a class="headerlink" href="#gaussianization-flow-g" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.euclidean.gaussianization_flow">
+<span id="gaussianization-flow-g"></span><h4>Gaussianization flow (“g”)<a class="headerlink" href="#module-jammy_flows.layers.euclidean.gaussianization_flow" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.euclidean.gaussianization_flow.gf_block">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.euclidean.gaussianization_flow.</code><code class="sig-name descname">gf_block</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">nonlinear_stretch_type='classic'</em>, <em class="sig-param">num_kde=5</em>, <em class="sig-param">num_householder_iter=-1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">fit_normalization=0</em>, <em class="sig-param">inverse_function_type='inormal_partly_precise'</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">softplus_for_width=0</em>, <em class="sig-param">width_smooth_saturation=1</em>, <em class="sig-param">lower_bound_for_widths=0.01</em>, <em class="sig-param">upper_bound_for_widths=100</em>, <em class="sig-param">clamp_widths=0</em>, <em class="sig-param">regulate_normalization=0</em>, <em class="sig-param">add_skewness=0</em>, <em class="sig-param">rotation_mode='householder'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.gaussianization_flow.gf_block" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.euclidean.gaussianization_flow.gf_block.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">nonlinear_stretch_type='classic'</em>, <em class="sig-param">num_kde=5</em>, <em class="sig-param">num_householder_iter=-1</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">fit_normalization=0</em>, <em class="sig-param">inverse_function_type='inormal_partly_precise'</em>, <em class="sig-param">model_offset=0</em>, <em class="sig-param">softplus_for_width=0</em>, <em class="sig-param">width_smooth_saturation=1</em>, <em class="sig-param">lower_bound_for_widths=0.01</em>, <em class="sig-param">upper_bound_for_widths=100</em>, <em class="sig-param">clamp_widths=0</em>, <em class="sig-param">regulate_normalization=0</em>, <em class="sig-param">add_skewness=0</em>, <em class="sig-param">rotation_mode='householder'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.euclidean.gaussianization_flow.gf_block.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Gaussianization flow: Symbol “g”</p>
+<p>Implements <a class="reference external" href="https://arxiv.org/abs/2003.01941">https://arxiv.org/abs/2003.01941</a> as a modified version of the official implementation in <a class="reference external" href="https://github.com/chenlin9/Gaussianization_Flows">https://github.com/chenlin9/Gaussianization_Flows</a>. Fixes numerical issues with bisection inversion due to more efficient newton iterations, which also makes samples differentiable + fixes numerical issues with inverse CDF parametrization. Also allows
+for amortization (the original implementation is meant only for non-conditional PDFs). Further adds multiple rotation parametrizations, logistic skewness option, and an rq-spline option for the non-linear mapping.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>dimension</strong> (<em>int</em>) – Dimension of the PDF. Set by <em>jammy_flows.pdf</em>.</p></li>
+<li><p><strong>nonlinear_stretch_type</strong> (<em>str</em>) – One of [“classic”, “rq_splines”]. Default is classic, but also allows to replace non-linear mapping with rational quadratic splines.</p></li>
+<li><p><strong>num_kde</strong> (<em>int</em>) – Number of KDE Kernels in each one-dimensional transformation.</p></li>
+<li><p><strong>num_householder_iter</strong> (<em>int</em>) – if &lt;=0, no householder transformation is performed. If positive, it defines the number of parameters in householder transformations.</p></li>
+<li><p><strong>fit_normalization</strong> (<em>int</em>) – If set, also fits the normalization.</p></li>
+<li><p><strong>inverse_function_type</strong> (<em>str</em>) – One of [“partly_crude”, “partly_precise”, “full_pade”, “isgimoid”]. “Partly_crude” is implemented in the original repository (<a class="reference external" href="https://github.com/chenlin9/Gaussianization_Flows">https://github.com/chenlin9/Gaussianization_Flows</a>), but has numerical issues. The option “isigmoid” “is an easier inverse CDF that looses exact CDF identification but gains some speed and is numerically stable. It is recommended to use “isigmoid” or “partly_precise”.</p></li>
+<li><p><strong>model_offset</strong> (<em>int</em>) – Set by <em>jammy_flows.pdf</em>.</p></li>
+<li><p><strong>softplus_for_width</strong> (<em>int</em>) – If set, uses <em>soft_plus</em> to predict width. Otherwhise exponential function.</p></li>
+<li><p><strong>width_smooth_saturaiton</strong> (<em>int</em>) – If set, saturates the width symmetrically at the lower and upper end.</p></li>
+<li><p><strong>lower_bound_for_widths</strong> (<em>float</em>) – Determines the lower width bound.</p></li>
+<li><p><strong>upper_bound_for_widths</strong> (<em>float</em>) – Determines the upper width bound.</p></li>
+<li><p><strong>clamp_widths</strong> (<em>int</em>) – If set, clamps widths above threshold.</p></li>
+<li><p><strong>regulate_normalization</strong> (<em>int</em>) – If set, regulates with a lower bound of 1 and upper bound of 100 (fixed) similar to width regulation.</p></li>
+<li><p><strong>add_skewness</strong> (<em>int</em>) – If set, adds skewness to the basis functions in order to make flow more flexible.</p></li>
+<li><p><strong>rotation_mode</strong> (<em>str</em>) – <p>One of different rotation parametrizations:</p>
+<div class="line-block">
+<div class="line">- <strong>householder</strong>: Default implementation from the original paper.</div>
+<div class="line">- <strong>angles</strong>: Parametrized via “Givens rotation”</div>
+<div class="line">- <strong>triangular_combination</strong>: Parametrization of an upper and lower triangular matrix.</div>
+<div class="line">- <strong>cayley</strong>: “Cayley representation” of rotations.</div>
+</div>
+</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="module-jammy_flows.layers.euclidean.polynomial_stretch_flow">
 <span id="polynomial-stretch-flow-p"></span><h4>Polynomial stretch flow (“p”)<a class="headerlink" href="#module-jammy_flows.layers.euclidean.polynomial_stretch_flow" title="Permalink to this headline">¶</a></h4>
@@ -423,11 +580,59 @@ rotation_mode (str): One of [“angles”, “householder”]. <em>Angles</em> i
 </dd></dl>
 
 </div>
-<div class="section" id="segmented-2-d-sphere-flow-n">
-<h4>Segmented 2-d sphere flow (“n”)<a class="headerlink" href="#segmented-2-d-sphere-flow-n" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.spheres.segmented_sphere_nd">
+<span id="segmented-2-d-sphere-flow-n"></span><h4>Segmented 2-d sphere flow (“n”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.segmented_sphere_nd" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.segmented_sphere_nd.</code><code class="sig-name descname">segmented_sphere_nd</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='g'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='g'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>A segmented conditional flow that models a flow on the torus and then maps to the sphere. Symbol “n”</p>
+<p>Follows <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>. Seems to be stable when non-conditional, but can be unstable in certain configurations in conditional mode.
+Slight modification, in that instead of the torus one can also choose an infinite torus, whose z-axis is modeled via a Euclidean flow instead of an interval flow.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>rotation_mode</strong> (<em>str</em>) – One of [“angles, “householder”]</p></li>
+<li><p><strong>use_moebius_xyz_parametreization</strong> (<em>bool</em>) – Two different parametrizations for the Moebius part.</p></li>
+<li><p><strong>num_basis_functions</strong> (<em>int</em>) – Number of Moebius basis functions.</p></li>
+<li><p><strong>zenith_type_layers</strong> (<em>str</em>) – Either “g” or multiple “gg” (Gaussianization flows) for infinite torus parametrization, or “r” or multiple “rr” (Rational-Quadratic Spline) for torus parametrization.</p></li>
+<li><p><strong>max_rank</strong> (<em>int</em>) – Max rank of the MLP that maps from azimuth to zenith dimension.</p></li>
+<li><p><strong>hidden_dims</strong> (<em>str/int/list</em><em>(</em><em>int</em><em>)</em>) – Hidden dims of MLP that maps from azimuth to zenith dimension.</p></li>
+<li><p><strong>higher_order_cylinder_parametrization</strong> (<em>bool</em>) – Slightly different parametrization which allows some simplifications in intermedate steps. Default False (makes it hard to combine spherical flows).</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
-<div class="section" id="exponential-map-2-d-sphere-flow-v">
-<h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#exponential-map-2-d-sphere-flow-v" title="Permalink to this headline">¶</a></h4>
+<div class="section" id="module-jammy_flows.layers.spheres.exponential_map_s2">
+<span id="exponential-map-2-d-sphere-flow-v"></span><h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.exponential_map_s2" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
+<dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.exponential_map_s2.</code><code class="sig-name descname">exponential_map_s2</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Uses the spherical exponential map. Symbol: “v”</p>
+<p>Uses linear and quadratic potential as described in <a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a>, and exponential potential as described in <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>.
+Additionally added a spline-based potential.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>exp_map_type</strong> (<em>str</em>) – Defines the potential of the exponential map. One of [“linear”, “quadratic”, “exponential”, “splines”].</p></li>
+<li><p><strong>natural_direction</strong> (<em>int</em>) – </p></li>
+<li><p><strong>num_components</strong> (<em>int</em>) – How many components to sum over in the exponential map.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="chart-based-continuous-2-d-sphere-flow-c">
 <h4>Chart-based continuous 2-d sphere flow (“c”)<a class="headerlink" href="#chart-based-continuous-2-d-sphere-flow-c" title="Permalink to this headline">¶</a></h4>
