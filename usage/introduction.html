@@ -77,20 +77,20 @@
 <p>Jammy Flows (<strong>J</strong> oint <strong>A</strong> utoregressive <strong>M</strong> anifold ( <strong>MY</strong> ) Normalizing <strong>Flows</strong>) implements normalizing flow PDFs that can be defined to describe joint distributions over an arbitrary number of multiple manifolds and grew out of work described in .</p>
 <p>The manifolds are connected via (inverse) autoregressive connections, where the connectivity is akin to the one described in the paper <em>Improving Variational Inference with Inverse Autoregressive Flow</em> (<em>https://arxiv.org/abs/1606.04934</em>). There are two major differences to the IAF implementation. The first difference is that the autoregressive connections in <em>jammy_flows</em> are explicitly linking different manifold flows, not each individual dimension. This allows to describe distributions defined jointly over multiple manifolds, e.g. a Euclidean manifold and a sphere. The second difference is that the coupling layers are not affine (i.e. linear couplings that describe Gaussian distributions), but general nonlinear couplings that can describe any normalizing flow distribution. As such, the autoregressive connections map to any desired normalizing flow implemented in the package.</p>
 <p>The autoregressive routing is automatically handled in the background, and the user can get started to define a PDF with a simple syntax.</p>
-<div class="section" id="initialization">
-<h2>Initialization<a class="headerlink" href="#initialization" title="Permalink to this headline">¶</a></h2>
-<dl class="simple">
-<dt>There are currently 4 different manifolds supported by <a href="#id1"><span class="problematic" id="id2">*</span></a>jammy_flows.</dt><dd><ul class="simple">
+<p>There are currently 4 different manifolds supported by <em>jammy_flows</em>.</p>
+<blockquote>
+<div><ul class="simple">
 <li><p>Euclidean (“e”)</p></li>
 <li><p>spherical (“s”)</p></li>
 <li><p>interval (“i”)</p></li>
 <li><p>simplex (“a”)</p></li>
 </ul>
-</dd>
-</dl>
+</div></blockquote>
 <p>The abbreviations are important, because they are used by <em>jammy_flows</em> to construct a tensor product of manifolds on which the PDF will live. For each manifold, there are manifold-specific normalzing flows defined on them. Each of those flows also is abbreviated by its own letter. For a list of flows and respective letter abbreviations, have a look in the API documentation.</p>
-<p>Now lets see how to use this abbreviation logic in practice.
-For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write</p>
+<p>Now lets see how to use this abbreviation logic in practice.</p>
+<div class="section" id="initialization">
+<h2>Initialization<a class="headerlink" href="#initialization" title="Permalink to this headline">¶</a></h2>
+<p>For example, to describe a PDF over a four dimensional space, consisting of 2 Euclidean dimensions and a 2-sphere, one could write</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
 
 <span class="n">flow_pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e2+s2&quot;</span><span class="p">,</span> <span class="s2">&quot;ggg+n&quot;</span><span class="p">)</span>
