@@ -16,11 +16,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v3
-    - name: install_rtd_theme
-      run:
-        pip install sphinx_rtd_theme
     - uses: ammaraskar/sphinx-action@master
       with:
+        pre-build-command: "python -m pip install sphinx_rtd_theme"
         docs-folder: "docs/"
         
      # - uses: actions/upload-artifact@v1
