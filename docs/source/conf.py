@@ -22,7 +22,7 @@ project = 'jammy_flows'
 author = 'Thorsten Glüsenkamp'
 
 # The full version, including alpha/beta/rc tags
-release = '0.1'
+release = 'master'
 
 
 # -- General configuration ---------------------------------------------------
