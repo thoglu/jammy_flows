@@ -2,7 +2,7 @@
 
 <img src="https://github.com/thoglu/jammy_flows/workflows/build/badge.svg"> <img src="https://github.com/thoglu/jammy_flows/workflows/tests/badge.svg">
 
-This package implements (conditional) PDFs with **J**oint **A**utoregressive **M**anifold (**MY**) normalizing-flows. It grew out of work for the paper [Unifying supervised learning and VAEs - automating statistical inference in (astro-)particle physics with amortized conditional normalizing flows [arXiv:2008.05825]](https://arxiv.org/abs/2008.05825) and includes the paper's described methodology for coverage calculation of PDFs on tensor products of manifolds. For Euclidean manifolds, it includes an updated implementation of the [offical implementation](https://github.com/chenlin9/Gaussianization_Flows) of [Gaussianization flows [arXiv:2003.01941]](https://arxiv.org/abs/2003.01941), where now the inverse is differentiable (adding Newton iterations to the bisection) and made more stable using better approximations of the inverse Gaussian CDF. Several other state-of-the art flows, in particular also for spheres, are implemented sometimes using slight modifications or extensions.
+This package implements (conditional) PDFs with **J**oint **A**utoregressive **M**anifold (**MY**) normalizing-flows. It grew out of work for the paper [Unifying supervised learning and VAEs - automating statistical inference in (astro-)particle physics with amortized conditional normalizing flows [arXiv:2008.05825]](https://arxiv.org/abs/2008.05825) and includes the paper's described methodology for coverage calculation of PDFs on tensor products of manifolds. For Euclidean manifolds, it includes an updated implementation of the [offical implementation](https://github.com/chenlin9/Gaussianization_Flows) of [Gaussianization flows [arXiv:2003.01941]](https://arxiv.org/abs/2003.01941), where now the inverse is differentiable (adding Newton iterations to the bisection) and made more stable using better approximations of the inverse Gaussian CDF. Several other state-of-the art flows are implemented sometimes using slight modifications or extensions.
 
 The package has a simple syntax that lets the user define a PDF and get going with a single line of code that **should just work**. To define a 10-d PDF, with 4 Euclidean dimensions, followed by a 2-sphere, followed again by 4 Euclidean dimensions, one could for example write
 ```
@@ -17,7 +17,7 @@ Have a look at the [script](examples/jammy_flows.py) that generates the above an
 
 ### Documentation
 
-https://thoglu.github.io/jammy_flows/index.html
+The docs can be found [here](https://thoglu.github.io/jammy_flows/index.html).
 
 Also check out the [example script](examples/jammy_flows.py) and [example notebook](examples/examples.ipynb).
 
@@ -26,7 +26,7 @@ Also check out the [example script](examples/jammy_flows.py) and [example notebo
 ### General
 
 - [x] Autoregressive conditional structure is taken care of behind the scenes and connects manifolds
-- [x] Coverage is straightforward. Everything, including spherical dimensions, is based on a Gaussian base distribution ([arXiv:2008.0582](https://arxiv.org/abs/2008.05825)).
+- [x] Coverage is straightforward. Everything (including spherical, interval and simplex flows) is based on a Gaussian base distribution ([arXiv:2008.0582](https://arxiv.org/abs/2008.05825)).
 - [x] Bisection & Newton iterations for differentiable inverse (used for certain non-analytic inverse flow functions)
 - [x] amortizable MLPs that can use low-rank approximations
 - [x] amortizable PDFs - the total PDF can be the output of another neural network
@@ -53,11 +53,11 @@ Also check out the [example script](examples/jammy_flows.py) and [example notebo
  
 ### Interval Flows:
 
-- [x] "Neural Spline Flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)
+- [x] "Neural Spline Flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032) (**"r"**)
 
 ### Simplex Flows:
 
-- [x] Autoregressive simplex flow [arXiv:2008.05456](https://arxiv.org/abs/2008.05456)
+- [x] Autoregressive simplex flow [arXiv:2008.05456](https://arxiv.org/abs/2008.05456) (**"w"**)
 
 For a description of all flows and abbreviations, have a look in the docs at https://thoglu.github.io/jammy_flows/usage/api.html#module-jammy_flows.layers.layer_base.
 
