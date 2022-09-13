@@ -16,13 +16,6 @@ def return_safe_angle_within_pi(x, safety_margin=1e-10):
     ret=torch.where(small_mask, safety_margin, x)
     ret=torch.where(large_mask, numpy.pi-safety_margin, ret)
 
-    """
-    ret=torch.ones_like(x)
-    ret[small_mask]=angle_diff
-    ret[large_mask]=numpy.pi-angle_diff
-    ret[(~small_mask) & (~large_mask)]=x[(~small_mask) & (~large_mask)]
-    """
-
     return ret
 
 class sphere_base(layer_base.layer_base):

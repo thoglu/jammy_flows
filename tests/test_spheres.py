@@ -36,7 +36,7 @@ class Test(unittest.TestCase):
         input=torch.from_numpy(numpy.array([0.0,numpy.pi*2.0])[:,None])
 
         ev,_,_=this_flow(input)
-
+       
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
 
         extra_flow_defs=dict()

@@ -194,8 +194,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                     sfcyl=sf_extra
 
                     res=lcyl-sfcyl
-                    #print("to subspace ", lcyl, sfcyl)
-                    #log_det-=(res-2.0*lsexp).sum(axis=-1)
+                    
                     log_det=log_det+(-lcyl-sfcyl).sum(axis=-1)
 
                     return res, log_det
@@ -209,21 +208,18 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
             else:
               
-                ### just a linear trafo
-                #scaled=x/numpy.pi
-                #log_det-=numpy.log(numpy.pi)
-                ###
-       
-                ## FIXME .. this is only correct for 2-d!!
-                scaled=-torch.cos(x)/2.0+1.0/2.0
-                log_det=log_det+torch.log(torch.sin(x[:,0])/2.0)
-                ##########
+                x=sphere_base.return_safe_angle_within_pi(x, safety_margin=1e-8)
 
+                scaled=-torch.cos(x)/2.0+1.0/2.0
+                
+                log_det=log_det+torch.log(torch.sin(x[:,0])/2.0)
+           
+                ##########
+                """
                 good_scaled=(scaled>0) & (scaled < 1.0)
                 scaled=torch.where(scaled<=0.0, 1e-8, scaled)
                 scaled=torch.where(scaled>=1.0, scaled-1e-8,scaled)
-
-                #scaled=good_scaled*scaled+(scaled==0)*(scaled+1e-3)+(scaled==1.0)*(scaled-1e-3)
+                """
 
                 if(self.subspace_is_euclidean):
                     inv=(torch.log(scaled)-torch.log(1.0-scaled))
@@ -271,43 +267,22 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
                     x=1.0/(1.0+torch.exp(-x))
 
-                #### linear trafo
-                #res*=numpy.pi
-                #log_det+=numpy.log(numpy.pi)
-                ####
-
-              
-                ## FIXME .. this is only correct for 2-d!!
-                
-                #log_det+=-0.5*torch.log(res-res**2)[:,0]
-                
                 x=torch.where(x<=1e-5, 1e-5, x)
                 x=torch.where(x>=1.0-1e-5, 1.0-1e-5, x)
 
                 x=torch.acos(1.0-2*x)
 
                 log_det=log_det-torch.log(torch.sin(x[:,0])/2.0)
-                #print("after sub space ", log_det, x)
+            
                 return x, log_det, None
         else:
             raise Exception("Unknown subspace mapping", self.subspace_mapping)
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
-
-        #if(self.higher_order_cylinder_parametrization):
-        #    print("extra params MLP", extra_inputs[0,self.num_mlp_params-self.total_euclidean_pars:self.num_mlp_params])
-        ## input structure: 0-num_amortization_params -> MLP  , num_amortizpation_params-end: -> moebius trafo
+      
         [x,log_det]=inputs
 
         sf_extra=None
-
-        #if(self.always_parametrize_in_embedding_space):
-        #    print("-------> Warning: Cylinder-based 2-sphere flow is not recommended to use embedding space paremetrization between layers!")
-
-        ## this implementation requires another sin(theta) factor here
-        ## 
-        #log_det=log_det-torch.log(torch.sin(x[:,0]))
-
         
         if(self.always_parametrize_in_embedding_space):
            
@@ -318,10 +293,9 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             
             moebius_extra_inputs=extra_inputs[:,self.num_mlp_params:]
         
-        #print("moeb bef",x[:,self.dimension-1:] )
+        
         xm,log_det=self.moebius_trafo.inv_flow_mapping([x[:,self.dimension-1:],log_det], extra_inputs=moebius_extra_inputs)
-        #xm=x[:,self.dimension-1:]
-        #print("moeb af",xm )
+      
         potential_eucl=x[:,:self.dimension-1]
         
         ## parameter that holds possibly infinitesimal boundary of cylinder height parametrization
@@ -347,12 +321,10 @@ class segmented_sphere_nd(sphere_base.sphere_base):
             ## ddx = sin(x)/2
             log_det=log_det+0.5*(ln_cyl+sf_extra).sum(axis=-1)
 
-       
-            #print("_inv flow cyl ln / sf", ln_cyl, sf_extra)
         if(len(self.zenith_type_layer_list)>0):
-
+          
             eucl_x, log_det=self.to_subspace(potential_eucl,log_det, sf_extra=sf_extra)
-           
+            
             ## loop through all layers in each pdf and transform "this_target"
 
             if(self.num_mlp_params>0):
