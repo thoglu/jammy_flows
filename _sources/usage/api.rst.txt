@@ -144,13 +144,21 @@ Interval flow layers
 
 .. automodule:: jammy_flows.layers.intervals.interval_base
     :members:
-    :exclude-members: flow_mapping, get_desired_init_parameters, init_params, inv_flow_mapping, obtain_layer_param_structure, 
+    :special-members: __init__
+    :exclude-members: flow_mapping, get_desired_init_parameters, init_params, inv_flow_mapping, obtain_layer_param_structure, transform_target_space
 
+Identity layer ("z")
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. automodule:: jammy_flows.layers.intervals.interval_do_nothing
     :members:
+    :special-members: __init__
+
+Rational-quadratic spline flow ("r")
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
 .. automodule:: jammy_flows.layers.intervals.rational_quadratic_spline
     :members:
+    :special-members: __init__
 
 Simplex flow layers
 ----------------------------
@@ -160,7 +168,8 @@ Simplex flow layers
     :special-members: __init__
     :exclude-members: flow_mapping, get_desired_init_parameters, init_params, inv_flow_mapping, obtain_layer_param_structure, base_simplex_to_non_uniform_box, gauss_to_non_uniform_box, non_uniform_box_to_base_simplex, transform_target_space
 
-
+Iterative interval simplex flow ("w")
+^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 .. automodule:: jammy_flows.layers.simplex.inner_loop_simplex
     :members:
     :special-members: __init__

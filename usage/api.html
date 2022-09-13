@@ -17,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="prev" title="Introduction" href="introduction.html" /> 
+    <link rel="prev" title="Training" href="training.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -37,8 +37,8 @@
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <p class="caption"><span class="caption-text">Contents:</span></p>
 <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="installation.html">Installation</a></li>
 <li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1"><a class="reference internal" href="training.html">Training</a></li>
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API Documentation</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#general">General</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.flows">Main class</a></li>
@@ -65,8 +65,15 @@
 <li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.spheres.cnf_sphere_charts">Chart-based continuous 2-d sphere flow (“c”)</a></li>
 </ul>
 </li>
-<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.intervals.interval_base">Interval flow layers</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.simplex.simplex_base">Simplex flow layers</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.intervals.interval_base">Interval flow layers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.intervals.interval_do_nothing">Identity layer (“z”)</a></li>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.intervals.rational_quadratic_spline">Rational-quadratic spline flow (“r”)</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.simplex.simplex_base">Simplex flow layers</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#module-jammy_flows.layers.simplex.inner_loop_simplex">Iterative interval simplex flow (“w”)</a></li>
+</ul>
+</li>
 </ul>
 </li>
 </ul>
@@ -538,14 +545,13 @@ or all parameters are handed over (fix_total given), or the final bias vector is
 <dl class="function">
 <dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton">
 <code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">grad_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em>, <em class="sig-param">newton_tolerance=1e-14</em>, <em class="sig-param">verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton" title="Permalink to this definition">¶</a></dt>
-<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
+<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
 <li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
-<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.</p></li>
 <li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
 <li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
 <li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
@@ -554,7 +560,11 @@ Due to Newton iterations the returned inverse is differentiable and can be used 
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>The inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+</dd>
+</dl>
+</p>
 </dd>
 </dl>
 </dd></dl>
@@ -562,14 +572,13 @@ Due to Newton iterations the returned inverse is differentiable and can be used 
 <dl class="function">
 <dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_joint_func_and_grad">
 <code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_joint_func_and_grad</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">joint_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em>, <em class="sig-param">newton_tolerance=1e-14</em>, <em class="sig-param">verbose=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_joint_func_and_grad" title="Permalink to this definition">¶</a></dt>
-<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
+<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
-<li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
-<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>joint_func</strong> (<em>function</em>) – A function that calculates the function value and its derivative simultaneously.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.</p></li>
 <li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
 <li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
 <li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
@@ -578,44 +587,41 @@ Due to Newton iterations the returned inverse is differentiable and can be used 
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>The inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
 </dd>
 </dl>
-</dd></dl>
-
-<dl class="function">
-<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_slow">
-<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_slow</code><span class="sig-paren">(</span><em class="sig-param">func</em>, <em class="sig-param">grad_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">min_boundary=-100000.0</em>, <em class="sig-param">max_boundary=100000.0</em>, <em class="sig-param">num_bisection_iter=25</em>, <em class="sig-param">num_newton_iter=30</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_slow" title="Permalink to this definition">¶</a></dt>
-<dd><p>Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>func</strong> (<em>function</em>) – The function to find the inverse of.</p></li>
-<li><p><strong>grad_func</strong> (<em>function</em>) – The gradient function of the function.</p></li>
-<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.</p></li>
-<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
-<li><p><strong>min_boundary</strong> (<em>float</em>) – Minimum boundary for Bisection.</p></li>
-<li><p><strong>max_boundary</strong> (<em>float</em>) – Maximum boundary for bisection.</p></li>
-<li><p><strong>num_bisection_iter</strong> (<em>int</em>) – Number of bisection iterations.</p></li>
-<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p>The (differentiable) inverse of the function <em>func</em> in each sub-dimension in each batch item.</p>
+</p>
 </dd>
 </dl>
 </dd></dl>
 
 <dl class="function">
 <dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere">
-<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_sphere</code><span class="sig-paren">(</span><em class="sig-param">combined_func</em>, <em class="sig-param">find_tangent_func</em>, <em class="sig-param">basic_exponential_map_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">num_newton_iter=25</em>, <em class="sig-param">visualize=True</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_sphere</code><span class="sig-paren">(</span><em class="sig-param">combined_func</em>, <em class="sig-param">find_tangent_func</em>, <em class="sig-param">basic_exponential_map_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">num_newton_iter=25</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere" title="Permalink to this definition">¶</a></dt>
 <dd><p>Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
 In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
-Distributing the points randomly on the sphere dosnt really help, so every point is initialized just at (0,0,1).
-In order for this to work properly, the function has to be globally dipheomorphic.
-We follow <a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a> (“A Jacobian inequality for gradient maps on the sphere and its application to directional statistics”),
-in particular the implementation suggested in <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a> (“Normalizing Flows on Tori and Spheres”) to get this requirement satisfied for “exponential_map_flows”.</p>
+Distributing the points randomly on the sphere doesn’t really help, so every point is initialized just at (0,0,1).
+In order for this to work properly, the function <em>has</em> to be globally diffeomorphic, so the exponential map has to follow the conditions outlined in
+<a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a> (Sei 2009).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>combined_func</strong> (<em>function</em>) – A function that returns the (x,y,z) unit vector and its jacobian.</p></li>
+<li><p><strong>find_tangent_func</strong> (<em>function</em>) – A funtion to calculate the tangent at a given point along a certain direction.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>The inverse of the exponential map.</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
 </dd></dl>
 
 </div>
@@ -981,24 +987,53 @@ Mostly adapted from <a class="reference external" href="https://github.com/CUAI/
 <dt id="jammy_flows.layers.intervals.interval_base.interval_base">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.interval_base.</code><code class="sig-name descname">interval_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_base.interval_base" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
-<dt id="jammy_flows.layers.intervals.interval_base.interval_base.transform_target_space">
-<code class="sig-name descname">transform_target_space</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">log_det=0.0</em>, <em class="sig-param">transform_from='default'</em>, <em class="sig-param">transform_to='embedding'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_base.interval_base.transform_target_space" title="Permalink to this definition">¶</a></dt>
-<dd><p>Transforms the target vector from a given parametrization to another parametrization.
-Must be implemented by subclass.</p>
-</dd></dl>
+<dt id="jammy_flows.layers.intervals.interval_base.interval_base.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_base.interval_base.__init__" title="Permalink to this definition">¶</a></dt>
+<dd></dd></dl>
 
 </dd></dl>
 
-<span class="target" id="module-jammy_flows.layers.intervals.interval_do_nothing"></span><dl class="class">
+<div class="section" id="module-jammy_flows.layers.intervals.interval_do_nothing">
+<span id="identity-layer-z"></span><h4>Identity layer (“z”)<a class="headerlink" href="#module-jammy_flows.layers.intervals.interval_do_nothing" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
 <dt id="jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.interval_do_nothing.</code><code class="sig-name descname">interval_do_nothing</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">low_boundary=0.0</em>, <em class="sig-param">high_boundary=1.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.interval_do_nothing.interval_do_nothing.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Interval identity mapping: Symbol “z”</p>
+</dd></dl>
 
-<span class="target" id="module-jammy_flows.layers.intervals.rational_quadratic_spline"></span><dl class="class">
+</dd></dl>
+
+</div>
+<div class="section" id="module-jammy_flows.layers.intervals.rational_quadratic_spline">
+<span id="rational-quadratic-spline-flow-r"></span><h4>Rational-quadratic spline flow (“r”)<a class="headerlink" href="#module-jammy_flows.layers.intervals.rational_quadratic_spline" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
 <dt id="jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.intervals.rational_quadratic_spline.</code><code class="sig-name descname">rational_quadratic_spline</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">num_basis_elements=10</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=0</em>, <em class="sig-param">low_boundary=0</em>, <em class="sig-param">high_boundary=1.0</em>, <em class="sig-param">min_width=0.0001</em>, <em class="sig-param">min_height=0.0001</em>, <em class="sig-param">min_derivative=0.0001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline" title="Permalink to this definition">¶</a></dt>
-<dd></dd></dl>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">num_basis_elements=10</em>, <em class="sig-param">euclidean_to_interval_as_first=0</em>, <em class="sig-param">use_permanent_parameters=0</em>, <em class="sig-param">low_boundary=0</em>, <em class="sig-param">high_boundary=1.0</em>, <em class="sig-param">min_width=0.0001</em>, <em class="sig-param">min_height=0.0001</em>, <em class="sig-param">min_derivative=0.0001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.intervals.rational_quadratic_spline.rational_quadratic_spline.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Rational-quadartic spline layer: Symbol “r”</p>
+<p>Also known as Neural spline flows - <a class="reference external" href="https://arxiv.org/abs/1906.04032">https://arxiv.org/abs/1906.04032</a>. Adapted code from pyro implementation.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>num_basis_elements</strong> (<em>int</em>) – Number of spline elements.</p></li>
+<li><p><strong>low_boundary</strong> (<em>float</em>) – Lower boundary of the inverval.</p></li>
+<li><p><strong>high_boundary</strong> (<em>float</em>) – Higher boundary of the interval.</p></li>
+<li><p><strong>min_width</strong> (<em>float</em>) – Minimum width of a spline element.</p></li>
+<li><p><strong>min_height</strong> (<em>float</em>) – Minimum height of a spline element.</p></li>
+<li><p><strong>min_derivative</strong> (<em>float</em>) – Minimum derivative of a spline element.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
 
+</dd></dl>
+
+</div>
 </div>
 <div class="section" id="module-jammy_flows.layers.simplex.simplex_base">
 <span id="simplex-flow-layers"></span><h3>Simplex flow layers<a class="headerlink" href="#module-jammy_flows.layers.simplex.simplex_base" title="Permalink to this headline">¶</a></h3>
@@ -1013,18 +1048,21 @@ Must be implemented by subclass.</p>
 
 </dd></dl>
 
-<span class="target" id="module-jammy_flows.layers.simplex.inner_loop_simplex"></span><dl class="class">
+<div class="section" id="module-jammy_flows.layers.simplex.inner_loop_simplex">
+<span id="iterative-interval-simplex-flow-w"></span><h4>Iterative interval simplex flow (“w”)<a class="headerlink" href="#module-jammy_flows.layers.simplex.inner_loop_simplex" title="Permalink to this headline">¶</a></h4>
+<dl class="class">
 <dt id="jammy_flows.layers.simplex.inner_loop_simplex.inner_loop_simplex">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.simplex.inner_loop_simplex.</code><code class="sig-name descname">inner_loop_simplex</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">always_parametrize_in_embedding_space=0</em>, <em class="sig-param">project_from_gauss_to_simplex=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.inner_loop_simplex.inner_loop_simplex" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
 <dt id="jammy_flows.layers.simplex.inner_loop_simplex.inner_loop_simplex.__init__">
 <code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">always_parametrize_in_embedding_space=0</em>, <em class="sig-param">project_from_gauss_to_simplex=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.simplex.inner_loop_simplex.inner_loop_simplex.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Iterative simplex flow. Symbol: “w”</p>
-<p>Construction suggested in <a class="reference external" href="https://arxiv.org/pdf/2008.05456.pdf">https://arxiv.org/pdf/2008.05456.pdf</a>.</p>
+<p>Construction suggested in <a class="reference external" href="https://arxiv.org/abs/2008.05456">https://arxiv.org/abs/2008.05456</a>.</p>
 </dd></dl>
 
 </dd></dl>
 
+</div>
 </div>
 </div>
 </div>
@@ -1033,13 +1071,13 @@ Must be implemented by subclass.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="training.html" class="btn btn-neutral float-left" title="Training" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright .</p>
+    <p>&#169; Copyright 2022, Thorsten Glüsenkamp.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

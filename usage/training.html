@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Training &mdash; jammy_flows master documentation</title><link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+    <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  <script id="documentation_options" data-url_root="../" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/language_data.js"></script>
+        <script async="async" src="https://cdnjs.cloudflare.com/ajax/libs/mathjax/2.7.5/latest.js?config=TeX-AMS-MML_HTMLorMML"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="API Documentation" href="api.html" />
+    <link rel="prev" title="Introduction" href="introduction.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> jammy_flows
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <p class="caption"><span class="caption-text">Contents:</span></p>
+<ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="introduction.html">Introduction</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Training</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#non-conditional-pdf">non-conditional PDF</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#conditional-pdf">conditional PDF</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API Documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">jammy_flows</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Training</li>
+      <li class="wy-breadcrumbs-aside">
+              <a href="https://github.com/thoglu/jammy_flows/blob/main/docs/source/usage/training.rst" class="fa fa-github"> Edit on GitHub</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="training">
+<h1>Training<a class="headerlink" href="#training" title="Permalink to this headline">¶</a></h1>
+<div class="section" id="non-conditional-pdf">
+<h2>non-conditional PDF<a class="headerlink" href="#non-conditional-pdf" title="Permalink to this headline">¶</a></h2>
+<p>Lets say we have Euclidean 3-d samples “x” from a 3-d target distribution we want to approximate with a PDF p(x).
+First we initalize a 3-d PDF:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
+
+<span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e3&quot;</span><span class="p">,</span> <span class="s2">&quot;gggg&quot;</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We chose to do so with 4 Gaussianization flow layers. Next we just loop through the batches and minimize negative log-probability, assuming we have a torch optimizer:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># target_samples = array of 3-d samples from the target distribution</span>
+<span class="c1"># batch_size: the given batch size</span>
+<span class="c1"># num_batches_per_epoch: number of batches in the epoch</span>
+<span class="c1"># optimizer: the given pytorch optimizer</span>
+
+<span class="n">batch_size</span><span class="o">=</span><span class="mi">10</span>
+
+<span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_batches_per_epoch</span><span class="p">):</span>
+    <span class="n">this_label_batch</span><span class="o">=</span><span class="n">target_samples</span><span class="p">[</span><span class="n">ind</span><span class="p">:</span><span class="n">ind</span><span class="o">+</span><span class="n">batch_size</span><span class="p">]</span>
+
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+
+    <span class="n">log_pdf</span><span class="p">,</span><span class="n">_</span><span class="p">,</span><span class="n">_</span><span class="o">=</span><span class="n">pdf</span><span class="p">(</span><span class="n">this_label_batch</span><span class="p">)</span>
+
+    <span class="n">neg_log_loss</span><span class="o">=-</span><span class="n">log_pdf</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+    <span class="n">neg_log_loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+<span class="c1">### after training ###</span>
+
+<span class="c1">## evaluation</span>
+<span class="c1"># target_point = point &quot;x&quot; to evaluate the PDF at</span>
+<span class="c1"># log_pdf, base_log_pdf, base_point = pdf(target_point)</span>
+
+<span class="c1">## sampling</span>
+<span class="c1"># target_sample, base_sample, target_log_pdf, base_log_pdf = pdf.sample(samplesize=1000)</span>
+</pre></div>
+</div>
+</div>
+<div class="section" id="conditional-pdf">
+<h2>conditional PDF<a class="headerlink" href="#conditional-pdf" title="Permalink to this headline">¶</a></h2>
+<p>Let’s now say we want to describe a 3-d conditional PDF p(x;y) that depends on some 2-dimensional input ‘y’.</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">jammy_flows</span>
+
+<span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e3&quot;</span><span class="p">,</span> <span class="s2">&quot;gggg&quot;</span><span class="p">,</span> <span class="n">conditional_input_dim</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>Here we have to specify the conditional input dimension, and then in the training loop add the input.
+The rest is very similar to the non-conditional PDF:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># target_samples = array of 3-d samples from the target distribution</span>
+<span class="c1"># input_data = array of 2-d input data of same length as target_samples</span>
+<span class="c1"># batch_size: the given batch size</span>
+<span class="c1"># num_batches_per_epoch: number of batches in the epoch</span>
+<span class="c1"># optimizer: the given pytorch optimizer</span>
+
+<span class="k">for</span> <span class="n">ind</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_batches_per_epoch</span><span class="p">):</span>
+    <span class="n">this_label_batch</span><span class="o">=</span><span class="n">target_samples</span><span class="p">[</span><span class="n">ind</span><span class="p">:</span><span class="n">ind</span><span class="o">+</span><span class="n">batch_size</span><span class="p">]</span>
+    <span class="n">this_data_batch</span><span class="o">=</span><span class="n">input_data</span><span class="p">[</span><span class="n">ind</span><span class="p">:</span><span class="n">ind</span><span class="o">+</span><span class="n">batch_size</span><span class="p">]</span>
+
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">zero_grad</span><span class="p">()</span>
+
+    <span class="n">log_pdf</span><span class="p">,</span><span class="n">_</span><span class="p">,</span><span class="n">_</span><span class="o">=</span><span class="n">pdf</span><span class="p">(</span><span class="n">this_label_batch</span><span class="p">,</span> <span class="n">conditional_input</span><span class="o">=</span><span class="n">this_data_batch</span><span class="p">)</span>
+
+    <span class="n">neg_log_loss</span><span class="o">=-</span><span class="n">log_pdf</span><span class="o">.</span><span class="n">mean</span><span class="p">()</span>
+
+    <span class="n">neg_log_loss</span><span class="o">.</span><span class="n">backward</span><span class="p">()</span>
+
+    <span class="n">optimizer</span><span class="o">.</span><span class="n">step</span><span class="p">()</span>
+
+<span class="c1">### after training ###</span>
+
+<span class="c1">## evaluation</span>
+<span class="c1"># target_point = point &quot;x&quot; to evaluate the PDF at</span>
+<span class="c1"># log_pdf, base_log_pdf, base_point = pdf(target_point, conditional_input=some_input)</span>
+
+<span class="c1">## sampling, shape of &#39;some_input&#39; defines number of samples in conditional pdf</span>
+<span class="c1"># target_sample, base_sample, target_log_pdf, base_log_pdf = pdf.sample(conditional_input=some_input)</span>
+</pre></div>
+</div>
+</div>
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="introduction.html" class="btn btn-neutral float-left" title="Introduction" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="API Documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Thorsten Glüsenkamp.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
