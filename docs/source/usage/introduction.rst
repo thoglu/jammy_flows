@@ -14,6 +14,7 @@ There are currently 4 different manifolds supported by *jammy_flows*.
     * **spherical ("s")**
     * **interval ("i")**
     * **simplex ("a")**
+    
 
 **The abbreviations are important, because they are used by *jammy_flows* to construct a tensor product of manifolds on which the PDF will live**. For each manifold, there are manifold-specific normalizing flows defined on them. Each of those flows also is abbreviated by its own letter. For a list of flows and respective letter abbreviations, have a look in the API documentation.
 
