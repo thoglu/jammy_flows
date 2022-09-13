@@ -6,8 +6,15 @@ import collections
 from .. import layer_base
 
 class interval_base(layer_base.layer_base):
-    def __init__(self, dimension=1, euclidean_to_interval_as_first=0, use_permanent_parameters=False, low_boundary=0.0, high_boundary=1.0):
-    
+    def __init__(self, 
+                 dimension=1, 
+                 euclidean_to_interval_as_first=0, 
+                 use_permanent_parameters=False, 
+                 low_boundary=0.0, 
+                 high_boundary=1.0):
+        """
+        
+        """
         super().__init__(dimension=dimension)
 
         ## we only allow 1-dimensional interval flows

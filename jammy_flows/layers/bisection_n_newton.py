@@ -8,22 +8,34 @@ def close(a, b, rtol=1e-5, atol=1e-4):
     return equal
 
 
-def inverse_bisection_n_newton_joint_func_and_grad(func, joint_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30, newton_tolerance=1e-14, verbose=0):
+def inverse_bisection_n_newton_joint_func_and_grad(func, 
+                                                   joint_func, 
+                                                   target_arg, 
+                                                   *args, 
+                                                   min_boundary=-100000.0, 
+                                                   max_boundary=100000.0, 
+                                                   num_bisection_iter=25, 
+                                                   num_newton_iter=30, 
+                                                   newton_tolerance=1e-14, 
+                                                   verbose=0):
     """
     Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-    Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
 
     Parameters:
+
         func (function): The function to find the inverse of.
-        grad_func (function): The gradient function of the function.
-        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.
+        joint_func (function): A function that calculates the function value and its derivative simultaneously.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.
         *args (list): Any extra arguments passed to *func*.
         min_boundary (float): Minimum boundary for Bisection.
         max_boundary (float): Maximum boundary for bisection.
         num_bisection_iter (int): Number of bisection iterations.
         num_newton_iter (int): Number of Newton iterations.
+
     Returns:
-        The (differentiable) inverse of the function *func* in each sub-dimension in each batch item.
+
+        Tensor
+            The inverse of the function *func* in each sub-dimension in each batch item.
 
     """
     new_upper = torch.tensor(max_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
@@ -108,23 +120,34 @@ def inverse_bisection_n_newton_joint_func_and_grad(func, joint_func, target_arg,
     
     return prev
 
-## differentiable newton iterations
-def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30, newton_tolerance=1e-14, verbose=0):
+def inverse_bisection_n_newton(func, 
+                               grad_func, 
+                               target_arg, 
+                               *args, 
+                               min_boundary=-100000.0, 
+                               max_boundary=100000.0, 
+                               num_bisection_iter=25, 
+                               num_newton_iter=30, 
+                               newton_tolerance=1e-14, 
+                               verbose=0):
     """
     Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-    Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
 
     Parameters:
+    
         func (function): The function to find the inverse of.
         grad_func (function): The gradient function of the function.
-        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.
         *args (list): Any extra arguments passed to *func*.
         min_boundary (float): Minimum boundary for Bisection.
         max_boundary (float): Maximum boundary for bisection.
         num_bisection_iter (int): Number of bisection iterations.
         num_newton_iter (int): Number of Newton iterations.
+
     Returns:
-        The (differentiable) inverse of the function *func* in each sub-dimension in each batch item.
+
+        Tensor
+            The inverse of the function *func* in each sub-dimension in each batch item.
 
     """
     new_upper = torch.tensor(max_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
@@ -217,23 +240,7 @@ def inverse_bisection_n_newton(func, grad_func, target_arg, *args, min_boundary=
     return prev
 
 def inverse_bisection_n_newton_slow(func, grad_func, target_arg, *args, min_boundary=-100000.0, max_boundary=100000.0, num_bisection_iter=25, num_newton_iter=30):
-    """
-    Performs bisection and Newton iterations simulataneously in each 1-d subdimension in a given batch.
-    Due to Newton iterations the returned inverse is differentiable and can be used in automatic differentiation.
-
-    Parameters:
-        func (function): The function to find the inverse of.
-        grad_func (function): The gradient function of the function.
-        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size BXD where B is the batchsize, and D the dimension.
-        *args (list): Any extra arguments passed to *func*.
-        min_boundary (float): Minimum boundary for Bisection.
-        max_boundary (float): Maximum boundary for bisection.
-        num_bisection_iter (int): Number of bisection iterations.
-        num_newton_iter (int): Number of Newton iterations.
-    Returns:
-        The (differentiable) inverse of the function *func* in each sub-dimension in each batch item.
-
-    """
+   
     new_upper = torch.tensor(max_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
     new_lower = torch.tensor(min_boundary).type(torch.double).repeat(*target_arg.shape).to(target_arg.device)
     #print("num iterations: ", iteration)
@@ -304,18 +311,32 @@ def inverse_bisection_n_newton_slow(func, grad_func, target_arg, *args, min_boun
     
     return prev
 
-
-
-
-
-def inverse_bisection_n_newton_sphere(combined_func, find_tangent_func, basic_exponential_map_func, target_arg, *args, num_newton_iter=25, visualize=True):
+def inverse_bisection_n_newton_sphere(combined_func, 
+                                      find_tangent_func, 
+                                      basic_exponential_map_func, 
+                                      target_arg, 
+                                      *args, 
+                                      num_newton_iter=25):
     """
     Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
     In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
-    Distributing the points randomly on the sphere dosnt really help, so every point is initialized just at (0,0,1).
-    In order for this to work properly, the function has to be globally dipheomorphic.
-    We follow https://arxiv.org/abs/0906.0874 ("A Jacobian inequality for gradient maps on the sphere and its application to directional statistics"),
-    in particular the implementation suggested in https://arxiv.org/abs/2002.02428 ("Normalizing Flows on Tori and Spheres") to get this requirement satisfied for "exponential_map_flows".
+    Distributing the points randomly on the sphere doesn't really help, so every point is initialized just at (0,0,1).
+    In order for this to work properly, the function *has* to be globally diffeomorphic, so the exponential map has to follow the conditions outlined in 
+    https://arxiv.org/abs/0906.0874 (Sei 2009).
+
+    Parameters:
+    
+        combined_func (function): A function that returns the (x,y,z) unit vector and its jacobian.
+        find_tangent_func (function): A funtion to calculate the tangent at a given point along a certain direction.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.
+        *args (list): Any extra arguments passed to *func*.
+        num_newton_iter (int): Number of Newton iterations.
+
+    Returns:
+
+        Tensor
+            The inverse of the exponential map.
+
     """
     
     prev=torch.zeros_like(target_arg)

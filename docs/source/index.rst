@@ -11,8 +11,8 @@ Documentation test
    :maxdepth: 2
    :caption: Contents:
 
-   usage/installation
    usage/introduction
+   usage/training
    usage/api
 
 Indices and tables

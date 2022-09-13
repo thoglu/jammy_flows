@@ -18,7 +18,7 @@ sys.path.insert(0, os.path.abspath('../../'))
 # -- Project information -----------------------------------------------------
 
 project = 'jammy_flows'
-#copyright = '2020, Thorsten Glüsenkamp'
+copyright = '2022, Thorsten Glüsenkamp'
 author = 'Thorsten Glüsenkamp'
 
 # The full version, including alpha/beta/rc tags

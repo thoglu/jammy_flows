@@ -20,7 +20,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
         """
         Iterative simplex flow. Symbol: "w"
 
-        Construction suggested in https://arxiv.org/pdf/2008.05456.pdf.
+        Construction suggested in https://arxiv.org/abs/2008.05456.
         """
         super().__init__(dimension=dimension, 
                          use_permanent_parameters=use_permanent_parameters,

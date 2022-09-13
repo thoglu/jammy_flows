@@ -6,7 +6,10 @@ from . import interval_base
 
 class interval_do_nothing(interval_base.interval_base):
     def __init__(self, dimension, euclidean_to_interval_as_first=0, use_permanent_parameters=False, low_boundary=0.0, high_boundary=1.0):
-    
+        """
+        Interval identity mapping: Symbol “z"
+        """
+        
         super().__init__(dimension=dimension, euclidean_to_interval_as_first=euclidean_to_interval_as_first, use_permanent_parameters=use_permanent_parameters, low_boundary=low_boundary, high_boundary=high_boundary)
 
         self.use_permanent_parameters=use_permanent_parameters

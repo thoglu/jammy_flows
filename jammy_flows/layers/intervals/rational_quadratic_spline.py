@@ -61,8 +61,30 @@ def unconstrained_rational_quadratic_spline(inputs,
 
 
 class rational_quadratic_spline(interval_base.interval_base):
-    def __init__(self, dimension, num_basis_elements=10, euclidean_to_interval_as_first=0, use_permanent_parameters=0, low_boundary=0, high_boundary=1.0, min_width=1e-4, min_height=1e-4, min_derivative=1e-4):
-    
+    def __init__(self, 
+                 dimension, 
+                 num_basis_elements=10, 
+                 euclidean_to_interval_as_first=0, 
+                 use_permanent_parameters=0, 
+                 low_boundary=0, 
+                 high_boundary=1.0, 
+                 min_width=1e-4, 
+                 min_height=1e-4, 
+                 min_derivative=1e-4):
+        """
+        Rational-quadartic spline layer: Symbol “r"
+
+        Also known as Neural spline flows - https://arxiv.org/abs/1906.04032. Adapted code from pyro implementation.
+        
+        Parameters:
+            num_basis_elements (int): Number of spline elements.
+            low_boundary (float): Lower boundary of the inverval.
+            high_boundary (float): Higher boundary of the interval.
+            min_width (float): Minimum width of a spline element.
+            min_height (float): Minimum height of a spline element.
+            min_derivative (float): Minimum derivative of a spline element.
+
+        """
         super().__init__(dimension=dimension, euclidean_to_interval_as_first=euclidean_to_interval_as_first, use_permanent_parameters=use_permanent_parameters, low_boundary=low_boundary, high_boundary=high_boundary)
         
         ## add parameters from this layer (on top of householder params defined in the class parent)

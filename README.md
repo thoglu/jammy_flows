@@ -48,7 +48,7 @@ Also check out the [example notebook](examples/examples.ipynb).
 
 ### S2:
 - [x] Autorregressive flow for N-Spheres ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"n"**)
-- [x] Exponential map flow ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"v"**)
+- [x] Exponential map flow ([arXiv:0906.0874](https://arxiv.org/abs/0906.0874)/[arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"v"**)
 - [x] Neural Manifold Ordinary Differential Equations [arXiv:2006.10254](https://arxiv.org/abs/2006.10254) (**"c"**)
  
 ### Interval Flows:
