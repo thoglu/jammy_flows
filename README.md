@@ -13,13 +13,13 @@ pdf=jammy_flows.pdf("e4+s2+e4", "gggg+n+gggg")
 The first argument describes the manifold structure, the second argument the flow layers for a particular manifold. Here **"g"** and **"n"** stand for particular normalizing flow layers that are pre-implemented (see **Features** below). The Euclidean parts in this example use 4 **"g"** layers each.
 <img src="animation.gif" alt="drawing" width="800"/>
 
-Have a look at the [script](examples/jammy_flows.py) that generates the above animation or at the example [notebook](examples/examples.ipynb).
+Have a look at the [script](examples/jammy_flows.py) that generates the above animation.
 
 ### Documentation
 
 The docs can be found [here](https://thoglu.github.io/jammy_flows/index.html).
 
-Also check out the [example script](examples/jammy_flows.py) and [example notebook](examples/examples.ipynb).
+Also check out the [example notebook](examples/examples.ipynb).
 
 ## Features
 
@@ -59,7 +59,7 @@ Also check out the [example script](examples/jammy_flows.py) and [example notebo
 
 - [x] Autoregressive simplex flow [arXiv:2008.05456](https://arxiv.org/abs/2008.05456) (**"w"**)
 
-For a description of all flows and abbreviations, have a look in the docs at https://thoglu.github.io/jammy_flows/usage/api.html#module-jammy_flows.layers.layer_base.
+For a description of all flows and abbreviations, have a look in the docs [here](https://thoglu.github.io/jammy_flows/usage/api.html#module-jammy_flows.layers.layer_base).
 
 ## Requirements
 
