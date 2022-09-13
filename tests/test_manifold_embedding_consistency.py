@@ -136,14 +136,14 @@ class Test(unittest.TestCase):
         self.test_cases=[]
 
         testcase=dict()
-        testcase["pdf_def"]="e1+s2+c3+e1+s2"
+        testcase["pdf_def"]="e1+s2+a3+e1+s2"
         testcase["layer_def"]="g+v+w+g+v"
 
         self.test_cases.append(testcase)
         
         ## multiple simplices 
         testcase=dict()
-        testcase["pdf_def"]="c3+e1"
+        testcase["pdf_def"]="a3+e1"
         testcase["layer_def"]="w+g"
 
         self.test_cases.append(testcase)
