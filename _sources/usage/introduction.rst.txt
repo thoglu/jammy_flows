@@ -99,3 +99,19 @@ The log-probability obtained will now contain the extra log-det factor to proper
 ----------------
 Sampling
 ----------------
+
+To generate 30 samples, we could call 
+
+..  code-block:: python
+    
+    # evaluating at embedding coordinates
+    sample_target, sample_base, log_prob_target, log_prob_base=flow_pdf.sample(allow_gradients=True, samplesize=30)
+
+We use ``allow_gradients=True`` to have differentiable samples. If no derivatives are required, one can just call the function with ``allow_gradients=False``, which can dramatically reduce memory use because the computation graph does not need to be constructed.
+If derivatives are active, ``log_prob_target`` will have the correct derivatives to be used in differentiable expectation values.
+
+.. math::
+
+   \mathrm{\texttt{log_prob_target}}(\theta) = \mathrm{ln}(p_\theta)({\texttt{sample_target}}_{\theta})
+
+This is to be preferred than manually in a second step calculating the right-hand side of the equation because internally it does not require a full inverse mapping but has the correct gradient dependency as the right-hand side automatically.

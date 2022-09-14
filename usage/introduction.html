@@ -149,6 +149,16 @@ The third is the position in the base space.</p>
 </div>
 <div class="section" id="sampling">
 <h2>Sampling<a class="headerlink" href="#sampling" title="Permalink to this headline">¶</a></h2>
+<p>To generate 30 samples, we could call</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="c1"># evaluating at embedding coordinates</span>
+<span class="n">sample_target</span><span class="p">,</span> <span class="n">sample_base</span><span class="p">,</span> <span class="n">log_prob_target</span><span class="p">,</span> <span class="n">log_prob_base</span><span class="o">=</span><span class="n">flow_pdf</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">allow_gradients</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">samplesize</span><span class="o">=</span><span class="mi">30</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>We use <code class="docutils literal notranslate"><span class="pre">allow_gradients=True</span></code> to have differentiable samples. If no derivatives are required, one can just call the function with <code class="docutils literal notranslate"><span class="pre">allow_gradients=False</span></code>, which can dramatically reduce memory use because the computation graph does not need to be constructed.
+If derivatives are active, <code class="docutils literal notranslate"><span class="pre">log_prob_target</span></code> will have the correct derivatives to be used in differentiable expectation values.</p>
+<div class="math notranslate nohighlight">
+\[\mathrm{\texttt{log_prob_target}}(\theta) = \mathrm{ln}(p_\theta)({\texttt{sample_target}}_{\theta})\]</div>
+<p>This is to be preferred than manually in a second step calculating the right-hand side of the equation because internally it does not require a full inverse mapping but has the correct gradient dependency as the right-hand side automatically.</p>
 </div>
 </div>
 
