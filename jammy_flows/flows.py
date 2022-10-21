@@ -1132,7 +1132,6 @@ class pdf(nn.Module):
                conditional_input=None, 
                samplesize=1,  
                seed=None, 
-               device=torch.device("cpu"), 
                allow_gradients=False, 
                amortization_parameters=None, 
                force_embedding_coordinates=False, 
@@ -1144,7 +1143,6 @@ class pdf(nn.Module):
             conditional_input (Tensor/None): Of shape N x D where N is the batch size and D the input space dimension if given. Else None.
             samplesize (int): Samplesize.
             seed (None/int):
-            device (torch.device):
             allow_gradients (bool): If False, does not propagate gradients and saves memory by not building the graph. Off by default, so has to be switched on for training.
             amortization_parameters (Tensor/None): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates for the sample.
@@ -1168,13 +1166,13 @@ class pdf(nn.Module):
 
         if(allow_gradients):
 
-            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, device=device, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
         else:   
             with torch.no_grad():
-                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, device=device, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1327,8 +1325,8 @@ class pdf(nn.Module):
     def _obtain_sample(self, 
                        conditional_input=None, 
                        predefined_target_input=None, 
-                       samplesize=1, seed=None, 
-                       device=torch.device("cpu"), 
+                       samplesize=1, 
+                       seed=None, 
                        amortization_parameters=None, 
                        force_embedding_coordinates=False, 
                        force_intrinsic_coordinates=False):
@@ -1341,7 +1339,6 @@ class pdf(nn.Module):
             conditional_input (Tensor/None): Input tensor when conditional PDF.
             predefined_target_input (Tensor/None): When given, evaluates the MVN there. Otherwise samples a MVN random variable before.
             samplesize (int): 
-            device: 
             amortization_parameters (bool): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates in the output sample.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the output sample.
@@ -1360,13 +1357,14 @@ class pdf(nn.Module):
 
         data_type = torch.float64
         used_sample_size = samplesize
-        used_device=device
+        used_device=next(self.parameters()).device
 
         if conditional_input is not None:
 
             used_sample_size = conditional_input.shape[0]
             data_type = conditional_input.dtype
-            used_device = conditional_input.device
+            assert(used_device==conditional_input.device)
+            
 
         x=None
         log_gauss_evals=0.0
@@ -1375,6 +1373,8 @@ class pdf(nn.Module):
         if(predefined_target_input is not None):
 
             x=predefined_target_input
+
+            assert(used_device==predefined_target_input.device)
 
             if(conditional_input is not None):
 
@@ -1386,7 +1386,7 @@ class pdf(nn.Module):
             else:
                 data_type=predefined_target_input.dtype
                 used_sample_size=predefined_target_input.shape[0]
-                used_device=predefined_target_input.device
+              
 
             log_gauss_evals = torch.distributions.MultivariateNormal(
                 torch.zeros(self.total_base_dim).type(data_type).to(used_device),

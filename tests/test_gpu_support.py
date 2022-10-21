@@ -230,7 +230,7 @@ class Test(unittest.TestCase):
                     print("conditional ....")
                     c_input=torch.ones( (100, flow_init[1]["conditional_input_dim"]), dtype=torch.float64, device=torch.device("cuda"))
 
-                gpu_sample,_,_,_ = pdf.sample(device=dev, conditional_input=c_input, samplesize=100)
+                gpu_sample,_,_,_ = pdf.sample(conditional_input=c_input, samplesize=100)
 
                 res,_,_=pdf(gpu_sample, conditional_input=c_input)
 
