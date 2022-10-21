@@ -312,7 +312,7 @@ For the Gaussianization flow, data can be used to initilialize the starting dist
 
 <dl class="method">
 <dt id="jammy_flows.flows.pdf.sample">
-<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">device=device(type='cpu')</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.flows.pdf.sample" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.flows.pdf.sample" title="Permalink to this definition">¶</a></dt>
 <dd><p>Samples from the (conditional) PDF.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -320,7 +320,6 @@ For the Gaussianization flow, data can be used to initilialize the starting dist
 <li><p><strong>conditional_input</strong> (<em>Tensor/None</em>) – Of shape N x D where N is the batch size and D the input space dimension if given. Else None.</p></li>
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize.</p></li>
 <li><p><strong>seed</strong> (<em>None/int</em>) – </p></li>
-<li><p><strong>device</strong> (<em>torch.device</em>) – </p></li>
 <li><p><strong>allow_gradients</strong> (<em>bool</em>) – If False, does not propagate gradients and saves memory by not building the graph. Off by default, so has to be switched on for training.</p></li>
 <li><p><strong>amortization_parameters</strong> (<em>Tensor/None</em>) – Used to amortize the whole PDF. Otherwise None.</p></li>
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Enforces embedding coordinates for the sample.</p></li>
