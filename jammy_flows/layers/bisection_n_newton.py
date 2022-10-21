@@ -63,7 +63,7 @@ def inverse_bisection_n_newton_joint_func_and_grad(func,
     #print("target arg", target_arg.shape)
 
 
-    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool)
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool, device=target_arg.device)
 
     ## check where we want to broadcast the masking, and wnhere not
 
@@ -175,7 +175,7 @@ def inverse_bisection_n_newton(func,
     #print("target arg", target_arg.shape)
 
 
-    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool)
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool, device=target_arg.device)
 
     broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
 

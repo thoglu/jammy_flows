@@ -145,7 +145,7 @@ class simplex_base(layer_base.layer_base):
 
         ## (1,0,0,...)+ 1X2 * 2XN
 
-        mm_result=self.canonical_one_hot+torch.matmul(x, self.M)
+        mm_result=self.canonical_one_hot.to(x.device)+torch.matmul(x, self.M.to(x.device))
 
         ## area increases by sqrt(dim+1)
         log_det=log_det+0.5*numpy.log(self.dimension+1)
@@ -158,7 +158,7 @@ class simplex_base(layer_base.layer_base):
 
         ## (1,0,0,...)+ 1X2 * 2XN
 
-        mm_result=torch.matmul(x-self.canonical_one_hot, self.M_reverse)
+        mm_result=torch.matmul(x-self.canonical_one_hot.to(x.device), self.M_reverse.to(x.device))
 
         ## area decreases by sqrt(dim+1)
         log_det=log_det-0.5*numpy.log(self.dimension+1)
@@ -170,28 +170,6 @@ class simplex_base(layer_base.layer_base):
     def inv_flow_mapping(self, inputs, extra_inputs=None,use_gauss_projection=True):
         
         [res, log_det] = inputs
-        """
-        if(force_embedding_coordinates):
-
-            assert(force_intrinsic_coordinates==False)
-            assert(res.shape[1]==(self.dimension+1))
-            ## check if we are in base simplex, if so embed in canonical simplex because it is forced
-            if(self.always_parametrize_in_embedding_space==False):
-                # typically this flow takes intrinsic coordinates, but we overwrite this here...
-                res, log_det=self.canonical_simplex_to_base_simplex([res, log_det])
-
-        elif(force_intrinsic_coordinates):
-            assert(res.shape[1]==self.dimension)
-            ## check if we are in canonical simplex, if so project to base simplex because it is forced
-            if(self.always_parametrize_in_embedding_space):
-                res, log_det=self.base_simplex_to_canonical_simplex([res, log_det])
-        else:
-
-            if(self.always_parametrize_in_embedding_space):
-                assert(res.shape[1]==(self.dimension+1))
-            else:
-                assert(res.shape[1]==self.dimension)
-        """
 
         res, log_det=self._inv_flow_mapping([res, log_det], extra_inputs=extra_inputs)
         
@@ -223,22 +201,6 @@ class simplex_base(layer_base.layer_base):
             
         ### all flow mappings happen at the base simplex
         res, log_det= self._flow_mapping([res, log_det], extra_inputs=extra_inputs)
-
-        """
-        if(force_embedding_coordinates):
-
-            assert(force_intrinsic_coordinates==False)
-
-            ## check if we are in base simplex, if so embed in canonical simplex because it is forced
-            if(res.shape[1]==self.dimension):
-                res, log_det=self.base_simplex_to_canonical_simplex([res, log_det])
-
-        elif(force_intrinsic_coordinates):
-
-            ## check if we are in canonical simplex, if so project to base simplex because it is forced
-            if(res.shape[1]==(self.dimension+1)):
-                res, log_det=self.canonical_simplex_to_base_simplex([res, log_det])
-        """
 
         return res, log_det
 

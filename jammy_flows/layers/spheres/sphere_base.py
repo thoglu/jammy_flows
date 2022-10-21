@@ -95,14 +95,13 @@ class sphere_base(layer_base.layer_base):
 
             hh_dim=self.dimension+1
 
-            mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
-
             if(extra_inputs is not None):
                 
-                mat_pars=mat_pars+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
+                mat_pars=torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
 
-                #extra_input_counter+=self.num_householder_params
             else:
+
+                mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
                 mat_pars=mat_pars.repeat(x.shape[0],1,1)
 
             return self.compute_householder_matrix(mat_pars, hh_dim, device=device)

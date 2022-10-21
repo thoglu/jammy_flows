@@ -380,30 +380,6 @@ class Test(unittest.TestCase):
 
             if("c" in init[0][1]):
                 sys.exit(-1)
-
-    def test_gpu(self):
-
-        print("-> Testing gpu-support <-")
-        dev=torch.device("cuda")
-        try:
-            a=torch.Tensor([1.0,2.0]).to(dev)
-        except:
-            print("GPU not supported - skipping GPU test")
-        else:
-            print("GPU supported ..")
-
-            check_list=[ ["e1", "g"], ["e1", "p"], ["s1", "m"], ["s2","n"] ]
-
-            for args in check_list:
-                pdf=f.pdf(*args)
-
-                gpu_sample,_,_,_ = pdf.sample(device=dev)
-
-                res,_,_=pdf(gpu_sample)
-
-                print(res)
-
-
     
     def test_derivative(self):
         print("Testing derivatives of Gaussianization flows")

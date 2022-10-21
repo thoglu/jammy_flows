@@ -381,7 +381,6 @@ class gf_block(euclidean_base.euclidean_base):
         ## the widths can actually be a non log
        
         ## shape to B X KDE index dim X dimension
-        #print("LOG EXPO", log_skew_exponents)
 
         widths=torch.exp(log_widths)
 
@@ -408,7 +407,7 @@ class gf_block(euclidean_base.euclidean_base):
         if(self.add_skewness):
             ## differentiate CDF/SF for +/- skewed distributions (they mirror each other)
 
-            log_cdfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double)
+            log_cdfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double, device=x.device)
 
             pos_mask=skew_signs[0,:,0]>0
         
@@ -421,7 +420,7 @@ class gf_block(euclidean_base.euclidean_base):
 
             ####
 
-            log_sfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double)
+            log_sfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double, device=x.device)
 
             ## positive sfs
             log_sfs.masked_scatter_(pos_mask[None,:,None], extra_functions.log_one_plus_exp_x_to_a_minus_1(-common_x_argument[:,pos_mask,:], skew_exponents[:,pos_mask,:]))

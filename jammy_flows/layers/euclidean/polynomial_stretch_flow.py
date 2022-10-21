@@ -77,34 +77,21 @@ class psf_block(euclidean_base.euclidean_base):
 
         if use_permanent_parameters:
             self.log_widths1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
-        else:
-            self.log_widths1 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
-
+       
 
         if use_permanent_parameters:
             self.log_widths2 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
-        else:
-            self.log_widths2 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)
-
-        #self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
-      
+       
         if use_permanent_parameters:
             self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
-        else:
-            self.means1 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
         
         
         if use_permanent_parameters:
             self.means2 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
-        else:
-            self.means2 = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
-
+        
         if use_permanent_parameters:
             self.log_exponent = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
-        else:
-            self.log_exponent = torch.zeros(num_transforms, self.dimension).type(torch.double).unsqueeze(0)#.to(device)
-    
-        
+       
      
         self.num_householder_params=0
 
@@ -114,9 +101,7 @@ class psf_block(euclidean_base.euclidean_base):
                 self.vs = nn.Parameter(
                     torch.randn(self.householder_iter, dimension).type(torch.double).unsqueeze(0)
                 )
-            else:
-                self.vs = torch.zeros(self.householder_iter, dimension).type(torch.double).unsqueeze(0) 
-
+           
             self.num_householder_params=self.householder_iter*self.dimension
 
         self.total_param_num+=self.total_transform_params+self.num_householder_params
@@ -183,14 +168,15 @@ class psf_block(euclidean_base.euclidean_base):
 
         extra_input_counter=0
         if self.use_householder:
-            this_vs=self.vs
+           
+            
             if(extra_inputs is not None):
-                
+               
+                this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.householder_iter, self.dimension])
 
-                this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.vs.shape[1], self.vs.shape[2]])
-
-                
                 extra_input_counter+=self.num_householder_params
+            else:
+                this_vs=self.vs
 
             rotation_matrix = self.compute_householder_matrix(this_vs, device=x.device)
 
@@ -201,36 +187,33 @@ class psf_block(euclidean_base.euclidean_base):
                     raise Exception("rotation matrix first dim is larger than data first dim (batch dim) .. taht should never happen!")
 
 
-        log_widths1=self.log_widths1.to(x)
-        log_widths2=self.log_widths2.to(x)
-
-        means1=self.means1.to(x)
-        means2=self.means2.to(x)
-
-        log_exponent=self.log_exponent.to(x)
-
         if(extra_inputs is not None):
           
-            log_widths1=log_widths1+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_widths1.shape[1],  self.log_widths1.shape[2]])
+            log_widths1=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms,  self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            log_widths2=log_widths2+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_widths2.shape[1],  self.log_widths2.shape[2]])
+            log_widths2=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms,  self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            means1=means1+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.means1.shape[1],  self.means1.shape[2]])
+            means1=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms,  self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            means2=means2+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.means2.shape[1],  self.means2.shape[2]])
+            means2=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms,  self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            log_exponent=log_exponent+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_exponent.shape[1],  self.log_exponent.shape[2]])
+            log_exponent=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms,  self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-        """
-        widths1 = torch.exp(log_widths1)+self.width_min
-        widths2 = torch.exp(log_widths2)+self.width_min
-        exponents=torch.exp(log_exponent)+self.exp_min
-        """
+        else:
+
+            log_widths1=self.log_widths1.to(x)
+            log_widths2=self.log_widths2.to(x)
+
+            means1=self.means1.to(x)
+            means2=self.means2.to(x)
+
+            log_exponent=self.log_exponent.to(x)
+      
         
         widths1=self.width_transform(log_widths1)
         widths2=self.width_transform(log_widths2)
@@ -273,28 +256,20 @@ class psf_block(euclidean_base.euclidean_base):
         
         [x, log_det] = inputs
 
-        log_widths1=self.log_widths1.to(x)
-        log_widths2=self.log_widths2.to(x)
-
-        means1=self.means1.to(x)
-        means2=self.means2.to(x)
-
-        log_exponent=self.log_exponent.to(x)
+        
 
         extra_input_counter=0
         if self.use_householder:
-            this_vs=self.vs
-
-          
+            
             if(extra_inputs is not None):
 
-                #print("extra inputs ", extra_inputs[:,:self.num_householder_params])
-                this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.vs.shape[1], self.vs.shape[2]])
-                #print(this_vs)
-
-                
+                this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.householder_iter, self.dimension])
                 extra_input_counter+=self.num_householder_params
-        
+
+            else:
+
+                this_vs=self.vs
+
             rotation_matrix = self.compute_householder_matrix(this_vs, device=x.device)
 
             if(rotation_matrix.shape[0]!=x.shape[0]):
@@ -308,27 +283,29 @@ class psf_block(euclidean_base.euclidean_base):
         
         if(extra_inputs is not None):
             
-            log_widths1=log_widths1+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_widths1.shape[1],  self.log_widths1.shape[2]])
+            log_widths1=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms, self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            log_widths2=log_widths2+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_widths2.shape[1],  self.log_widths2.shape[2]])
+            log_widths2=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms, self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            means1=means1+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.means1.shape[1],  self.means1.shape[2]])
+            means1=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms, self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            means2=means2+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.means2.shape[1],  self.means2.shape[2]])
+            means2=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms, self.dimension])
             extra_input_counter+=self.num_params_per_item
 
-            log_exponent=log_exponent+torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.log_exponent.shape[1],  self.log_exponent.shape[2]])
+            log_exponent=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_per_item], [x.shape[0] , self.num_transforms, self.dimension])
             extra_input_counter+=self.num_params_per_item
 
+        else:
+            log_widths1=self.log_widths1.to(x)
+            log_widths2=self.log_widths2.to(x)
 
-        """
-        widths1 = torch.exp(log_widths1)+self.width_min
-        widths2 = torch.exp(log_widths2)+self.width_min
-        exponents=torch.exp(log_exponent)+self.exp_min
-        """
+            means1=self.means1.to(x)
+            means2=self.means2.to(x)
+
+            log_exponent=self.log_exponent.to(x)
         
         widths1=self.width_transform(log_widths1)
         widths2=self.width_transform(log_widths2)
