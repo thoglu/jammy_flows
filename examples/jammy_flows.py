@@ -318,9 +318,6 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
 if __name__ == "__main__":
 
-    ###
-    ### Disclaimer: The script currently does not corretly support spherical flows (S2) until they are reworked
-    ###
     parser = argparse.ArgumentParser('train_example')
 
     parser.add_argument("-sentence", type=str, default="JAMMY FLOWS")
