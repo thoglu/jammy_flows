@@ -28,6 +28,10 @@ def seed_everything(seed_no):
     torch.manual_seed(seed_no)
 
 ############################
+## This scripts illustrates the "rotated" lambert projection for the given S2-flow defined by *layer_def*.
+## The left figure is always centralized on the given *true position* (red dot) in lambert projection, while the right figure 
+## shows the standard zenith/azimuth view where the red point (true position) moves.
+############################
 
 if __name__ == "__main__":
 
@@ -35,34 +39,20 @@ if __name__ == "__main__":
 
     parser.add_argument("-layer_def", type=str, default="n")
     parser.add_argument("-num_samples", type=int, default=10)
-    #parser.add_argument("-projection", type=str, default="lambert", choices=["lambert", "standard"]) 
 
     args=parser.parse_args()
 
     seed_everything(1)
-    ## define PDF
-
+  
     extra_flow_defs=dict()
-    extra_flow_defs[0]=dict()
-    extra_flow_defs[0]["n"]=dict()
-    extra_flow_defs[0]["n"]["use_extra_householder"]=1
-    extra_flow_defs[0]["n"]["higher_order_cylinder_parametrization"]=0
-    extra_flow_defs[0]["n"]["zenith_type_layers"]="rr"
-
-    extra_flow_defs["v"]=dict()
-    #extra_flow_defs["v"]["kwargs"]["use_extra_householder"]=0
-    extra_flow_defs["v"]["natural_direction"]=0
-    extra_flow_defs["v"]["exp_map_type"]="nn"
-    
 
     test_pdf=jammy_flows.pdf("s2", args.layer_def, options_overwrite=extra_flow_defs)
 
-    #res,_,_,_=test_pdf._obtain_sample(predefined_target_input=torch.Tensor([[0.0,0.1],[0.0,0.2]]))
-
     num_steps=20
-    for ind in range(num_steps):
 
-        ## generate zentih/azi steps to define some "true postion"
+    ## visualize PDF for different "true positions", i.e. from different vantage points
+    for ind in range(num_steps):
+        
         max_zen=numpy.pi-0.001
         min_zen=0.001
         zen_step=(max_zen-min_zen)/num_steps
@@ -73,10 +63,6 @@ if __name__ == "__main__":
         azi_step=(max_azi-min_azi)/num_steps
         true_azi=min_azi+ind*azi_step
 
-        ## visualize PDF for different "true positions", i.e. from different vantage points
-       
-    
-      
         fig=pylab.figure(figsize=(9,4))
 
         gs=fig.add_gridspec(1, 2)
