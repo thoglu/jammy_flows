@@ -167,8 +167,8 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     if (conditional_input is not None):
         cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
-    
-    ## require intrinsic coordinates
+        if(cinput.is_cuda):
+            eval_positions=eval_positions.to(cinput)
     
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
@@ -197,13 +197,13 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
           if(s2_rotate_to_true_value and true_values is not None):
               fix_point=true_values[model.target_dim_indices[ind][0]:model.target_dim_indices[ind][1]]
           problematic_pars=spherical_to_cartesian_lambert(problematic_pars, fix_point=fix_point)
-      flagged_coords=problematic_pars.detach().numpy()
+      flagged_coords=problematic_pars.cpu().numpy()
 
-    res = (-600.0)*torch.ones(len(torch_positions)).type_as(torch_positions)
+    res = (-600.0)*torch.ones(len(torch_positions)).type_as(torch_positions).to(log_res)
     res[mask_inner] = log_res  #.exp()
    
-    res = res.detach().numpy()
-    numpy_positions=eval_positions.detach().numpy()
+    res = res.cpu().numpy()
+    numpy_positions=eval_positions.cpu().numpy()
     if((numpy.isfinite(res)==False).sum()>0):
       print("Non-finite evaluation during PDF eval for plotting..")
       print((numpy.isfinite(res)==False).sum())
@@ -221,7 +221,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     res.resize([npts] * len(mins_maxs))
 
-    resized_torch_positions = torch_positions.detach().numpy()
+    resized_torch_positions = torch_positions.cpu().numpy()
     resized_torch_positions.resize([npts] * len(mins_maxs) + [len(mins_maxs)])
 
     ## add in sin(theta) factors into density
@@ -547,12 +547,7 @@ def plot_joint_pdf(pdf,
     if (bounds is not None):
         assert(len(bounds)==len(mms)), "Bounds must be given for every dimension!"
         mms = bounds
-    else:
-        ## make sure intervals are within bounds in automatic mode
-        for dim_index, b in enumerate(mms):
-            print(b)
-
-        #sys.exit(-1)
+   
 
     ## true positions are typically labels
     plotted_true_values=None
@@ -566,8 +561,8 @@ def plot_joint_pdf(pdf,
         new_b = b
         if (type(b[0]) == torch.Tensor):
             new_b = [
-                float(b[0].detach().numpy()),
-                float(b[1].detach().numpy())
+                float(b[0].cpu().numpy()),
+                float(b[1].cpu().numpy())
             ]
 
         pure_float_mms.append(new_b)
@@ -576,7 +571,7 @@ def plot_joint_pdf(pdf,
     totalpts = total_pdf_eval_pts
     pts_per_dim = int(totalpts**(1.0 / float(dim)))
 
-    samples = samples.detach().clone()
+    samples = samples.cpu().clone()
 
     gridline_dict=None
     if(s2_show_gridlines and "s2" in pdf.pdf_defs_list):
@@ -629,7 +624,7 @@ def plot_joint_pdf(pdf,
 
 
 
-    samples = samples.numpy()
+    samples = samples.cpu().numpy()
 
     pdf_conditional_input = conditional_input
 
@@ -788,7 +783,7 @@ def plot_joint_pdf(pdf,
         ## plot true values
         if (plotted_true_values is not None):
             
-            ax.plot([plotted_true_values[0]], [plotted_true_values[1]],
+            ax.plot([plotted_true_values[0]].cpu().numpy(), [plotted_true_values[1].cpu().numpy()],
                     color="red",
                     marker="o",
                     ms=3.0)
@@ -890,7 +885,7 @@ def plot_joint_pdf(pdf,
                                   cmap=colormap)
 
                     if (plotted_true_values is not None):
-                        ax.plot([plotted_true_values[ind2]], [plotted_true_values[ind1]],
+                        ax.plot([plotted_true_values[ind2].cpu().numpy()], [plotted_true_values[ind1].cpu().numpy()],
                                 color="red",
                                 marker="o",
                                 ms=3.0)
@@ -951,7 +946,7 @@ def plot_joint_pdf(pdf,
                     ax.hist(samples[:, ind1], bins=hist_bounds, density=True)
 
                     if (plotted_true_values is not None):
-                        ax.axvline(plotted_true_values[ind1], color="red", lw=2.0)
+                        ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
 
                     if (autoscale):
                         if (plotting_bounds is not None):
@@ -1006,7 +1001,7 @@ def visualize_pdf(pdf,
           samplesize=nsamples,
           conditional_input=sample_conditional_input,
           seed=seed)
-
+      
       higher_dim_spheres = False
 
       new_subgridspec, total_pdf_integral = plot_joint_pdf(

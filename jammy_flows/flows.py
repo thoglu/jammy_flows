@@ -964,6 +964,7 @@ class pdf(nn.Module):
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf!"
         if(conditional_input is not None):
             assert(x.shape[0]==conditional_input.shape[0]), "Evaluating input x and condititional input shape must be similar!"
+            assert(x.is_cuda==conditional_input.is_cuda), ("input tensor *x* and *conditional_input* are on different devices .. resp. cuda flags: 1) x, 2) conditional_input, 3) pdf model", x.is_cuda, conditional_input.is_cuda, next(self.parameters()).is_cuda)
 
         tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
