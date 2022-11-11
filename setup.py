@@ -18,7 +18,7 @@ URL = 'https://github.com/thoglu/jammy_flows'
 EMAIL = 'thorsten.glu@gmail.com'
 AUTHOR = 'Thorsten Glüsenkamp'
 REQUIRES_PYTHON = '>=3.6.0'
-VERSION = '0.93'
+VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
