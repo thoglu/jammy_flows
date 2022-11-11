@@ -72,6 +72,20 @@ For a description of all flows and abbreviations, have a look in the docs [here]
 The package has been built and tested with these versions, but might work just fine with older ones.
 
 ## Installation
+
+### specific version:
+
+```
+pip install git+https://github.com/thoglu/jammy_flows.git@*tag* 
+```
+e.g.
+```
+pip install git+https://github.com/thoglu/jammy_flows.git@1.0.0
+```
+to install release 1.0.0.
+
+### master:
+
 ```
 pip install git+https://github.com/thoglu/jammy_flows.git
 ```
