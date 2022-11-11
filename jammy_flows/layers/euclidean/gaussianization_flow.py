@@ -860,29 +860,28 @@ class gf_block(euclidean_base.euclidean_base):
                 extra_input_counter+=self.dimension*4
 
 
-            ## TODO: might make the next choice a parameter
-            if(True):
-                left=boundary_points[:,:,0:1]
-                right=boundary_points[:,:,1:2]
+            
+            ## older parametrization .. does not seem work well with gradients
+            #left=boundary_points[:,:,0:1]
+            #right=boundary_points[:,:,1:2]
 
-                new_left=torch.where(left<right, left, right)
-                new_right=torch.where(left<right, right, left)
+            #new_left=torch.where(left<right, left, right)
+            #new_right=torch.where(left<right, right, left)
 
-                bottom=boundary_points[:,:,2:3]
-                top=boundary_points[:,:,3:4]
-                    
-                new_bottom=torch.where(bottom<top, bottom, top)
-                new_top=torch.where(bottom<top, top, bottom)
-            else:
-                # currently not used
-                min_abs_width=1e-3
+            #bottom=boundary_points[:,:,2:3]
+            #top=boundary_points[:,:,3:4]
+                
+            #new_bottom=torch.where(bottom<top, bottom, top)
+            #new_top=torch.where(bottom<top, top, bottom)
+           
+            ## TODO: remove hardcoding of minimum widths
+            min_abs_width=0.5
 
-                new_left=boundary_points[:,:,0:1]
-                #new_right=new_left+torch.nn.functional.softplus(boundary_points[:,:,1:2])+min_abs_width
-                new_right=new_left+torch.exp(boundary_points[:,:,1:2])+min_abs_width
+            new_left=boundary_points[:,:,0:1]
+            new_right=new_left+torch.exp(boundary_points[:,:,1:2])+min_abs_width
 
-                new_bottom=boundary_points[:,:,2:3]
-                new_top=new_bottom+torch.exp(boundary_points[:,:,3:4])+min_abs_width
+            new_bottom=boundary_points[:,:,2:3]
+            new_top=new_bottom+torch.exp(boundary_points[:,:,3:4])+min_abs_width
 
             return (log_widths, log_heights, log_derivatives, new_left,new_right,new_bottom,new_top), rotation_params
 

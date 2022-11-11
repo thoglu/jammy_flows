@@ -198,7 +198,6 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     word_ids=torch.nn.functional.one_hot(torch.arange(num_words), num_words).type(torch.float64)
 
-    ## 2 * log_pdf differences
     cinput=test_data
     if(model.conditional_input_dim is None):
         cinput=None
@@ -211,29 +210,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     bmin=9999
     bmax=-9999
     mask=[]
-    """
-    for pdf_str in model.pdf_defs_list:
-        this_dim=int(pdf_str[1:])
-        this_type=pdf_str[0]
-        if(this_type=="e"):
-
-            for ind in range(this_dim):
-                this_min=test_labels.detach().numpy()[:,glob_dim_index].min()
-                this_max=test_labels.detach().numpy()[:,glob_dim_index].max()
-
-                if(this_min<bmin):
-                    bmin=this_min
-
-                if(this_max>bmax):
-                    bmax=this_max
-
-                glob_dim_index+=1
-
-        else:
-            glob_dim_index+=2
-            continue
-    """
-   
+ 
     sphere_plot_type="standard"
     for pdf_str in model.pdf_defs_list:
         this_dim=int(pdf_str[1:])
@@ -248,12 +225,10 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
                 bounds.append([-2,2])
                 bounds.append([-2,2])
 
-            #glob_dim_index+=2
         elif(this_type=="e"):
             for ind in range(this_dim):
                 bounds.append([-12.0,12.0])
-            #bounds.append([-12.0,12.0])
-
+          
         elif(this_type=="i"):
             bounds.append([0.0,1.0])
         elif(this_type=="c"):
@@ -270,8 +245,8 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     coverage_probs=np.linspace(0.01,0.99,100)
     true_twice_llhs=scipy.stats.chi2.ppf(coverage_probs, df=dim)
-    ## plot PDF for individual "word input data"
 
+    ## plot PDF for individual "word input data"
     colors=pylab.cm.tab10.colors
 
     cov_ax=fig.add_subplot(gridspec[0,num_words])
@@ -283,12 +258,11 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
         if(model.conditional_input_dim is None):
             cinput=None
 
-        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=2000, nsamples=1000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=10000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
      
-        
         act_cov=[]
         for ind,true_cov in enumerate(coverage_probs):
 
@@ -310,8 +284,6 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     fig.savefig(fname)
 
     pylab.close(fig)
-
-    #test_evals, standard_normal_base_evals, _=model(test_labels, conditional_input=test_data)
 
 
 ############################
@@ -347,28 +319,11 @@ if __name__ == "__main__":
 
     extra_flow_defs=dict()
     extra_flow_defs["n"]=dict()
-    extra_flow_defs["n"]["zenith_type_layers"]="g"
-    extra_flow_defs["n"]["rotation_mode"]="householder"
-    extra_flow_defs["n"]["add_rotation"]=1
 
     extra_flow_defs["g"]=dict()
-    extra_flow_defs["g"]["regulate_normalization"]=1
-    extra_flow_defs["g"]["fit_normalization"]=1
-    extra_flow_defs["g"]["add_skewness"]=0  
-    extra_flow_defs["g"]["rotation_mode"]="angles"
-    extra_flow_defs["g"]["nonlinear_stretch_type"]="classic" 
+    extra_flow_defs["g"]["nonlinear_stretch_type"]="rq_splines" 
 
-    extra_flow_defs["t"]=dict()
-    extra_flow_defs["t"]["cov_type"]="full"
 
-    extra_flow_defs["v"]=dict()
-    extra_flow_defs["v"]["exp_map_type"]="splines"
-    extra_flow_defs["v"]["num_components"]=10
-    extra_flow_defs["v"]["natural_direction"]=1
-
-    extra_flow_defs["c"]=dict()
-    extra_flow_defs["c"]["cnf_network_highway_mode"]=4
-    extra_flow_defs["c"]["cnf_network_hidden_dims"]="512-512"
 
     cinput=len(args.sentence.split(" "))
     if(args.use_conditional_pdf==0):
