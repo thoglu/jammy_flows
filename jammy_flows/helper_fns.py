@@ -652,7 +652,7 @@ def plot_joint_pdf(pdf,
         else:
             ## find ax in existing gridspec
             for ax in fig.get_axes():
-                ax_geometry=ax.get_geometry()
+                ax_geometry=ax.get_subplotspec().get_geometry()
 
                 if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
                     continue
@@ -680,7 +680,7 @@ def plot_joint_pdf(pdf,
             ax = fig.add_subplot(subgridspec[0, 0])
         else:
             for ax in fig.get_axes():
-                ax_geometry=ax.get_geometry()
+                ax_geometry=ax.get_subplotspec().get_geometry()
 
                 if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
                     continue
@@ -855,7 +855,7 @@ def plot_joint_pdf(pdf,
 
                     found_ax=False
                     for ax in fig.get_axes():
-                        ax_geometry=ax.get_geometry()
+                        ax_geometry=ax.get_subplotspec().get_geometry()
                         num_rows=ax_geometry[0]
                         this_gridspec=ax.get_gridspec()
 
@@ -920,7 +920,8 @@ def plot_joint_pdf(pdf,
                     ## looking for ax
                     found_ax=False
                     for ax in fig.get_axes():
-                        ax_geometry=ax.get_geometry()
+                       
+                        ax_geometry=ax.get_subplotspec().get_geometry()
                         num_rows=ax_geometry[0]
                         
                         if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
