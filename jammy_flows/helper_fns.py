@@ -783,7 +783,7 @@ def plot_joint_pdf(pdf,
         ## plot true values
         if (plotted_true_values is not None):
             
-            ax.plot([plotted_true_values[0]].cpu().numpy(), [plotted_true_values[1].cpu().numpy()],
+            ax.plot([plotted_true_values[0].cpu().numpy()], [plotted_true_values[1].cpu().numpy()],
                     color="red",
                     marker="o",
                     ms=3.0)
