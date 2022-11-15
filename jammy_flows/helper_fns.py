@@ -242,9 +242,11 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
 def rotate_coords_to(theta, phi, target, reverse=False):
 
-  target_theta=target[0]
-  target_phi=target[1]
+  target_theta=target[0].cpu().numpy()
+  target_phi=target[1].cpu().numpy()
 
+  phi=phi.cpu().numpy()
+  theta=theta.cpu().numpy()
 
   x=numpy.cos(target_phi)*numpy.sin(target_theta)
   y=numpy.sin(target_phi)*numpy.sin(target_theta)
@@ -269,7 +271,8 @@ def rotate_coords_to(theta, phi, target, reverse=False):
   x=numpy.cos(phi)*numpy.sin(theta)
   y=numpy.sin(phi)*numpy.sin(theta)
   z=numpy.cos(theta)
-  vals=torch.cat([x[:,None], y[:,None],z[:,None]], dim=1)
+
+  vals=numpy.concatenate([x[:,None], y[:,None],z[:,None]], axis=1)
 
   res=torch.from_numpy(rot_matrix.apply(vals))
   
@@ -289,7 +292,7 @@ def rotate_coords_to(theta, phi, target, reverse=False):
   #phi_smaller_mask=phi<0
   #phi[phi_smaller_mask]=phi[phi_smaller_mask]+2*numpy.pi
  
-  return theta, phi
+  return theta.to(target), phi.to(target)
 
 def cartesian_lambert_to_spherical(xl, fix_point=None):
 
@@ -792,7 +795,7 @@ def plot_joint_pdf(pdf,
         if(s2_show_gridlines and gridline_dict is not None):
           
           for gl in gridline_dict[(0,2)]:
-            np_gl=gl.numpy()
+            np_gl=gl.cpu().numpy()
 
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
        
