@@ -37,13 +37,11 @@ class fully_amortized_pdf(nn.Module):
         predict_log_normalization=False,
         skip_mlp_initialization=False
     ):  
-
         """
         A fully amortized PDF, where in contrast to the standard autoregressive conditional PDF, also the whole autoregressive transformation, including MLPs, is amortized.
 
-        See documentation for an exact structural difference.
+        See documentation for an exact structural difference. Accessed via *jammy_flows.fully_amortized_pdf*.
         
-        -----------------------                                                --------------------
         Parameters:
             pdf_defs (str): String of characters describing the joint PDF structure: Sub-space structure is spearated by "+".
                             Example: "e2+s1+s2", describes a joint PDF over a 2-dimensional euclidean space, a 1-sphere and a 2-sphere: a joint 5-dimensional PDF.
@@ -145,6 +143,28 @@ class fully_amortized_pdf(nn.Module):
                 conditional_input=None, 
                 force_embedding_coordinates=False, 
                 force_intrinsic_coordinates=False):
+        """
+        Calculates log-probability at the target *x*. Also returns some other quantities that are calculated as a consequence.
+
+        Parameters:
+
+            x (Tensor): Target position to calculate log-probability at. Must be of shape (B,D), where B = batch dimension.
+            conditional_input (Tensor/None): Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__.
+            force_embedding_coordinates (bool): Enforces embedding coordinates in the input *x*.
+            force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the input *x*. 
+        
+        Returns:
+
+            Tensor
+                Log-probability, shape = (B,)
+
+            Tensor
+                Log-probability at base distribution, shape = (B,)
+
+            Tensor
+                Position at base distribution, shape = (B,D)
+
+        """
 
         assert(conditional_input is not None), "This is by design a conditional PDF .. we require conditional input!"
 
@@ -161,9 +181,31 @@ class fully_amortized_pdf(nn.Module):
                force_embedding_coordinates=False, 
                force_intrinsic_coordinates=False):
 
-        assert(conditional_input is not None), "This is by design a conditional PDF .. we require conditional input!"
+        """ 
+        Samples from the (conditional) PDF. 
 
-        used_device=next(self.parameters())
+        Parameters:
+            conditional_input (Tensor/None): Of shape N x D where N is the batch size and D the input space dimension if given. Else None.
+            samplesize (int): Samplesize.
+            seed (None/int):
+            allow_gradients (bool): If False, does not propagate gradients and saves memory by not building the graph. Off by default, so has to be switched on for training.
+            force_embedding_coordinates (bool): Enforces embedding coordinates for the sample.
+            force_intrinsic_coordinates (bool): Enforces intrinsic coordinates for the sample.
+        
+        Returns:
+
+            Tensor
+                Sample in target space.
+            Tensor
+                Sample in base space.
+            Tensor
+                Log-pdf evaluation in target space
+            Tensor
+                Log-pdf evaluation in base space
+
+        """
+
+        assert(conditional_input is not None), "This is by design a conditional PDF .. we require conditional input!"
 
         all_flow_params=self.amortization_mlp(conditional_input) 
 
@@ -171,8 +213,7 @@ class fully_amortized_pdf(nn.Module):
                                            seed=seed,
                                            allow_gradients=allow_gradients,
                                            force_embedding_coordinates=force_embedding_coordinates, 
-                                           force_intrinsic_coordinates=force_intrinsic_coordinates,
-                                           device=used_device)
+                                           force_intrinsic_coordinates=force_intrinsic_coordinates)
 
 
 
@@ -207,6 +248,17 @@ class fully_amortized_pdf(nn.Module):
             self.amortization_mlp[-1].bias.data=global_amortization_init.data
 
     def count_parameters(self, verbose=False):
+
+        """
+            Counts parameters of the model. It does not matter, if all paramters are amortized or not, will always return the same.
+            
+            Parameters:
+                verbose (bool): Prints out number of parameters. Differentiates amortization from non-amortization params.
+            
+            Returns:
+                int
+                    Number of parameters (incl. amortization params).
+        """
 
         if(verbose):
             print("Amoritized PDF param count: \n\

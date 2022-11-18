@@ -38,8 +38,8 @@ class pdf(nn.Module):
         skip_mlp_initialization=False
     ):  
         """
-        The main class of the project that defines a pytorch normalizing-flow PDF .
-        The two main actions are evaluating the log-probability and sampling.
+        The main class of the project that defines a pytorch normalizing-flow PDF.
+        The two main actions are evaluating the log-probability and sampling. Accessed via *jammy_flows.pdf*.
 
         Parameters:
             pdf_defs (str): String of characters describing the joint PDF structure: Sub-space structure is spearated by "+".
@@ -1118,8 +1118,7 @@ class pdf(nn.Module):
                allow_gradients=False, 
                amortization_parameters=None, 
                force_embedding_coordinates=False, 
-               force_intrinsic_coordinates=False,
-               device=None):
+               force_intrinsic_coordinates=False):
         """ 
         Samples from the (conditional) PDF. 
 
@@ -1150,13 +1149,13 @@ class pdf(nn.Module):
 
         if(allow_gradients):
 
-            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates, device=device)
+            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
         else:   
             with torch.no_grad():
-                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates, device=device)
+                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1313,8 +1312,7 @@ class pdf(nn.Module):
                        seed=None, 
                        amortization_parameters=None, 
                        force_embedding_coordinates=False, 
-                       force_intrinsic_coordinates=False,
-                       device=None):
+                       force_intrinsic_coordinates=False):
         """
         Obtains a sample from the Multivariate Standard Normal, evaluates it and passes it through forward machinery. 
         When *predefined_target_input* is given, takes this as a sample.
@@ -1345,9 +1343,10 @@ class pdf(nn.Module):
 
         # make sure device is set if amortization is used
         if(self.amortize_everything):
-            assert(device is not None)
-            used_device=device
+            assert(amortization_parameters is not None)
+            used_device=amortization_parameters.device
             used_sample_size=amortization_parameters.shape[0]
+
             if(conditional_input is not None):
                 ## TODO - maybe allow for more flexible shape combinations
                 assert(conditional_input.shape[0]==amortization_parameters.shape[0])
