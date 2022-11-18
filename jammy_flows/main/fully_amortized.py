@@ -9,6 +9,7 @@ from torch import nn
 from typing import Union
 
 from . import default
+from .. import amortizable_mlp
 from ..extra_functions import list_from_str, NONLINEARITIES
 
 def copy_attributes(objfrom, objto, names):
