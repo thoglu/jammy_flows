@@ -258,16 +258,15 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
         if(model.conditional_input_dim is None):
             cinput=None
 
-        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput, total_pdf_eval_pts=10000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
+        _,_,pdf_integral=helper_fns.visualize_pdf(model, fig, gridspec=gridspec[0,word_index], conditional_input=cinput.to(test_data), total_pdf_eval_pts=10000, nsamples=10000, contour_probs=[], hide_labels=True,bounds=bounds,s2_norm=sphere_plot_type)
     
         ## plot coverage
         this_coverage=twice_pdf_diff[(wid[word_index]==test_data[:,word_index])]
      
         act_cov=[]
         for ind,true_cov in enumerate(coverage_probs):
-
-            act_cov.append(sum(this_coverage<true_twice_llhs[ind])/float(len(this_coverage)))
-
+            
+            act_cov.append(float(sum(this_coverage<true_twice_llhs[ind]).cpu())/float(len(this_coverage)))
            
         cov_ax.plot(coverage_probs, act_cov, label=r"$p(x|'%s')$ (integral: %.2f)" % (words[word_index],pdf_integral), color=colors[word_index])
 
@@ -301,8 +300,14 @@ if __name__ == "__main__":
     parser.add_argument("-test_size", type=int, default=500)
     parser.add_argument("-lr", type=float, default=0.001)
     parser.add_argument("-plot_every_n", type=int, default=200)
+    parser.add_argument("-fully_amortized_pdf", type=int, default=0)
+    parser.add_argument("-gpu", type=int, default=0)
 
     args=parser.parse_args()
+
+    if(args.gpu):
+        assert(torch.cuda.is_available)
+    gpu_device=torch.device("cuda:0")
 
     seed_everything(1)
 
@@ -316,24 +321,46 @@ if __name__ == "__main__":
 
     ## test used to calculate coverage
     test_data, test_labels=sample_data(args.pdf_def, args.sentence, num_samples=args.test_size)
+    if(args.gpu):
+        test_data=test_data.to(gpu_device)
+        test_labels=test_labels.to(gpu_device)
 
     extra_flow_defs=dict()
     extra_flow_defs["n"]=dict()
 
     extra_flow_defs["g"]=dict()
-    extra_flow_defs["g"]["nonlinear_stretch_type"]="rq_splines" 
+    extra_flow_defs["g"]["nonlinear_stretch_type"]="classic" 
 
 
 
     cinput=len(args.sentence.split(" "))
     if(args.use_conditional_pdf==0):
         cinput=None
-    word_pdf=jammy_flows.pdf(args.pdf_def, args.layer_def, conditional_input_dim=cinput, hidden_mlp_dims_sub_pdfs="128",options_overwrite=extra_flow_defs, use_custom_low_rank_mlps=False,
-        custom_mlp_highway_mode=4)
+
+    if(args.fully_amortized_pdf):
+        word_pdf=jammy_flows.fully_amortized_pdf(args.pdf_def, 
+                                                 args.layer_def, 
+                                                 conditional_input_dim=cinput, 
+                                                 options_overwrite=extra_flow_defs, 
+                                                 amortization_mlp_use_costom_mode=False,
+                                                 amortization_mlp_dims="128",
+                                                 amortization_mlp_highway_mode=0)
+    else:
+        word_pdf=jammy_flows.pdf(args.pdf_def, 
+                                 args.layer_def, 
+                                 conditional_input_dim=cinput, 
+                                 hidden_mlp_dims_sub_pdfs="128",
+                                 options_overwrite=extra_flow_defs, 
+                                 use_custom_low_rank_mlps=True,
+                                 custom_mlp_highway_mode=0)
 
     word_pdf.count_parameters(verbose=True)
     ## initalize params with test sample (only advantage gains for Gaussianization flows)
     word_pdf.init_params(data=test_labels)
+
+    
+    if(args.gpu):
+        word_pdf.to(gpu_device)
 
     ## start training loop
     num_batches=args.train_size//args.batch_size
@@ -358,6 +385,12 @@ if __name__ == "__main__":
             cinput=batch_data
             if(args.use_conditional_pdf==0):
                 cinput=None
+
+            if(args.gpu):
+                batch_labels=batch_labels.to(gpu_device)
+                if(cinput is not None):
+                    cinput=cinput.to(gpu_device)
+
             log_pdf, _,_=word_pdf(batch_labels, conditional_input=cinput)
            
             ## neg log-loss
@@ -377,9 +410,13 @@ if __name__ == "__main__":
 
                 with torch.no_grad():
                     print("VALIDATION EVAL")
+                    
                     test_cinput=test_data
                     if(args.use_conditional_pdf==0):
                         test_cinput=None
+
+
+
                     val_log_pdf, _, _=word_pdf(test_labels, conditional_input=test_cinput)
                     val_loss=-val_log_pdf.mean()
                     print("ep: %d / batch_id: %d / val-loss %.3f" % (ep_id, batch_id, val_loss))

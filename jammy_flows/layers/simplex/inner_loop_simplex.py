@@ -5,7 +5,7 @@ import numpy
 
 from . import simplex_base
 
-from ... import flows
+from ...main import default
 
 import torch.distributions as tdist
 
@@ -34,7 +34,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
         # hard coded 10 basis elements at the moment
         flow_dict["r"]["num_basis_elements"]=10
       
-        self.inner_flow=flows.pdf("+".join(["i1_0.0_1.0"]*self.dimension),
+        self.inner_flow=default.pdf("+".join(["i1_0.0_1.0"]*self.dimension),
                                   "+".join(["rr"]*self.dimension), 
                                   options_overwrite=flow_dict,
                                   amortize_everything=True,

@@ -444,17 +444,17 @@ class gf_block(euclidean_base.euclidean_base):
         return log_cdf, log_sf, log_pdf
 
 
-    def compute_householder_matrix(self, vs, device=torch.device("cpu")):
+    def compute_householder_matrix(self, vs):
 
-        Q = torch.eye(self.dimension, device=device).type(torch.double).unsqueeze(0).repeat(vs.shape[0], 1,1)
+        Q = torch.eye(self.dimension, device=vs.device).type(torch.double).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
         for i in range(self.householder_iter):
         
-            v = vs[:,i].reshape(-1,self.dimension, 1).to(device)
+            v = vs[:,i].reshape(-1,self.dimension, 1).to(vs.device)
             
             v = v / v.norm(dim=1).unsqueeze(-1)
 
-            Qi = torch.eye(self.dimension, device=device).type(torch.double).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
+            Qi = torch.eye(self.dimension, device=vs.device).type(torch.double).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
 
             Q = torch.bmm(Q, Qi)
 
@@ -724,13 +724,13 @@ class gf_block(euclidean_base.euclidean_base):
                 this_vs=self.vs.to(x)
                 if(extra_inputs is not None):
                     
-                    this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], self.vs.shape[1], self.vs.shape[2]])
+                    this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [-1, self.vs.shape[1], self.vs.shape[2]])
 
                     
                     extra_input_counter+=self.num_householder_params
 
                 ## rotation_params is actually a matrix
-                rotation_params = self.compute_householder_matrix(this_vs, device=x.device)
+                rotation_params = self.compute_householder_matrix(this_vs)
 
         elif(self.rotation_mode=="angles"):
             # implemented as givens rotations
@@ -847,16 +847,16 @@ class gf_block(euclidean_base.euclidean_base):
 
             else:
 
-                log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [x.shape[0] , self.dimension, self.num_kde])
+                log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [-1 , self.dimension, self.num_kde])
                 extra_input_counter+=self.dimension*self.num_kde
 
-                log_heights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [x.shape[0] , self.dimension, self.num_kde])
+                log_heights=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*self.num_kde], [-1 , self.dimension, self.num_kde])
                 extra_input_counter+=self.dimension*self.num_kde
 
-                log_derivatives=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*(self.num_kde+1)], [x.shape[0] ,  self.dimension,self.num_kde+1])
+                log_derivatives=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*(self.num_kde+1)], [-1 ,  self.dimension,self.num_kde+1])
                 extra_input_counter+=self.dimension*(self.num_kde+1)
 
-                boundary_points=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*4], [x.shape[0] , self.dimension, 4])
+                boundary_points=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.dimension*4], [-1 , self.dimension, 4])
                 extra_input_counter+=self.dimension*4
 
 
@@ -1028,7 +1028,7 @@ class gf_block(euclidean_base.euclidean_base):
         ###############################
 
         if(self.nonlinear_stretch_type=="classic"):
-        
+         
             x, log_deriv=self.sigmoid_inv_error_pass_combined_val_n_log_derivative(x, *flow_params)
 
             log_det=log_det+log_deriv.sum(axis=-1)
@@ -1116,7 +1116,7 @@ class gf_block(euclidean_base.euclidean_base):
 
             ## widths
             desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)
-
+           
             ## normalization
             if(self.fit_normalization):
                 desired_param_vec.append(torch.ones(self.num_kde*self.dimension))
@@ -1376,9 +1376,9 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
                         data_matrix=torch.matmul(cur_data.T, cur_data)
 
-                        evalues, evecs=scipy.linalg.eig(data_matrix)
+                        evalues, evecs=scipy.linalg.eig(data_matrix.cpu().numpy())
 
-                        l, sigma, r=scipy.linalg.svd(data_matrix)
+                        l, sigma, r=scipy.linalg.svd(data_matrix.cpu().numpy())
                         
                         loss_fn=get_loss_fn(r, num_householder_iter=cur_layer.householder_iter)
 
@@ -1387,19 +1387,21 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
                         ## fit a matrix via householder parametrization such that it fits the target orthogonal matrix V^* from SVD of X^T*X (PCA data Matrix)
                         res=minimize(loss_fn, start_vec)
 
-                        param_list.append(torch.from_numpy(res["x"]))
-                        this_vs=torch.from_numpy(res["x"])
+                        param_list.append(torch.from_numpy(res["x"]).to(data))
+                        this_vs=torch.from_numpy(res["x"]).to(data)
                         
                     else:
 
-                        this_vs=torch.randn(cur_layer.dimension*cur_layer.householder_iter)
+                        this_vs=torch.randn(cur_layer.dimension*cur_layer.householder_iter).to(data)
                         param_list.append(this_vs)
 
                     gblock=gf_block(dim, num_householder_iter=cur_layer.householder_iter)
 
                     hh_pars=this_vs.reshape(gblock.vs.shape)
+                    
                     rotation_matrix=gblock.compute_householder_matrix(hh_pars)
                     rotation_matrix=rotation_matrix.repeat(cur_data.shape[0], 1,1)
+                    
                     ## inverted matrix
                     cur_data = torch.bmm(rotation_matrix.permute(0,2,1), cur_data.unsqueeze(-1)).squeeze(-1)
             elif(cur_layer.rotation_mode=="angles"):
@@ -1418,7 +1420,7 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
                 
                 ## use all percentiles for KDE
                 percentiles_to_use=numpy.linspace(0,100,num_kde)#[1:-1]
-                percentiles=torch.from_numpy(numpy.percentile(cur_data.detach().numpy(), percentiles_to_use, axis=0))
+                percentiles=torch.from_numpy(numpy.percentile(cur_data.cpu().numpy(), percentiles_to_use, axis=0)).to(data)
 
              
                 ## add means
@@ -1427,13 +1429,13 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
 
              
                 quarter_diffs=percentiles[1:,:]-percentiles[:-1,:]
-                min_perc_diff=quarter_diffs.min(axis=0, keepdim=True)[0]
+                min_perc_diff=(quarter_diffs.min(axis=0, keepdim=True)[0])
 
             
                 ## this seems to be optimized settings for num_kde=20
-                bw=numpy.log(min_perc_diff*1.5)
+                bw=torch.log(min_perc_diff*1.5)
+                
                 bw=torch.ones_like(percentiles[None,:,:])*bw
-
                
                 flattened_bw=bw.flatten()
                 #############
@@ -1476,10 +1478,10 @@ def find_init_pars_of_chained_gf_blocks(layer_list, data, householder_inits="ran
                     param_list.append(torch.ones_like(flattened_bw))
 
                 ## skewness is not used, just as a single multiplicator
-                this_skewness_exponent=torch.DoubleTensor([1.0])
+                this_skewness_exponent=torch.DoubleTensor([1.0]).to(data)
 
                 # signs is not used, used as a single multiplicator
-                this_skewness_signs=torch.DoubleTensor([1.0])
+                this_skewness_signs=torch.DoubleTensor([1.0]).to(data)
 
                 if(cur_layer.add_skewness):
 

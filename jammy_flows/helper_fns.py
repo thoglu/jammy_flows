@@ -800,7 +800,7 @@ def plot_joint_pdf(pdf,
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
        
         ## adjust axis bounds
-
+        
         if (plotting_bounds is not None):
             ax.set_xlim(plotting_bounds[0][0], plotting_bounds[0][1])
             ax.set_ylim(plotting_bounds[1][0], plotting_bounds[1][1]) 
@@ -908,7 +908,7 @@ def plot_joint_pdf(pdf,
 
                     if (plotting_bounds is not None):
                         used_bounds = [plotting_bounds[ind2], plotting_bounds[ind1]]
-
+                    
                     if (autoscale and used_bounds is not None):
 
                         ax.set_xlim(used_bounds[0][0], used_bounds[0][1])
@@ -945,13 +945,11 @@ def plot_joint_pdf(pdf,
                     if (plotting_bounds is not None):
                         hist_bounds = numpy.linspace(plotting_bounds[ind2][0],
                                                      plotting_bounds[ind2][1], 50)
-
-                    
                     ax.hist(samples[:, ind1], bins=hist_bounds, density=True)
 
                     if (plotted_true_values is not None):
                         ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
-
+                
                     if (autoscale):
                         if (plotting_bounds is not None):
                             ax.set_xlim(plotting_bounds[ind2][0], plotting_bounds[ind2][1])
@@ -1005,7 +1003,7 @@ def visualize_pdf(pdf,
           samplesize=nsamples,
           conditional_input=sample_conditional_input,
           seed=seed)
-      
+     
       higher_dim_spheres = False
 
       new_subgridspec, total_pdf_integral = plot_joint_pdf(

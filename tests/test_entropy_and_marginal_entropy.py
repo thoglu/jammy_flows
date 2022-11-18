@@ -10,7 +10,7 @@ import random
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-import jammy_flows.flows as f
+import jammy_flows.main.default as f
 
 import jammy_flows.helper_fns as helper_fns
 
@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
 
         self.flow_inits=[]
 
-        for extra_def in [dict(), {"conditional_input_dim":2}]:
+        for extra_def in [{"hidden_mlp_dims_sub_pdfs":"64-64"}, {"conditional_input_dim":2, "hidden_mlp_dims_sub_pdfs":"64-64"}]:
 
             self.flow_inits.append([ ["s2", "y"], extra_def])
             
@@ -85,7 +85,7 @@ class Test(unittest.TestCase):
         modified_options["g"]["num_kde"]=2
         modified_options["g"]["fit_normalization"]=0
 
-        for extra_def in [{"options_overwrite": modified_options}, {"conditional_input_dim":2, "options_overwrite": modified_options}]:
+        for extra_def in [{"options_overwrite": modified_options, "hidden_mlp_dims_sub_pdfs":"64-64"}, {"conditional_input_dim":2, "options_overwrite": modified_options,"hidden_mlp_dims_sub_pdfs":"64-64"}]:
 
             self.flow_inits_numerical_comp.append([ ["e1", "g"], extra_def])
             
@@ -104,10 +104,12 @@ class Test(unittest.TestCase):
             print("entropy test for ", init)
             seed_everything(1)
             tolerance=1e-7
-
+            print("testtorch0 ", torch.randn(2))
             #seed_everything(0)
-            print("init ", init[1])
+            print("init", init[1])
             this_flow=f.pdf(*init[0], **init[1])
+            print("num params ",this_flow.count_parameters())
+        
             this_flow.double()
 
             ## init with small damping factor
@@ -138,6 +140,7 @@ class Test(unittest.TestCase):
 
                 else:
                     log_prob, _,_=this_flow(eval_pts)
+                    print("eval pts", eval_pts)
                     print("LOG PROB", log_prob)
                     entropy_numerical=-(log_prob.exp()*log_prob*bw).sum().unsqueeze(-1)
 
@@ -211,7 +214,7 @@ class Test(unittest.TestCase):
                     else:
 
                         log_prob, _,_=this_flow(eval_xy)
-
+                        print("evalxy", eval_xy)
                         if(cur_marginal_option=="total"):
                           
                             entropy_numerical=-(log_prob.exp()*log_prob*bw_x*bw_y).sum().unsqueeze(-1)
@@ -221,7 +224,7 @@ class Test(unittest.TestCase):
                         else:
 
                             ## resape logprobs .. first axis is y, second is x
-
+                            print("logprobs")
                             print(log_prob)
                             reshaped_logprobs=log_prob.reshape(num_eval_pts_y, num_eval_pts_x)
 

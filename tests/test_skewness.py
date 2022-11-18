@@ -10,7 +10,7 @@ import random
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 
-import jammy_flows.flows as f
+import jammy_flows.main.default as f
 
 import jammy_flows.helper_fns as helper_fns
 

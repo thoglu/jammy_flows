@@ -305,6 +305,7 @@ class sphere_base(layer_base.layer_base):
         if(self.dimension==1):
            
             return x*sign, log_det
+            
         elif(self.dimension==2):
 
             x_val=x[:,0:1]*torch.cos(x[:,1:2])
