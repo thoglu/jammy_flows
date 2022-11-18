@@ -5,13 +5,23 @@ API Documentation
 General
 =============================
 
-Main class
+Main class (default PDF)
 ----------------------------
 
-.. automodule:: jammy_flows.flows
+.. automodule:: jammy_flows.main.default
     :members: 
     :special-members: __init__
     :exclude-members: obtain_flow_param_structure
+
+Fully amortizable PDF
+----------------------------
+
+.. automodule:: jammy_flows.main.fully_amortized
+    :members: 
+    :special-members: __init__
+
+Other options and functions
+----------------------------
 
 .. automodule:: jammy_flows.flow_options
     :members: obtain_default_options
@@ -25,6 +35,8 @@ Amortizable MLP
 .. automodule:: jammy_flows.amortizable_mlp
     :members:
     :special-members: __init__
+
+
 
 Numerical inversion
 ----------------------------
