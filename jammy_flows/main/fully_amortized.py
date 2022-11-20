@@ -31,7 +31,7 @@ class fully_amortized_pdf(nn.Module):
         inner_mlp_ranks=10,
         inner_mlp_highway_mode=1,
         amortization_mlp_dims="128",
-        amortization_mlp_use_costom_mode=False,
+        amortization_mlp_use_custom_mode=False,
         amortization_mlp_ranks=0,
         amortization_mlp_highway_mode=0,
         predict_log_normalization=False,
@@ -70,7 +70,7 @@ class fully_amortized_pdf(nn.Module):
         super().__init__()
 
         self.conditional_input_dim=conditional_input_dim
-        self.use_amortizable_mlp=amortization_mlp_use_costom_mode
+        self.use_amortizable_mlp=amortization_mlp_use_custom_mode
 
 
         self.pdf_to_amortize=default.pdf(pdf_defs,
