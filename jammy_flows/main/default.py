@@ -95,7 +95,7 @@ class pdf(nn.Module):
         if(self.amortize_everything):
             assert(self.use_custom_low_rank_mlps), "Amortizing all MLPs requires custom MLPs."
             self.total_number_amortizable_params=0
-
+    
         self.read_model_definition(pdf_defs, 
                                    flow_defs, 
                                    options_overwrite, 
@@ -490,8 +490,9 @@ class pdf(nn.Module):
         
                     ## if this sub pdf has no parameters, we do not need to define an MLP
                     if(tot_num_pars_this_pdf==0):
-                        
+                   
                         self.mlp_predictors.append(None)
+                        prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
 
                         continue
 
@@ -506,6 +507,7 @@ class pdf(nn.Module):
 
                 if(num_predicted_pars==0):
                     self.mlp_predictors.append(None)
+                    prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
                     continue
 
                 ## take previous dimensions as input
@@ -514,11 +516,11 @@ class pdf(nn.Module):
                 # also add input summary dimensions
                 if(self.conditional_input_dim is not None):
                     this_summary_dim+=self.conditional_input_dim
-
+                
                 if(self.use_custom_low_rank_mlps):
 
                     these_hidden_dims=list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-
+                    
                     custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
                     
                     if(self.amortize_everything):
@@ -530,7 +532,7 @@ class pdf(nn.Module):
 
                     mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
                     mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
-
+                   
                     nn_list = []
                     for i in range(len(mlp_in_dims)):
                        
@@ -544,9 +546,9 @@ class pdf(nn.Module):
                     
                     self.mlp_predictors.append(torch.nn.Sequential(*nn_list))
 
-
-                prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
                
+                prev_extra_input_num+=self.layer_list[pdf_index][-1]._embedding_conditional_return_num()
+                
             if(self.predict_log_normalization):
 
                 if(self.data_summary_dim is not None):
