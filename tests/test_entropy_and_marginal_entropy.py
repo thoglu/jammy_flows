@@ -63,7 +63,7 @@ class Test(unittest.TestCase):
 
         self.flow_inits=[]
 
-        for extra_def in [{"hidden_mlp_dims_sub_pdfs":"64-64"}, {"conditional_input_dim":2, "hidden_mlp_dims_sub_pdfs":"64-64"}]:
+        for extra_def in [{"amortization_mlp_dims":"64-64"}, {"conditional_input_dim":2, "amortization_mlp_dims":"64-64"}]:
 
             self.flow_inits.append([ ["s2", "y"], extra_def])
             
@@ -85,7 +85,7 @@ class Test(unittest.TestCase):
         modified_options["g"]["num_kde"]=2
         modified_options["g"]["fit_normalization"]=0
 
-        for extra_def in [{"options_overwrite": modified_options, "hidden_mlp_dims_sub_pdfs":"64-64"}, {"conditional_input_dim":2, "options_overwrite": modified_options,"hidden_mlp_dims_sub_pdfs":"64-64"}]:
+        for extra_def in [{"options_overwrite": modified_options, "amortization_mlp_dims":"64-64"}, {"conditional_input_dim":2, "options_overwrite": modified_options,"amortization_mlp_dims":"64-64"}]:
 
             self.flow_inits_numerical_comp.append([ ["e1", "g"], extra_def])
             

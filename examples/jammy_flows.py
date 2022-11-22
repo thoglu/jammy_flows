@@ -349,10 +349,10 @@ if __name__ == "__main__":
         word_pdf=jammy_flows.pdf(args.pdf_def, 
                                  args.layer_def, 
                                  conditional_input_dim=cinput, 
-                                 hidden_mlp_dims_sub_pdfs="128",
+                                 amortization_mlp_dims="128",
                                  options_overwrite=extra_flow_defs, 
-                                 use_custom_low_rank_mlps=True,
-                                 custom_mlp_highway_mode=0)
+                                 amortization_mlp_use_custom_mode=True,
+                                 amortization_mlp_highway_mode=0)
 
     word_pdf.count_parameters(verbose=True)
     ## initalize params with test sample (only advantage gains for Gaussianization flows)

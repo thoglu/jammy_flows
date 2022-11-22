@@ -25,14 +25,14 @@ class pdf(nn.Module):
         flow_defs, 
         options_overwrite=dict(),
         conditional_input_dim=None,
-        hidden_mlp_dims_sub_pdfs="128",
+        amortization_mlp_dims="128",
         predict_log_normalization=False,
         join_poisson_and_pdf_description=False,
         hidden_mlp_dims_poisson="128",
         rank_of_mlp_mappings_poisson=0,
-        use_custom_low_rank_mlps=False,
-        rank_of_mlp_mappings_sub_pdfs=0,
-        custom_mlp_highway_mode=0,
+        amortization_mlp_use_custom_mode=False,
+        amortization_mlp_ranks=0,
+        amortization_mlp_highway_mode=0,
         amortize_everything=False,
         use_as_passthrough_instead_of_pdf=False,
         skip_mlp_initialization=False
@@ -53,7 +53,7 @@ class pdf(nn.Module):
 
             conditional_input_dim (None/int): Conditional input dimension if a conditional PDF. None to define non-conditional PDF.
 
-            hidden_mlp_dims_sub_pdfs (str/list(str)): Hidden structure of MLP for each sub-manifold. 
+            amortization_mlp_dims (str/list(str)): Hidden structure of MLP for each sub-manifold. 
 
             predict_log_normalization (bool): Predict log-mean of Poisson distribution
 
@@ -61,11 +61,11 @@ class pdf(nn.Module):
     
             hidden_mlp_dims_poisson (str/list(str)): If the log-mean is predicted by its own MLP, defines the hidden structure of the MLP.
             
-            use_custom_low_rank_mlps (bool): Use custom AmortizableMLP class instead of default chained Linear layers.
+            amortization_mlp_use_custom_mode (bool): Use custom AmortizableMLP class instead of default chained Linear layers.
 
             rank_of_mlp_mappings_poisson (int): Max rank of custom Poisson predictor MLP matrices.
     
-            custom_mlp_highway_mode (int): Connectivity mode for custom MLPs if used.
+            amortization_mlp_highway_mode (int): Connectivity mode for custom MLPs if used.
     
             amortize_everything (bool): Indicates whether all parameters, including the MLPs, should be amortized.
 
@@ -77,10 +77,10 @@ class pdf(nn.Module):
         """
         super().__init__()
 
-        self.use_custom_low_rank_mlps=use_custom_low_rank_mlps
+        self.amortization_mlp_use_custom_mode=amortization_mlp_use_custom_mode
         self.predict_log_normalization=predict_log_normalization
         self.join_poisson_and_pdf_description=join_poisson_and_pdf_description
-        self.custom_mlp_highway_mode=custom_mlp_highway_mode
+        self.amortization_mlp_highway_mode=amortization_mlp_highway_mode
         self.amortize_everything=amortize_everything
 
         if(self.amortize_everything):
@@ -93,15 +93,15 @@ class pdf(nn.Module):
         self.total_number_amortizable_params=None
 
         if(self.amortize_everything):
-            assert(self.use_custom_low_rank_mlps), "Amortizing all MLPs requires custom MLPs."
+            assert(self.amortization_mlp_use_custom_mode), "Amortizing all MLPs requires custom MLPs."
             self.total_number_amortizable_params=0
     
         self.read_model_definition(pdf_defs, 
                                    flow_defs, 
                                    options_overwrite, 
                                    conditional_input_dim, 
-                                   hidden_mlp_dims_sub_pdfs, 
-                                   rank_of_mlp_mappings_sub_pdfs)
+                                   amortization_mlp_dims, 
+                                   amortization_mlp_ranks)
        
         self.init_flow_structure()
         
@@ -134,8 +134,8 @@ class pdf(nn.Module):
                               flow_defs, 
                               options_overwrite,
                               conditional_input_dim,
-                              hidden_mlp_dims_sub_pdfs,
-                              rank_of_mlp_mappings_sub_pdfs):
+                              amortization_mlp_dims,
+                              amortization_mlp_ranks):
         
         # list of the pdf defs (e.g. e2 for 2-d Euclidean) for each subpdf
         # i.e. e2+s2 will yield 2 entries, one for each manifold
@@ -199,25 +199,25 @@ class pdf(nn.Module):
         self.conditional_input_dim=conditional_input_dim
 
         ## define internal mlp mapping dims as list
-        self.hidden_mlp_dims_sub_pdfs=hidden_mlp_dims_sub_pdfs
-        if(type(self.hidden_mlp_dims_sub_pdfs)==str):
-            self.hidden_mlp_dims_sub_pdfs=[self.hidden_mlp_dims_sub_pdfs]*len(self.pdf_defs_list)
-        elif(type(self.hidden_mlp_dims_sub_pdfs)!=list):
-            raise Exception("Hidden MLP dimensions must be defined either str or list, received ", type(self.hidden_mlp_dims_sub_pdfs))
+        self.amortization_mlp_dims=amortization_mlp_dims
+        if(type(self.amortization_mlp_dims)==str):
+            self.amortization_mlp_dims=[self.amortization_mlp_dims]*len(self.pdf_defs_list)
+        elif(type(self.amortization_mlp_dims)!=list):
+            raise Exception("Hidden MLP dimensions must be defined either str or list, received ", type(self.amortization_mlp_dims))
         
-        self.rank_of_mlp_mappings_sub_pdfs=rank_of_mlp_mappings_sub_pdfs
-        if(type(self.rank_of_mlp_mappings_sub_pdfs)==int):
-            self.rank_of_mlp_mappings_sub_pdfs=[self.rank_of_mlp_mappings_sub_pdfs]*len(self.pdf_defs_list)
-        elif(type(self.rank_of_mlp_mappings_sub_pdfs)==str):
-            self.rank_of_mlp_mappings_sub_pdfs=[self.rank_of_mlp_mappings_sub_pdfs]*len(self.pdf_defs_list)
-        elif(type(self.rank_of_mlp_mappings_sub_pdfs)!=list):
+        self.amortization_mlp_ranks=amortization_mlp_ranks
+        if(type(self.amortization_mlp_ranks)==int):
+            self.amortization_mlp_ranks=[self.amortization_mlp_ranks]*len(self.pdf_defs_list)
+        elif(type(self.amortization_mlp_ranks)==str):
+            self.amortization_mlp_ranks=[self.amortization_mlp_ranks]*len(self.pdf_defs_list)
+        elif(type(self.amortization_mlp_ranks)!=list):
             raise Exception("Rank of MLP sub pdfs has to defined as an int or list type!")
      
         ## sub pdf hidden mlp dims must be equal to number of sub pdfs (or sub-pdfs-1 if no encoder present)
         required_hidden_mlp_dims_len=len(self.pdf_defs_list)
         if(required_hidden_mlp_dims_len>0):
-            if(len(self.hidden_mlp_dims_sub_pdfs)!=required_hidden_mlp_dims_len):
-                raise Exception("hidden mlp dimension definitions for sub pdfs is wrong length (%d) .. requires length (%d)" %(len(self.hidden_mlp_dims_sub_pdfs), required_hidden_mlp_dims_len))
+            if(len(self.amortization_mlp_dims)!=required_hidden_mlp_dims_len):
+                raise Exception("hidden mlp dimension definitions for sub pdfs is wrong length (%d) .. requires length (%d)" %(len(self.amortization_mlp_dims), required_hidden_mlp_dims_len))
 
         self.layer_list = nn.ModuleList()
 
@@ -517,11 +517,11 @@ class pdf(nn.Module):
                 if(self.conditional_input_dim is not None):
                     this_summary_dim+=self.conditional_input_dim
                 
-                if(self.use_custom_low_rank_mlps):
+                if(self.amortization_mlp_use_custom_mode):
 
-                    these_hidden_dims=list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
+                    these_hidden_dims=list_from_str(self.amortization_mlp_dims[pdf_index])
                     
-                    custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_sub_pdfs[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
+                    custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.amortization_mlp_ranks[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
                     
                     if(self.amortize_everything):
                         self.total_number_amortizable_params+=custom_mlp.num_amortization_params
@@ -530,8 +530,8 @@ class pdf(nn.Module):
 
                 else:
 
-                    mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-                    mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
+                    mlp_in_dims = [this_summary_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
+                    mlp_out_dims = list_from_str(self.amortization_mlp_dims[pdf_index]) + [num_predicted_pars]
                    
                     nn_list = []
                     for i in range(len(mlp_in_dims)):
@@ -562,14 +562,14 @@ class pdf(nn.Module):
                         this_summary_dim=self.data_summary_dim[-1]
                         num_predicted_pars=1
 
-                        if(self.use_custom_low_rank_mlps):
+                        if(self.amortization_mlp_use_custom_mode):
                            
-                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.custom_mlp_highway_mode, svd_mode="smart")
+                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
 
                         else:
 
-                            mlp_in_dims = [this_summary_dim] + list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index])
-                            mlp_out_dims = list_from_str(self.hidden_mlp_dims_sub_pdfs[pdf_index]) + [num_predicted_pars]
+                            mlp_in_dims = [this_summary_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
+                            mlp_out_dims = list_from_str(self.amortization_mlp_dims[pdf_index]) + [num_predicted_pars]
 
                             nn_list = []
                             for i in range(len(mlp_in_dims)):

@@ -38,7 +38,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
                                   "+".join(["rr"]*self.dimension), 
                                   options_overwrite=flow_dict,
                                   amortize_everything=True,
-                                  use_custom_low_rank_mlps=True, 
+                                  amortization_mlp_use_custom_mode=True, 
                                   use_as_passthrough_instead_of_pdf=True)
      
         self.total_num_inner_flow_params=self.inner_flow.total_number_amortizable_params

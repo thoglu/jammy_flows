@@ -77,17 +77,17 @@ class fully_amortized_pdf(nn.Module):
                                        flow_defs,
                                        options_overwrite=options_overwrite,
                                        conditional_input_dim=None,
-                                       hidden_mlp_dims_sub_pdfs=inner_mlp_dims_sub_pdfs,
+                                       amortization_mlp_dims=inner_mlp_dims_sub_pdfs,
                                        predict_log_normalization=False,
-                                       use_custom_low_rank_mlps=True,
-                                       rank_of_mlp_mappings_sub_pdfs=inner_mlp_ranks,
-                                       custom_mlp_highway_mode=inner_mlp_highway_mode,
+                                       amortization_mlp_use_custom_mode=True,
+                                       amortization_mlp_ranks=inner_mlp_ranks,
+                                       amortization_mlp_highway_mode=inner_mlp_highway_mode,
                                        amortize_everything=True,
                                        skip_mlp_initialization=skip_mlp_initialization
                                        )
 
         # mirror some attributes
-        copy_attributes(self.pdf_to_amortize, self, ["pdf_defs_list", "total_target_dim"])
+        copy_attributes(self.pdf_to_amortize, self, ["pdf_defs_list", "flow_defs_list", "total_target_dim", "target_dim_indices_intrinsic", "target_dim_indices_embedded", "target_dim_indices", "base_dim_indices"])
 
 
         mlp_hidden_dims=list_from_str(amortization_mlp_dims)

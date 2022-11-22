@@ -94,9 +94,9 @@ class Test(unittest.TestCase):
                         d["conditional_input_dim"]=2
                         
                        
-                        d["hidden_mlp_dims_sub_pdfs"]=mlp_hidden
-                        d["rank_of_mlp_mappings_sub_pdfs"]=lr_approx
-                        d["use_custom_low_rank_mlps"]=use_rank
+                        d["amortization_mlp_dims"]=mlp_hidden
+                        d["amortization_mlp_ranks"]=lr_approx
+                        d["amortization_mlp_use_custom_mode"]=use_rank
                         d["options_overwrite"]=gf_setting
 
                         self.flow_inits.append([[pdf_def, flow_def], d])
