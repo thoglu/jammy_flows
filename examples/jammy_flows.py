@@ -342,7 +342,7 @@ if __name__ == "__main__":
                                                  args.layer_def, 
                                                  conditional_input_dim=cinput, 
                                                  options_overwrite=extra_flow_defs, 
-                                                 amortization_mlp_use_costom_mode=False,
+                                                 amortization_mlp_use_custom_mode=False,
                                                  amortization_mlp_dims="128",
                                                  amortization_mlp_highway_mode=0)
     else:

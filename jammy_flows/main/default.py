@@ -1571,6 +1571,7 @@ class pdf(nn.Module):
 
                 if(gf_init):
                     if(layer_type=="g"):
+                        
                         params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
                     elif(layer_type=="h"):
                         params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
@@ -1578,7 +1579,7 @@ class pdf(nn.Module):
                     params_list.append(params.type(torch.float64))
 
                 else:
-                    
+                   
                     ## get basic rough init...
                     this_list=[]
                     for l in this_layer_list:
@@ -1627,6 +1628,7 @@ class pdf(nn.Module):
                                 desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params, prev_damping_factor=damping_factor)
                                 num_uvb_pars=mlp_predictor.num_amortization_params
                                 global_amortization_init[global_amortization_index:global_amortization_index+num_uvb_pars]=desired_uvb_params
+                                global_amortization_index+=num_uvb_pars
                             else:
                                 mlp_predictor.initialize_uvbs(fix_final_bias=these_params, prev_damping_factor=damping_factor)
 
@@ -1666,13 +1668,12 @@ class pdf(nn.Module):
 
                         if(self.amortize_everything):
                             global_amortization_init[global_amortization_index:global_amortization_index+tot_param_index]=these_params
-
-                        global_amortization_index+=tot_param_index
+                            global_amortization_index+=tot_param_index
 
                         if(ind==0 and self.amortize_everything and self.predict_log_normalization):
                             global_amortization_init[global_amortization_index+1]=0.1
                             global_amortization_index+=1
-
+        
         return global_amortization_init
 
 #### Experimental functions

@@ -220,7 +220,7 @@ class fully_amortized_pdf(nn.Module):
     def init_params(self, data=None, damping_factor=1000.0):
 
         global_amortization_init=self.pdf_to_amortize.init_params(data=data, damping_factor=damping_factor)
-
+       
         ## initialize MLP with global desired init
         if(self.use_amortizable_mlp):
             self.amortization_mlp.initialize_uvbs(fix_final_bias=global_amortization_init, prev_damping_factor=damping_factor)
@@ -246,6 +246,8 @@ class fully_amortized_pdf(nn.Module):
             # finally overwrite bias to be equivalent to desired parameters at initialization
             
             self.amortization_mlp[-1].bias.data=global_amortization_init.data
+
+
 
     def count_parameters(self, verbose=False):
 
