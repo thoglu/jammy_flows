@@ -84,15 +84,19 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     cinput = None
 
     sin_zen_mask=[]
+
+    used_npts=npts
+    if(npts<2):
+        used_npts=2
   
     for pdf_index,pdf in enumerate(model.pdf_defs_list):
         this_sub_dim = int(pdf[1])
         if (pdf == "s2" and s2_norm=="lambert"):
             #has_high_dim_spheres = True
-            side_vals.append(numpy.linspace(-2, 2, npts))
+            side_vals.append(numpy.linspace(-2, 2, used_npts))
             bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
 
-            side_vals.append(numpy.linspace(-2, 2, npts))
+            side_vals.append(numpy.linspace(-2, 2, used_npts))
             bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
 
             sin_zen_mask.extend([0,0])
@@ -101,18 +105,18 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
           sin_zen_mask.extend([0,0])
           
-          zen_vals=numpy.linspace(mins_maxs[glob_ind][0]+1e-4, mins_maxs[glob_ind][1]-1e-4, npts)
+          zen_vals=numpy.linspace(mins_maxs[glob_ind][0]+1e-4, mins_maxs[glob_ind][1]-1e-4, used_npts)
           side_vals.append(zen_vals)
           bin_volumes*=(side_vals[-1][1] - side_vals[-1][0])
 
-          side_vals.append(numpy.linspace(1e-4, 2*numpy.pi-1e-4, npts))
+          side_vals.append(numpy.linspace(1e-4, 2*numpy.pi-1e-4, used_npts))
           bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
 
         elif(pdf=="s2"):
           raise Exception("s2_norm ", s2_norm, " unknown .")
         elif("i1" in pdf):
             
-            side_vals.append(numpy.linspace(model.layer_list[pdf_index][-1].low_boundary+1e-5, model.layer_list[pdf_index][-1].high_boundary-1e-5, npts))
+            side_vals.append(numpy.linspace(model.layer_list[pdf_index][-1].low_boundary+1e-5, model.layer_list[pdf_index][-1].high_boundary-1e-5, used_npts))
 
             bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
             sin_zen_mask.append(0)
@@ -121,7 +125,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             for ind, mm in enumerate(mins_maxs[glob_ind:glob_ind +
                                                this_sub_dim]):
 
-                side_vals.append(numpy.linspace(mm[0], mm[1], npts))
+                side_vals.append(numpy.linspace(mm[0], mm[1], used_npts))
                 bin_volumes *= (side_vals[-1][1] - side_vals[-1][0])
 
                 sin_zen_mask.append(0)
@@ -133,7 +137,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     torch_positions = torch.from_numpy(
         numpy.resize(
             numpy.array(eval_positions).T,
-            (npts**len(mins_maxs), len(mins_maxs))))
+            (used_npts**len(mins_maxs), len(mins_maxs))))
     eval_positions = torch_positions.clone()
   
     mask_inner = torch.ones(len(torch_positions)) == 1
@@ -166,7 +170,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             mask_inner=mask_inner & (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1] ].sum(axis=1) < 1.0)
 
     if (conditional_input is not None):
-        cinput = conditional_input.repeat(npts**len(mins_maxs), 1)[mask_inner]
+        cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
         if(cinput.is_cuda):
             eval_positions=eval_positions.to(cinput)
     
@@ -219,10 +223,10 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     #######################
 
 
-    res.resize([npts] * len(mins_maxs))
+    res.resize([used_npts] * len(mins_maxs))
 
     resized_torch_positions = torch_positions.cpu().numpy()
-    resized_torch_positions.resize([npts] * len(mins_maxs) + [len(mins_maxs)])
+    resized_torch_positions.resize([used_npts] * len(mins_maxs) + [len(mins_maxs)])
 
     ## add in sin(theta) factors into density
 
@@ -569,7 +573,6 @@ def plot_joint_pdf(pdf,
             ]
 
         pure_float_mms.append(new_b)
-
 
     totalpts = total_pdf_eval_pts
     pts_per_dim = int(totalpts**(1.0 / float(dim)))
@@ -983,7 +986,8 @@ def visualize_pdf(pdf,
                   s2_rotate_to_true_value=True,
                   s2_show_gridlines=True,
                   skip_plotting_samples=False,
-                  var_names=[]):
+                  var_names=[],
+                  num_iterative_steps=-1):
    
     with torch.no_grad():
       sample_conditional_input = conditional_input
@@ -999,11 +1003,53 @@ def visualize_pdf(pdf,
       if (gridspec is None):
           gridspec = fig.add_gridspec(1, 1)[0, 0]
 
-      samples, samples_base, evals, evals_base = pdf.sample(
-          samplesize=nsamples,
-          conditional_input=sample_conditional_input,
-          seed=seed)
-     
+      if(sample_conditional_input is not None):
+
+        if(num_iterative_steps>0):
+            assert(sample_conditional_input.shape[0]%num_iterative_steps==0), "Number of total sample points must be divisible by iterative steps!"
+            
+            num_per_step=int(sample_conditional_input.shape[0]/num_iterative_steps)
+            samples=[]
+
+            for cur_step in range(num_iterative_steps):
+
+                cur_samples, _, _, _ = pdf.sample(
+                  conditional_input=sample_conditional_input[cur_step*num_per_step:cur_step*num_per_step+num_per_step],
+                  seed=seed+cur_step if seed is not None else None)
+
+                samples.append(cur_samples)
+
+            samples=torch.cat(samples, dim=0)
+
+        else:
+
+            samples, _, _, _ = pdf.sample(
+              conditional_input=sample_conditional_input,
+              seed=seed)
+      else:
+
+        if(num_iterative_steps>0):
+            assert(nsamples%num_iterative_steps==0), "Number of total sample points must be divisible by iterative steps!"
+            
+            num_per_step=int(nsamples/num_iterative_steps)
+            samples=[]
+
+            for cur_step in range(num_iterative_steps):
+
+                cur_samples, _, _, _ = pdf.sample(
+                  samplesize=num_per_step,
+                  seed=seed+cur_step if seed is not None else None)
+
+                samples.append(cur_samples)
+
+            samples=torch.cat(samples, dim=0)
+
+        else:
+
+          samples, samples_base, evals, evals_base = pdf.sample(
+              samplesize=nsamples,
+              seed=seed)
+
       higher_dim_spheres = False
 
       new_subgridspec, total_pdf_integral = plot_joint_pdf(

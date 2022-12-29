@@ -252,9 +252,9 @@ class AmortizableMLP(nn.Module):
 
             self.initialize_uvbs()
 
-        else:
+        #else:
            
-            self.u_v_b_pars=torch.zeros(self.num_amortization_params).unsqueeze(0)
+        #    self.u_v_b_pars=torch.zeros(self.num_amortization_params).unsqueeze(0)
 
         #######################
         #print("first 10 uvb after init .. ", self.u_v_b_pars[0,:10])
@@ -517,7 +517,7 @@ class AmortizableMLP(nn.Module):
             nonlinear=0
 
             this_rank=mlp_def["used_ranks"][ind]
-        
+           
             this_u, amortization_params=amortization_params[:, :mlp_def["num_u_s"][ind]], amortization_params[:, mlp_def["num_u_s"][ind]:]
             this_v, amortization_params=amortization_params[:, :mlp_def["num_v_s"][ind]], amortization_params[:, mlp_def["num_v_s"][ind]:]
             this_b, amortization_params=amortization_params[:, :mlp_def["num_b_s"][ind]], amortization_params[:, mlp_def["num_b_s"][ind]:]
@@ -527,9 +527,9 @@ class AmortizableMLP(nn.Module):
                 ## the low-rank decomposition would actualy take more parameters than the full matrix .. just do a standard full matrix product
                 if(mlp_def["full_weight_matrix_flags"][ind]):
                     # no svd decomposition, the whole weight matrix is stored in the "u" vector
+                 
                     A=this_u.view(-1, mlp_def["outputs"][ind], mlp_def["inputs"][ind])
-                    
-                  
+                        
                     nonlinear=self._adaptive_matmul(A, prev)
 
                 else:
@@ -590,16 +590,22 @@ class AmortizableMLP(nn.Module):
             Tensor
                 Output of the AmortizableMLP.
         """
-        amortization_params=self.u_v_b_pars.to(i)
 
+        
         if(extra_inputs is not None):
-
+            assert(self.use_permanent_parameters==False)
+            
             if(self.use_permanent_parameters):
                 raise Exception("MLP uses permanent parameters but extra inputs are given in forward. This is not allowed!")
 
             assert(extra_inputs.shape[1]==self.num_amortization_params), ("Extra inputs dimension (%d) does not match number of amortization params of MLP (%d) " % (extra_inputs.shape[1], self.num_amortization_params))
 
             amortization_params=extra_inputs
+
+        else:
+         
+            assert(self.use_permanent_parameters)
+            amortization_params=self.u_v_b_pars.to(i)
 
         ## we only work with batched inputs
         ## currently dim=2
