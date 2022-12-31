@@ -1,9 +1,6 @@
 import torch
 from torch import nn
 
-from ..layers.euclidean.gaussianization_flow import find_init_pars_of_chained_gf_blocks
-from ..layers.euclidean.gaussianization_flow_old import find_init_pars_of_chained_gf_blocks_old
-
 from .. import flow_options
 
 from .. import extra_functions
@@ -1539,21 +1536,37 @@ class pdf(nn.Module):
             ## 0) check data
             if(data is not None):
                 ## initialization data has to match pdf dimenions
-                assert(data.shape[1]==self.total_target_dim)
+                assert(data.shape[1]==self.total_target_dim), "Initialization with data must match the target dimension of the PDF!"
 
-            ## 1) Find initialization params of all layers
+            ## 1) Find initialization params of all layers - each index corresponds to all flows from a given sub manifold
             params_list=[]
             ## loop through all the layers and get the initializing parameters
 
             this_dim_index=0
 
             for subflow_index, subflow_description in enumerate(self.pdf_defs_list):
-                    
-              
-                this_layer_list=self.layer_list[subflow_index]
-
+                
                 this_dim=self.target_dims[subflow_index]
 
+                this_layer_list=self.layer_list[subflow_index]
+
+                if("e" in subflow_description):
+                    
+                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None,householder_inits="random")
+
+                    params_list.append(params.type(torch.float64))
+
+                else:
+                    
+                    this_list=[]
+                    for l in this_layer_list:
+                        this_list.append(l.get_desired_init_parameters().type(torch.float64))
+
+                    params_list.append(torch.cat(this_list))
+
+                this_dim_index+=this_dim
+
+                """
                 ## special initalizations
                 ## check if all are gaussianization flow
                 gf_init=True
@@ -1572,7 +1585,7 @@ class pdf(nn.Module):
                 if(gf_init):
                     if(layer_type=="g"):
                         
-                        params=find_init_pars_of_chained_gf_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
+                        
                     elif(layer_type=="h"):
                         params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
                     
@@ -1586,8 +1599,8 @@ class pdf(nn.Module):
                         this_list.append(l.get_desired_init_parameters().type(torch.float64))
 
                     params_list.append(torch.cat(this_list))
-                    
-                this_dim_index+=this_dim
+                """
+                
 
 
             ## 2) Depending on encoding structure, use the init params at appropriate places
