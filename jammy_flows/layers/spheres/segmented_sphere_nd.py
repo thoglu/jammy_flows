@@ -8,6 +8,7 @@ from ..bisection_n_newton import inverse_bisection_n_newton
 from ...amortizable_mlp import AmortizableMLP
 from ...extra_functions import list_from_str, find_init_pars_of_chained_blocks
 
+from ..euclidean.gaussianization_flow import gf_block
 from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 from ..intervals.interval_do_nothing import interval_do_nothing
