@@ -61,6 +61,8 @@ class gf_block(euclidean_base.euclidean_base):
                  width_smooth_saturation=1,
                  lower_bound_for_widths=0.01,
                  upper_bound_for_widths=100,
+                 lower_bound_for_norms=1,
+                 upper_bound_for_norms=10,
                  clamp_widths=0,
                  regulate_normalization=0,
                  add_skewness=0,
@@ -82,8 +84,10 @@ class gf_block(euclidean_base.euclidean_base):
             model_offset (int): Set by *jammy_flows.pdf*.
             softplus_for_width (int): If set, uses *soft_plus* to predict width. Otherwhise exponential function.
             width_smooth_saturaiton (int): If set, saturates the width symmetrically at the lower and upper end.
-            lower_bound_for_widths (float): Determines the lower width bound.
-            upper_bound_for_widths (float): Determines the upper width bound.
+            lower_bound_for_widths (float): Determines the lower width bound for each KDE element.
+            upper_bound_for_widths (float): Determines the upper width bound for each KDE element.
+            lower_bound_for_norms (float): Determines the lower norm bound for each KDE element.
+            upper_bound_for_norms (float): Determines the upper norm bound for each KDE element.
             clamp_widths (int): If set, clamps widths above threshold.
             regulate_normalization (int): If set, regulates with a lower bound of 1 and upper bound of 100 (fixed) similar to width regulation.
             add_skewness (int): If set, adds skewness to the basis functions in order to make flow more flexible.
@@ -99,6 +103,10 @@ class gf_block(euclidean_base.euclidean_base):
         self.init = False
 
         self.nonlinear_stretch_type=nonlinear_stretch_type
+
+        # norms
+        self.lower_bound_for_norms=lower_bound_for_norms
+        self.upper_bound_for_norms=upper_bound_for_norms
 
         assert(lower_bound_for_widths>0.0)
         self.width_min=lower_bound_for_widths
@@ -326,7 +334,7 @@ class gf_block(euclidean_base.euclidean_base):
                     ## this serves as a stabilizer during training compared to no free-floating normalization, but at the same time
                     ## avoids near zero normalizations which can also lead to unwanted side effects
 
-                    self.normalization_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=1, max_val_normal_space=100)
+                    self.normalization_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=self.lower_bound_for_norms, max_val_normal_space=self.upper_bound_for_norms)
 
             #######################################
 

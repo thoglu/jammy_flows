@@ -43,6 +43,8 @@ opts_dict["g"]["kwargs"]["skip_model_offset"]=(0, [0,1])
 opts_dict["g"]["kwargs"]["softplus_for_width"]=(0, [0,1]) # use softplus instead of exp to transform log_width -> width
 opts_dict["g"]["kwargs"]["upper_bound_for_widths"]=(100, lambda x: (x==-1) or x>0) # define an upper bound for the value of widths.. -1 = no upper bound
 opts_dict["g"]["kwargs"]["lower_bound_for_widths"]=(0.01, lambda x: x>0) # define a lower bound for the value of widths
+opts_dict["g"]["kwargs"]["upper_bound_for_norms"]=(10, lambda x: (x==-1) or x>0) # define an upper bound for the value of widths.. -1 = no upper bound
+opts_dict["g"]["kwargs"]["lower_bound_for_norms"]=(1, lambda x: x>0) # define a lower bound for the value of widths
 opts_dict["g"]["kwargs"]["clamp_widths"]=(0, [0,1])
 opts_dict["g"]["kwargs"]["width_smooth_saturation"]=(1, [0,1]) # 
 opts_dict["g"]["kwargs"]["regulate_normalization"]=(1, [0,1])
