@@ -766,7 +766,9 @@ def plot_joint_pdf(pdf,
         
 
         ## plot contours from samples
+
         plotting_bounds = None
+
         if (contour_probs != [] and skip_plotting_samples==False):
             
             plotting_bounds = show_sample_contours(ax,
@@ -776,10 +778,9 @@ def plot_joint_pdf(pdf,
                                               contour_probs=contour_probs,
                                               sin_zen_mask=sin_zen_mask)
             
-       
-        
-
-
+        ## make sure we use the actual defined bounds if in 2d aswell
+        if(bounds is not None):
+            plotting_bounds=bounds
 
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
@@ -803,7 +804,7 @@ def plot_joint_pdf(pdf,
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
        
         ## adjust axis bounds
-        
+        print("plotting bounds in 2d ", plotting_bounds)
         if (plotting_bounds is not None):
             ax.set_xlim(plotting_bounds[0][0], plotting_bounds[0][1])
             ax.set_ylim(plotting_bounds[1][0], plotting_bounds[1][1]) 
