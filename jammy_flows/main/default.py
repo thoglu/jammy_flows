@@ -1396,7 +1396,7 @@ class pdf(nn.Module):
 
         # crosscheck if device is forced by keyword arg
         if(self.amortize_everything):
-            assert(used_device=amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
+            assert(used_device==amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
             
 
         x=None
