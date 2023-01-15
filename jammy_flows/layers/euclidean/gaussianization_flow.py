@@ -63,6 +63,7 @@ class gf_block(euclidean_base.euclidean_base):
                  upper_bound_for_widths=100,
                  lower_bound_for_norms=1,
                  upper_bound_for_norms=10,
+                 center_mean=0,
                  clamp_widths=0,
                  regulate_normalization=0,
                  add_skewness=0,
@@ -231,14 +232,17 @@ class gf_block(euclidean_base.euclidean_base):
         bandwidth = (4. * numpy.sqrt(math.pi) / ((math.pi ** 4) * num_kde)) ** 0.2
         self.init_log_width=numpy.log(bandwidth)
 
-        #######################################
+        self.center_mean=center_mean
+
+
         if(self.nonlinear_stretch_type=="classic"):
             ## means
             if use_permanent_parameters:
-                self.kde_means = nn.Parameter(torch.randn(self.num_kde, self.dimension).type(torch.double).unsqueeze(0))
+                self.kde_means = nn.Parameter(torch.randn(self.num_kde-self.center_mean, self.dimension).type(torch.double).unsqueeze(0))
 
-            ## increase params per kde*dim
-            self.total_param_num+=self.num_params_datapoints
+            ## increase params per (kde-center_mean)*dim
+            self.total_param_num+=(self.num_kde-self.center_mean)*self.dimension
+            self.total_param_num_means=(self.num_kde-self.center_mean)*self.dimension
 
             #######################################
 
@@ -811,7 +815,7 @@ class gf_block(euclidean_base.euclidean_base):
                 ## skipping householder params
                 #extra_input_counter=self.num_householder_params
 
-                kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
+                kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.total_param_num_means], [x.shape[0] , self.num_kde,  self.dimension])
                 extra_input_counter+=self.num_params_datapoints
 
                 kde_log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
@@ -836,7 +840,21 @@ class gf_block(euclidean_base.euclidean_base):
 
                 ## regulate log-normalizations if desired
                 kde_log_weights=self.normalization_regulator(kde_log_weights)
-          
+
+            if(self.center_mean):
+                #calculate last mean based on other weights and previous means
+                print(kde_log_weights.shape)
+                print(kde_means.shape)
+                normal_weights=kde_log_weights.exp()
+
+                print("normal_weights[:,:-1,:]", normal_weights[:,-1:,:].shape)
+                print(normal_weights[:,-1:,:])
+
+                new_mean=-(kde_means*normal_weights[:,:-1,:]).sum(axis=1, keepdims=True)/normal_weights[:,-1:,:]
+               
+                kde_means=torch.cat([kde_means, new_mean], dim=1)
+
+
             ## transform skewness if necessary
             if(self.add_skewness):
         
@@ -1178,8 +1196,8 @@ class gf_block(euclidean_base.euclidean_base):
         
         if(self.nonlinear_stretch_type=="classic"):
             # classic gaussianization flow
-            self.kde_means.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
-            counter+=self.num_params_datapoints
+            self.kde_means.data=torch.reshape(params[counter:counter+self.total_param_num_means], [1,self.num_kde-self.center_mean, self.dimension])
+            counter+=self.total_param_num_means
 
             self.kde_log_widths.data=torch.reshape(params[counter:counter+self.num_params_datapoints], [1,self.num_kde, self.dimension])
             counter+=self.num_params_datapoints
@@ -1269,8 +1287,8 @@ class gf_block(euclidean_base.euclidean_base):
                 ## skipping householder params
                 
 
-                kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
-                extra_input_counter+=self.num_params_datapoints
+                kde_means=extra_inputs[:,extra_input_counter:extra_input_counter+self.total_param_num_means].reshape(-1, self.num_kde, self.dimension)
+                extra_input_counter+=self.total_param_num_means
 
                 kde_log_widths=extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints].reshape(-1, self.num_kde, self.dimension)
                 extra_input_counter+=self.num_params_datapoints
