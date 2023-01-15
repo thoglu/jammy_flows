@@ -14,6 +14,14 @@ import sys
 
 from typing import Union
 
+## used to peek into param generator which can be empty
+def peek(iterable):
+    try:
+        first = next(iterable)
+    except StopIteration:
+        return None
+    return first
+
 class pdf(nn.Module):
 
     def __init__(
@@ -548,7 +556,7 @@ class pdf(nn.Module):
                 
             if(self.predict_log_normalization):
 
-                if(self.data_summary_dim is not None):
+                if(self.conditional_input_dim is not None):
 
                     ## we only have the encoding summary dim.. poisson mean does not depend on the other PDF pars
 
@@ -556,16 +564,16 @@ class pdf(nn.Module):
                     if(self.join_poisson_and_pdf_description==False):
 
                         assert(self.amortize_everything==False), "Separate poisson log-lambda predictor not implemented with 'amortize_everything' currently"
-                        this_summary_dim=self.data_summary_dim[-1]
+                        
                         num_predicted_pars=1
 
                         if(self.amortization_mlp_use_custom_mode):
                            
-                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
+                            self.log_normalization_mlp=extra_functions.AmortizableMLP(self.conditional_input_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
 
                         else:
 
-                            mlp_in_dims = [this_summary_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
+                            mlp_in_dims = [self.conditional_input_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
                             mlp_out_dims = list_from_str(self.amortization_mlp_dims[pdf_index]) + [num_predicted_pars]
 
                             nn_list = []
@@ -951,12 +959,14 @@ class pdf(nn.Module):
 
         base_pos, tot_log_det=self.all_layer_inverse(x, tot_log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
-        log_pdf = torch.distributions.MultivariateNormal(
-            torch.zeros_like(base_pos).to(x),
-            covariance_matrix=torch.eye(self.total_base_dim).type_as(x).to(x),
+        ## must faster calculation based on std normal
+        other=torch.distributions.Normal(
+            0.0,
+            1.0,
         ).log_prob(base_pos)
 
-      
+        log_pdf=other.sum(dim=-1)
+
         return log_pdf + tot_log_det, log_pdf, base_pos
 
     def obtain_flow_param_structure(self, 
@@ -1117,7 +1127,8 @@ class pdf(nn.Module):
                allow_gradients=False, 
                amortization_parameters=None, 
                force_embedding_coordinates=False, 
-               force_intrinsic_coordinates=False):
+               force_intrinsic_coordinates=False,
+               device=None):
         """ 
         Samples from the (conditional) PDF. 
 
@@ -1129,6 +1140,7 @@ class pdf(nn.Module):
             amortization_parameters (Tensor/None): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates for the sample.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates for the sample.
+            device (torch device/None): Default is None, since the device can usually be inferred. Has to be given when layers are used that do not contain parameters and no conditional parameters are available. 
         
         Returns:
 
@@ -1143,19 +1155,31 @@ class pdf(nn.Module):
 
 
         """
-
+       
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf or sampling from the pdf!"
 
         if(allow_gradients):
 
-            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, 
+                                                                                         seed=seed, 
+                                                                                         samplesize=samplesize, 
+                                                                                         amortization_parameters=amortization_parameters, 
+                                                                                         force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                         force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                         device=device)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
         else:   
             with torch.no_grad():
-                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, seed=seed, samplesize=samplesize, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-
+                sample, normal_base_sample, log_pdf_target, log_pdf_base=self._obtain_sample(conditional_input=conditional_input, 
+                                                                                             seed=seed, 
+                                                                                             samplesize=samplesize, 
+                                                                                             amortization_parameters=amortization_parameters, 
+                                                                                             force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                             force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                             device=device)
+           
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
     def all_layer_forward(self, 
@@ -1311,7 +1335,8 @@ class pdf(nn.Module):
                        seed=None, 
                        amortization_parameters=None, 
                        force_embedding_coordinates=False, 
-                       force_intrinsic_coordinates=False):
+                       force_intrinsic_coordinates=False,
+                       device=None):
         """
         Obtains a sample from the Multivariate Standard Normal, evaluates it and passes it through forward machinery. 
         When *predefined_target_input* is given, takes this as a sample.
@@ -1320,10 +1345,12 @@ class pdf(nn.Module):
 
             conditional_input (Tensor/None): Input tensor when conditional PDF.
             predefined_target_input (Tensor/None): When given, evaluates the MVN there. Otherwise samples a MVN random variable before.
-            samplesize (int): 
+            samplesize (int):
+            seed (None/int):
             amortization_parameters (bool): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates in the output sample.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the output sample.
+            device (torch device/None): Default is None, since the device can usually be inferred. Has to be given when layers are used that do not contain parameters and no conditional parameters are available. 
 
         Returns:
 
@@ -1336,9 +1363,10 @@ class pdf(nn.Module):
             Tensor
                 Log-pdf evaluation in base space
         """
-
+       
         data_type = torch.float64
         used_sample_size = samplesize
+        used_device=device
 
         # make sure device is set if amortization is used
         if(self.amortize_everything):
@@ -1350,19 +1378,31 @@ class pdf(nn.Module):
                 ## TODO - maybe allow for more flexible shape combinations
                 assert(conditional_input.shape[0]==amortization_parameters.shape[0])
         else:
-            used_device=next(self.parameters()).device
+            ## if one blindly uses next() on an empty param generator, it throws an error
+            res=peek(self.parameters()) 
 
+            if(res is None):
+                assert(device is not None), "Using a layer without parameters. Need to infer device from parameter *device* for sampling, but parameter is None!"
+
+                used_device=device
+
+        if(device is not None):
+            used_device=devide
+        
         if conditional_input is not None:
-
             used_sample_size = conditional_input.shape[0]
             data_type = conditional_input.dtype
             assert(used_device==conditional_input.device), (used_device, conditional_input.device)
+
+        # crosscheck if device is forced by keyword arg
+        if(self.amortize_everything):
+            assert(used_device=amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
             
 
         x=None
         log_gauss_evals=0.0
         std_normal_samples=0.0
-
+       
         if(predefined_target_input is not None):
 
             x=predefined_target_input
@@ -1408,7 +1448,7 @@ class pdf(nn.Module):
             x = std_normal_samples
 
         log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
-
+        
         new_targets, log_det=self.all_layer_forward(x, log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
         ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
