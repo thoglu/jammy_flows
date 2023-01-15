@@ -1515,7 +1515,7 @@ class pdf(nn.Module):
 
     ########
 
-    def init_params(self, data=None, damping_factor=1000.0):
+    def init_params(self, data=None, damping_factor=1000.0, mvn_min_max_sv_ratio=1e-3):
         """
         Initialize params of the normalizing flow such that the different sub flows play nice with each other and the starting distribution is a reasonable one.
         For the Gaussianization flow, data can be used to initilialize the starting distribution such that it roughly follows the data.
@@ -1552,7 +1552,7 @@ class pdf(nn.Module):
 
                 if("e" in subflow_description):
                     
-                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None,householder_inits="random")
+                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
 
                     params_list.append(params.type(torch.float64))
 

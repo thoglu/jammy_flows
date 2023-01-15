@@ -174,7 +174,7 @@ def get_trafo_matrix_mvn(dimension, params, cov_type):
     return numpy.sqrt(sigma)*r
 
         
-def find_init_pars_of_chained_blocks(layer_list, data, householder_inits="random"):
+def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-3):
 
     ## given an input *data_inits*, this function tries to initialize the gf block parameters
     ## to best match the data intis
@@ -220,7 +220,15 @@ def find_init_pars_of_chained_blocks(layer_list, data, householder_inits="random
              
                 data_matrix=torch.matmul(cur_data.T, cur_data)/float(data.shape[0])
 
-                loss_fn=get_loss_fn_mvn(data_matrix, cur_layer.cov_type)
+                # svd to increase small eigenvalues and "fix" the data matrix
+                l, sigma, r=scipy.linalg.svd(data_matrix)
+
+                minimum_allowed_singular_val=mvn_min_max_sv_ratio*max(sigma)
+                new_sigma=numpy.where(sigma<minimum_allowed_singular_val, minimum_allowed_singular_val, sigma)
+
+                fixed_data_matrix=(l*new_sigma) @ r
+
+                loss_fn=get_loss_fn_mvn(fixed_data_matrix, cur_layer.cov_type)
 
                 num_mat_params=cur_layer.total_param_num
                 if(cur_layer.model_offset):

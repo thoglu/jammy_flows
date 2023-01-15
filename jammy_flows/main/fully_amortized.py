@@ -217,9 +217,9 @@ class fully_amortized_pdf(nn.Module):
 
 
 
-    def init_params(self, data=None, damping_factor=1000.0):
+    def init_params(self, data=None, damping_factor=1000.0, mvn_min_max_sv_ratio=1e-3):
 
-        global_amortization_init=self.pdf_to_amortize.init_params(data=data, damping_factor=damping_factor)
+        global_amortization_init=self.pdf_to_amortize.init_params(data=data, damping_factor=damping_factor, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
        
         ## initialize MLP with global desired init
         if(self.use_amortizable_mlp):
