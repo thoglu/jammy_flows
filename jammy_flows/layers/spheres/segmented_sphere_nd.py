@@ -482,7 +482,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         
 
             ## use that distribution as initilization to GF flow
-            desired_euclidean_pars=find_init_pars_of_chained_blocks(self.zenith_type_layer_list, pseudo_data,householder_inits="random")
+            desired_euclidean_pars=find_init_pars_of_chained_blocks(self.zenith_type_layer_list, pseudo_data)
 
         else:
 
