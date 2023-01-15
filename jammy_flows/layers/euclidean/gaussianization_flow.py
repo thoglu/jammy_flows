@@ -1133,7 +1133,7 @@ class gf_block(euclidean_base.euclidean_base):
 
         if(self.nonlinear_stretch_type=="classic"):
             ## means
-            desired_param_vec.append(torch.randn(self.num_kde*self.dimension))
+            desired_param_vec.append(torch.randn(self.total_param_num_means))
 
             ## widths
             desired_param_vec.append(torch.ones(self.num_kde*self.dimension)*self.init_log_width)

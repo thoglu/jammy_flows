@@ -143,6 +143,14 @@ class Test(unittest.TestCase):
 
         self.flow_inits.append([ ["e3", "gg"], extra_flow_defs])
 
+        # center mean
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["g"]=dict()
+        extra_flow_defs["options_overwrite"]["g"]["center_mean"]=1
+
+        self.flow_inits.append([ ["e3", "ggg"], extra_flow_defs])
+
 
   
         #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}}}] )
@@ -302,12 +310,19 @@ class Test(unittest.TestCase):
                 
                 tolerance=1e-4
 
-       
             #seed_everything(0)
             this_flow=f.pdf(*init[0], **init[1])
             this_flow.double()
 
+            ## test for pure Euclidean manifold
+            if( (len(init[0][0].split("+"))==1) and (init[0][0][0]=="e")):
+                used_dim=int(init[0][0][1:])
+                gaussian_init_data=torch.randn(size=(100,used_dim),dtype=torch.float64)
+                
+                # test init function with random data
+                this_flow.init_params(data=gaussian_init_data)
 
+               
             cinput=None
             if("conditional_input_dim" in init[1].keys()):
                 rvec=numpy.random.normal(size=(samplesize,2))*100.0

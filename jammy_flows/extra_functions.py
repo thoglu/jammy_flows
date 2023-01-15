@@ -187,10 +187,12 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-3
 
     all_layers_params=[]
 
+    tot_num_expected_params=0
+
     with torch.no_grad():
         ## traverse layers in reversed order
         for layer_ind, cur_layer in enumerate(layer_list[::-1]):
-
+            tot_num_expected_params+=cur_layer.total_param_num
             # normal default layer init if not data present
             if(data is None):
                 all_layers_params.append(cur_layer.get_desired_init_parameters().type(torch.float64))
@@ -304,16 +306,19 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-3
                 assert(num_kde<100)
 
                 if(cur_layer.nonlinear_stretch_type=="classic"):
+
+                    ## TODO: This whole init routine for GFs should probably be reworked at some point.
                     
-                    ## use all percentiles for KDE
+                    ## based on percentiles
                     percentiles_to_use=numpy.linspace(0,100,num_kde)#[1:-1]
                     percentiles=torch.from_numpy(numpy.percentile(cur_data.cpu().numpy(), percentiles_to_use, axis=0)).to(data)
 
-                 
-                    ## add means
-                    param_list.append(percentiles.flatten())
-                    
 
+                    ## add means
+                    if(cur_layer.center_mean==0):
+                        param_list.append(percentiles.flatten())
+                    else:
+                        param_list.append(percentiles[:-1].flatten())
                  
                     quarter_diffs=percentiles[1:,:]-percentiles[:-1,:]
                     min_perc_diff=(quarter_diffs.min(axis=0, keepdim=True)[0])
@@ -397,5 +402,7 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-3
 
     all_layers_params=torch.cat(all_layers_params[::-1])
 
+    assert(len(all_layers_params)==tot_num_expected_params), ("Total number of defined params (%d) does not match expected params based on layer definitions (%d)" % (len(all_layers_params), tot_num_expected_params))
+    
     return all_layers_params
 
