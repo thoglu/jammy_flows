@@ -815,8 +815,8 @@ class gf_block(euclidean_base.euclidean_base):
                 ## skipping householder params
                 #extra_input_counter=self.num_householder_params
 
-                kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.total_param_num_means], [x.shape[0] , self.num_kde,  self.dimension])
-                extra_input_counter+=self.num_params_datapoints
+                kde_means=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.total_param_num_means], [x.shape[0] , self.num_kde-self.center_mean,  self.dimension])
+                extra_input_counter+=self.total_param_num_means
 
                 kde_log_widths=torch.reshape(extra_inputs[:,extra_input_counter:extra_input_counter+self.num_params_datapoints], [x.shape[0] , self.num_kde,  self.dimension])
                 extra_input_counter+=self.num_params_datapoints
