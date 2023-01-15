@@ -1555,7 +1555,7 @@ class pdf(nn.Module):
 
     ########
 
-    def init_params(self, data=None, damping_factor=1000.0):
+    def init_params(self, data=None, damping_factor=1000.0, mvn_min_max_sv_ratio=1e-3):
         """
         Initialize params of the normalizing flow such that the different sub flows play nice with each other and the starting distribution is a reasonable one.
         For the Gaussianization flow, data can be used to initilialize the starting distribution such that it roughly follows the data.
@@ -1592,7 +1592,7 @@ class pdf(nn.Module):
 
                 if("e" in subflow_description):
                     
-                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None,householder_inits="random")
+                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
 
                     params_list.append(params.type(torch.float64))
 
@@ -1605,43 +1605,6 @@ class pdf(nn.Module):
                     params_list.append(torch.cat(this_list))
 
                 this_dim_index+=this_dim
-
-                """
-                ## special initalizations
-                ## check if all are gaussianization flow
-                gf_init=True
-                for layer_index, layer_type in enumerate(self.flow_defs_list[subflow_index]):
-                    if(layer_type!="g" and layer_type !="h"):
-                        gf_init=False
-                    
-                    if(layer_type=="g"):
-                        
-                        if(this_layer_list[layer_index].nonlinear_stretch_type=="rq_splines"):
-                            gf_init=False
-
-                if(data is None):
-                    gf_init=False
-
-                if(gf_init):
-                    if(layer_type=="g"):
-                        
-                        
-                    elif(layer_type=="h"):
-                        params=find_init_pars_of_chained_gf_blocks_old(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim],householder_inits="random")
-                    
-                    params_list.append(params.type(torch.float64))
-
-                else:
-                   
-                    ## get basic rough init...
-                    this_list=[]
-                    for l in this_layer_list:
-                        this_list.append(l.get_desired_init_parameters().type(torch.float64))
-
-                    params_list.append(torch.cat(this_list))
-                """
-                
-
 
             ## 2) Depending on encoding structure, use the init params at appropriate places
        

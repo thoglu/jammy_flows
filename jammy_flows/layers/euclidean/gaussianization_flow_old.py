@@ -1026,7 +1026,7 @@ def get_loss_fn(target_matrix, num_householder_iter=-1):
     return compute_matching_distance
 
         
-def find_init_pars_of_chained_gf_blocks_old(layer_list, data, householder_inits="random"):
+def find_init_pars_of_chained_gf_blocks_old(layer_list, data):
 
     ## given an input *data_inits*, this function tries to initialize the gf block parameters
     ## to best match the data intis
