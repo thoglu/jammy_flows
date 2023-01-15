@@ -1366,7 +1366,7 @@ class pdf(nn.Module):
        
         data_type = torch.float64
         used_sample_size = samplesize
-        used_device=device
+        used_device=None
 
         # make sure device is set if amortization is used
         if(self.amortize_everything):
@@ -1377,6 +1377,14 @@ class pdf(nn.Module):
             if(conditional_input is not None):
                 ## TODO - maybe allow for more flexible shape combinations
                 assert(conditional_input.shape[0]==amortization_parameters.shape[0])
+                assert(conditional_input.device==amortization_parameters.device)
+
+        elif(conditional_input is not None):
+
+            used_sample_size = conditional_input.shape[0]
+            data_type = conditional_input.dtype
+            used_device = conditional_input.device
+
         else:
             ## if one blindly uses next() on an empty param generator, it throws an error
             res=peek(self.parameters()) 
@@ -1385,19 +1393,17 @@ class pdf(nn.Module):
                 assert(device is not None), "Using a layer without parameters. Need to infer device from parameter *device* for sampling, but parameter is None!"
 
                 used_device=device
+            else:
+                used_device=res.device
 
+        ## if device is given, one last overwrite and check that manual device agrees with other params
         if(device is not None):
-            used_device=devide
-        
-        if conditional_input is not None:
-            used_sample_size = conditional_input.shape[0]
-            data_type = conditional_input.dtype
-            assert(used_device==conditional_input.device), (used_device, conditional_input.device)
+            used_device=device
+            if(self.amortize_everything is not None):
+                assert(used_device == amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
 
-        # crosscheck if device is forced by keyword arg
-        if(self.amortize_everything):
-            assert(used_device==amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
-            
+            if conditional_input is not None:
+                assert(used_device==conditional_input.device), "Defined keyword *device* does not match device of conditional input params!"
 
         x=None
         log_gauss_evals=0.0
