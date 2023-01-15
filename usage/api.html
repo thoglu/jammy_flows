@@ -278,7 +278,7 @@ Each layer holds their own parameters.</p></li>
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.init_params">
-<code class="sig-name descname">init_params</code><span class="sig-paren">(</span><em class="sig-param">data=None</em>, <em class="sig-param">damping_factor=1000.0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.init_params" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">init_params</code><span class="sig-paren">(</span><em class="sig-param">data=None</em>, <em class="sig-param">damping_factor=1000.0</em>, <em class="sig-param">mvn_min_max_sv_ratio=0.001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.init_params" title="Permalink to this definition">¶</a></dt>
 <dd><p>Initialize params of the normalizing flow such that the different sub flows play nice with each other and the starting distribution is a reasonable one.
 For the Gaussianization flow, data can be used to initilialize the starting distribution such that it roughly follows the data.</p>
 <dl class="field-list simple">
