@@ -56,7 +56,7 @@ class pdf(nn.Module):
             
             options_overwrite (dict): Dictionary to overwrite default options of individual flow layers.
 
-            conditional_input_dim (None/int): Conditional input dimension if a conditional PDF. None to define non-conditional PDF.
+            conditional_input_dim (None/int/list(int)): Conditional input dimension if a conditional PDF. If a list is given, defines conditional input for each sub-pdf. None to define non-conditional PDF.
 
             amortization_mlp_dims (str/list(str)): Hidden structure of MLP for each sub-manifold. 
 
@@ -203,6 +203,15 @@ class pdf(nn.Module):
         ### now define input stuff
         self.conditional_input_dim=conditional_input_dim
 
+        ### single encoding tensor
+        self.encoding_type="single"
+
+        if(type(self.conditional_input_dim)==list):
+            for ci in self.conditional_input_dim:
+                assert(type(ci)==int)
+            # one encoding tensor per sub-pdf
+            self.encoding_type="multi"
+            
         ## define internal mlp mapping dims as list
         self.amortization_mlp_dims=amortization_mlp_dims
         if(type(self.amortization_mlp_dims)==str):
@@ -355,6 +364,9 @@ class pdf(nn.Module):
         self.log_normalization=None
 
         if(self.predict_log_normalization):
+
+            assert(len(self.pdf_defs_list)==1), "You chose to predict log-lambda, which is only allowed with a single sub-pdf (no autoregressive structure). \
+                                                 For autoregressive PDFs with log-lambda prediction, use fully amortized PDFs."
 
             if self.force_permanent_parameters_in_first_subpdf:
                 self.log_normalization=nn.Parameter(torch.randn(1).type(torch.double).unsqueeze(0))
@@ -520,7 +532,10 @@ class pdf(nn.Module):
 
                 # also add input summary dimensions
                 if(self.conditional_input_dim is not None):
-                    this_summary_dim+=self.conditional_input_dim
+                    if(type(self.conditional_input_dim)==int):
+                        this_summary_dim+=self.conditional_input_dim
+                    else:
+                        this_summary_dim+=self.conditional_input_dim[pdf_index]
                 
                 if(self.amortization_mlp_use_custom_mode):
 
@@ -559,7 +574,6 @@ class pdf(nn.Module):
                 if(self.conditional_input_dim is not None):
 
                     ## we only have the encoding summary dim.. poisson mean does not depend on the other PDF pars
-
                     ## only generate a Poisson MLP if poisson log-lambda and other flow parameters are to be predicted by separate MLPs
                     if(self.join_poisson_and_pdf_description==False):
 
@@ -567,13 +581,17 @@ class pdf(nn.Module):
                         
                         num_predicted_pars=1
 
+                        this_summary_dim=self.conditional_input_dim
+                        if(type(self.conditional_input_dim)==list):
+                            this_summary_dim=self.conditional_input_dim[0]
+
                         if(self.amortization_mlp_use_custom_mode):
                            
-                            self.log_normalization_mlp=extra_functions.AmortizableMLP(self.conditional_input_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
+                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
 
                         else:
 
-                            mlp_in_dims = [self.conditional_input_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
+                            mlp_in_dims = [this_summary_dim] + list_from_str(self.amortization_mlp_dims[pdf_index])
                             mlp_out_dims = list_from_str(self.amortization_mlp_dims[pdf_index]) + [num_predicted_pars]
 
                             nn_list = []
@@ -815,10 +833,14 @@ class pdf(nn.Module):
 
                 ## mlp preditors can be None for unresponsive layers like x/y
                 if(data_summary is not None):
-                    
-                    this_data_summary=data_summary
+
+                    if(type(data_summary)==list):
+                        this_data_summary=data_summary[pdf_index]
+                    else:
+                        this_data_summary=data_summary
+
                     if(len(extra_conditional_input)>0):
-                        this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                        this_data_summary=torch.cat([this_data_summary]+extra_conditional_input, dim=1)
                     
                     if(amortization_parameters is not None):
                         num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
@@ -933,7 +955,8 @@ class pdf(nn.Module):
         Parameters:
 
             x (Tensor): Target position to calculate log-probability at. Must be of shape (B,D), where B = batch dimension.
-            conditional_input (Tensor/None): Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__.
+            conditional_input (Tensor/list(Tensor)/None): Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be 
+                              a list of tensors, one for each sub-PDF, if *conditional_input_dim* in __init__ is a list of ints.
             amortization_parameters (Tensor/None): If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.
             force_embedding_coordinates (bool): Enforces embedding coordinates in the input *x*.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the input *x*. 
@@ -952,8 +975,13 @@ class pdf(nn.Module):
         """
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf!"
         if(conditional_input is not None):
-            assert(x.shape[0]==conditional_input.shape[0]), "Evaluating input x and condititional input shape must be similar!"
-            assert(x.is_cuda==conditional_input.is_cuda), ("input tensor *x* and *conditional_input* are on different devices .. resp. cuda flags: 1) x, 2) conditional_input, 3) pdf model", x.is_cuda, conditional_input.is_cuda, next(self.parameters()).is_cuda)
+            if(type(conditional_input)==list):
+                for ci in conditional_input:
+                    assert(x.shape[0]==ci.shape[0]), "Evaluating input x and condititional input shape must be similar!"
+                    assert(x.is_cuda==ci.is_cuda), ("input tensor *x* and *conditional_input* are on different devices .. resp. cuda flags: 1) x, 2) conditional_input, 3) pdf model", x.is_cuda, ci.is_cuda, next(self.parameters()).is_cuda)
+            else:
+                assert(x.shape[0]==conditional_input.shape[0]), "Evaluating input x and condititional input shape must be similar!"
+                assert(x.is_cuda==conditional_input.is_cuda), ("input tensor *x* and *conditional_input* are on different devices .. resp. cuda flags: 1) x, 2) conditional_input, 3) pdf model", x.is_cuda, conditional_input.is_cuda, next(self.parameters()).is_cuda)
 
         tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
@@ -986,14 +1014,26 @@ class pdf(nn.Module):
 
         if conditional_input is not None:
 
+            if(type(conditional_input)==list):
+
+                for ci_ind, ci in enumerate(conditional_input[:-1]):
+
+                    assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"
+                    assert(ci.dim()==conditional_input[ci_ind].dim()==2), "Conditional inputs must be 2-dimensional tensors."
+                    assert(ci.dtype==conditional_input[ci_ind].dtype), "Conditional input types do not match!"
+                    assert(ci.device==conditional_input[ci_ind].device), "Conditional input devices do not match!"
+
+                used_sample_size=conditional_input[0].shape[0]
+                data_type=conditional_input[0].dtype
+                used_device=conditional_input[0].device
+
+            else:
+           
+                used_sample_size = conditional_input.shape[0]
+                data_type = conditional_input.dtype
+                used_device = conditional_input.device
+
             data_summary=conditional_input
-
-            used_sample_size = data_summary.shape[0]
-            data_type = data_summary.dtype
-            used_device = data_summary.device
-
-            assert(data_summary.dim()==2), data_summary
-            #assert(data_summary.shape[0]==1), ("Requiring batćh size of 1! .. having .. ", data_summary.shape[0])
 
         x=None
         log_gauss_evals=0.0
@@ -1006,9 +1046,15 @@ class pdf(nn.Module):
             if(conditional_input is not None):
 
                 ## make sure inputs agree
-                assert(x.shape[0]==conditional_input.shape[0])
-                assert(x.dtype==data_summary.dtype)
-                assert(x.device==data_summary.device)
+
+                if(type(conditional_input)==list):
+                    assert(x.shape[0]==conditional_input[0].shape[0])
+                    assert(x.dtype==conditional_input[0].dtype)
+                    assert(x.device==conditional_input[0].device)
+                else:
+                    assert(x.shape[0]==conditional_input.shape[0])
+                    assert(x.dtype==conditional_input.dtype)
+                    assert(x.device==conditional_input.device)
 
             else:
                 data_type=predefined_target_input.dtype
@@ -1050,16 +1096,19 @@ class pdf(nn.Module):
 
         for pdf_index, pdf_layers in enumerate(self.layer_list):
 
-         
             this_pdf_type=self.pdf_defs_list[pdf_index]
             this_flow_def=self.flow_defs_list[pdf_index]
 
             extra_params = None
             if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
                
-                this_data_summary=data_summary
+                if(type(data_summary)==list):
+                    this_data_summary=data_summary[pdf_index]
+                else:
+                    this_data_summary=data_summary
+
                 if(len(extra_conditional_input)>0):
-                    this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                    this_data_summary=torch.cat([this_data_summary]+extra_conditional_input, dim=1)
 
                 extra_params=self.mlp_predictors[pdf_index](this_data_summary)
 
@@ -1103,8 +1152,6 @@ class pdf(nn.Module):
 
                 extra_param_counter += layer.total_param_num 
            
-            #new_targets.append(this_target)
-
             prev_target=this_target
 
            
@@ -1116,8 +1163,6 @@ class pdf(nn.Module):
         if (torch.isfinite(x) == 0).sum() > 0:
             raise Exception("nonfinite samples generated .. this should never happen!")
 
-     
-        ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
         return this_layer_param_structure
 
     def sample(self, 
@@ -1133,7 +1178,7 @@ class pdf(nn.Module):
         Samples from the (conditional) PDF. 
 
         Parameters:
-            conditional_input (Tensor/None): Of shape N x D where N is the batch size and D the input space dimension if given. Else None.
+            conditional_input (Tensor/list(Tensor)/None): Tensor of shape B x D where B is the batch size and D the input space dimension if given. Can also be a list of tensors, which must share batch dimensionality. Else None.
             samplesize (int): Samplesize.
             seed (None/int):
             allow_gradients (bool): If False, does not propagate gradients and saves memory by not building the graph. Off by default, so has to be switched on for training.
@@ -1223,7 +1268,6 @@ class pdf(nn.Module):
 
         for pdf_index, pdf_layers in enumerate(self.layer_list):
 
-         
             this_pdf_type=self.pdf_defs_list[pdf_index]
 
             ## by default not extra_params for the layers
@@ -1233,9 +1277,12 @@ class pdf(nn.Module):
 
                 if(data_summary is not None):
                     # conditional PDF (data_summary!=None) and MLP predictor given
-                    this_data_summary=data_summary
+                    if(type(data_summary)==list):
+                        this_data_summary=data_summary[pdf_index]
+                    else:   
+                        this_data_summary=data_summary
                     if(len(extra_conditional_input)>0):
-                        this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                        this_data_summary=torch.cat([this_data_summary]+extra_conditional_input, dim=1)
 
                     if(amortization_parameters is not None):
                         num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
@@ -1363,10 +1410,22 @@ class pdf(nn.Module):
             Tensor
                 Log-pdf evaluation in base space
         """
+
+
        
         data_type = torch.float64
         used_sample_size = samplesize
         used_device=None
+
+        ## some crosschecks
+        if(conditional_input is not None):
+            if(type(conditional_input)==list):
+                for ci_ind, ci in enumerate(conditional_input[:-1]):
+
+                    assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"
+                    assert(ci.dtype==conditional_input[ci_ind].dtype), "Conditional input types do not match!"
+                    assert(ci.device==conditional_input[ci_ind].device), "Conditional input devices do not match!"
+
 
         # make sure device is set if amortization is used
         if(self.amortize_everything):
@@ -1381,9 +1440,14 @@ class pdf(nn.Module):
 
         elif(conditional_input is not None):
 
-            used_sample_size = conditional_input.shape[0]
-            data_type = conditional_input.dtype
-            used_device = conditional_input.device
+                if(type(conditional_input)==list):
+                    used_sample_size = conditional_input[0].shape[0]
+                    data_type = conditional_input[0].dtype
+                    used_device = conditional_input[0].device
+                else:
+                    used_sample_size = conditional_input.shape[0]
+                    data_type = conditional_input.dtype
+                    used_device = conditional_input.device
 
         else:
             ## if one blindly uses next() on an empty param generator, it throws an error
@@ -1418,9 +1482,15 @@ class pdf(nn.Module):
             if(conditional_input is not None):
 
                 ## make sure inputs agree
-                assert(x.shape[0]==conditional_input.shape[0])
-                assert(x.dtype==conditional_input.dtype)
-                assert(x.device==conditional_input.device)
+
+                if(type(conditional_input)==list):
+                    assert(x.shape[0]==conditional_input[0].shape[0])
+                    assert(x.dtype==conditional_input[0].dtype)
+                    assert(x.device==conditional_input[0].device)
+                else:
+                    assert(x.shape[0]==conditional_input.shape[0])
+                    assert(x.dtype==conditional_input.dtype)
+                    assert(x.device==conditional_input.device)
 
             else:
                 data_type=predefined_target_input.dtype
@@ -1561,7 +1631,7 @@ class pdf(nn.Module):
 
     ########
 
-    def init_params(self, data=None, damping_factor=1000.0, mvn_min_max_sv_ratio=1e-3):
+    def init_params(self, data=None, damping_factor=1000.0, mvn_min_max_sv_ratio=1e-4):
         """
         Initialize params of the normalizing flow such that the different sub flows play nice with each other and the starting distribution is a reasonable one.
         For the Gaussianization flow, data can be used to initilialize the starting distribution such that it roughly follows the data.
@@ -1714,7 +1784,7 @@ class pdf(nn.Module):
     
         Parameters:
             sub_manifolds (list(int)): Contains indices of sub-manifolds if entropy should be calculated for marginal PDF of the given sub-manifold. *-1* stands for the total PDF and is the default.
-            conditional_input (Tensor/None): If passed defines the input to the PDF.
+            conditional_input (Tensor/list(Tensor)/None): If passed defines the input to the PDF.
             force_embedding_coordinates (bool): Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.
             force_intrinsic_coordinates (bool): Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.
             samplesize (int): Samplesize to use for entropy approximation.
@@ -1730,6 +1800,15 @@ class pdf(nn.Module):
         data_summary = None
         used_device=device
 
+        ## some crosschecks
+        if(conditional_input is not None):
+            if(type(conditional_input)==list):
+                for ci_ind, ci in enumerate(conditional_input[:-1]):
+
+                    assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"
+                    assert(ci.dtype==conditional_input[ci_ind].dtype), "Conditional input types do not match!"
+                    assert(ci.device==conditional_input[ci_ind].device), "Conditional input devices do not match!"
+
         if(force_embedding_coordinates==False):
             print("#### CAUTION: Calculating entropy without forcing embedding coordinates. This might lead to undesired and wrong entropies when using manifold PDFs!#############")
             #raise Exception()
@@ -1744,11 +1823,21 @@ class pdf(nn.Module):
 
             assert(self.conditional_input_dim is not None)
 
-            data_type = conditional_input.dtype
-            used_device = conditional_input.device
-            
-            # this behavior is a little differnet than in standard sample .. we sample for every conditional input multiple times
-            data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
+            if(type(conditional_input)==list):
+
+                data_type = conditional_input[0].dtype
+                used_device = conditional_input[0].device
+                
+                # a list of data summaries for the next functions
+                data_summary=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+
+            else:
+
+                data_type = conditional_input.dtype
+                used_device = conditional_input.device
+                
+                # this behavior is a little differnet than in standard sample .. we sample for every conditional input multiple times
+                data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
         #if(seed is not None):
@@ -1757,7 +1846,10 @@ class pdf(nn.Module):
         #std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device) if conditional_input is None else torch.randn(size=(data_summary.shape[0], self.total_base_dim), dtype=data_type, device=used_device)
         std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device)
         if(conditional_input is not None):
-            std_normal_samples=std_normal_samples.repeat(int(conditional_input.shape[0]), 1)
+            if(type(conditional_input)==list):
+                std_normal_samples=std_normal_samples.repeat(int(conditional_input[0].shape[0]), 1)
+            else:
+                std_normal_samples=std_normal_samples.repeat(int(conditional_input.shape[0]), 1)
 
         ## save the easy cases in dict
         base_evals_dict=dict()
@@ -1853,7 +1945,12 @@ class pdf(nn.Module):
                     
                     filled_up=torch.cat([joint_repeated, torch.ones(joint_repeated.shape[0], fillup_difference).to(repeated_final)], dim=1)
 
-                    new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None if data_summary is None else data_summary.repeat_interleave(samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                    if(data_summary is None):
+                        new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None, sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                    elif(type(data_summary)==list):
+                        new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, [ds.repeat_interleave(samplesize, dim=0) for ds in data_summary], sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                    else:
+                        new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, data_summary.repeat_interleave(samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
 
                     this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
@@ -1957,9 +2054,13 @@ class pdf(nn.Module):
             ## mlp preditors can be None for unresponsive layers like x/y
             if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
                 
-                this_data_summary=data_summary
+                if(type(data_summary)==list):
+                    this_data_summary=data_summary[pdf_index]
+                else:
+                    this_data_summary=data_summary
+
                 if(len(extra_conditional_input)>0):
-                    this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                    this_data_summary=torch.cat([this_data_summary]+extra_conditional_input, dim=1)
                 
                 if(amortization_parameters is not None):
                     num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params
@@ -2113,10 +2214,13 @@ class pdf(nn.Module):
 
                 extra_params = None
                 if(data_summary is not None and self.mlp_predictors[pdf_index] is not None):
-                   
-                    this_data_summary=data_summary
+                    
+                    if(type(data_summary)==list):
+                        this_data_summary=data_summary[pdf_index]
+                    else:
+                        this_data_summary=data_summary
                     if(len(extra_conditional_input)>0):
-                        this_data_summary=torch.cat([data_summary]+extra_conditional_input, dim=1)
+                        this_data_summary=torch.cat([this_data_summary]+extra_conditional_input, dim=1)
 
                     if(amortization_parameters is not None):
                         num_amortization_params=self.mlp_predictors[pdf_index].num_amortization_params

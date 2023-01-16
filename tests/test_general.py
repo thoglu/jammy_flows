@@ -151,8 +151,17 @@ class Test(unittest.TestCase):
 
         self.flow_inits.append([ ["e3", "ggg"], extra_flow_defs])
 
+        ### multiple conditional inputs
 
-  
+
+        # center mean
+        extra_flow_defs=dict()
+     
+        extra_flow_defs["conditional_input_dim"]=[3,4,5]
+       
+        self.flow_inits.append([ ["e1+e2+e1", "gg+g+ggg"], extra_flow_defs])
+
+
         #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_precise"}}}}] )
         #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_partly_crude"}}}}] )
         #self.flow_inits.append( [ [pdf_def, flow_def], {"options_overwrite":{"g":{"kwargs":{"inverse_function_type":"inormal_full_pade"}}}}] )
@@ -325,8 +334,16 @@ class Test(unittest.TestCase):
                
             cinput=None
             if("conditional_input_dim" in init[1].keys()):
-                rvec=numpy.random.normal(size=(samplesize,2))*100.0
-                cinput=torch.from_numpy(rvec)
+                if(type(init[1]["conditional_input_dim"])==int):
+
+                    rvec=numpy.random.normal(size=(samplesize,init[1]["conditional_input_dim"]))*100.0
+                    cinput=torch.from_numpy(rvec)
+                else:
+                    cinput=[]
+                    for ci_dim in init[1]["conditional_input_dim"]:
+
+                        rvec=numpy.random.normal(size=(samplesize,ci_dim))*100.0
+                        cinput.append(torch.from_numpy(rvec))
 
             with torch.no_grad():
                 samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput)
@@ -345,7 +362,11 @@ class Test(unittest.TestCase):
                 
                 inp=None
                 if(cinput is not None):
-                    inp=cinput[:10,:]
+                    if(type(cinput)==list):
+                        inp=[ci[:10,:] for ci in cinput]
+                    else:
+                        inp=cinput[:10,:]
+
                 res, log_det_new=this_flow.all_layer_forward(test_sample, log_det, inp)
 
              
@@ -355,7 +376,11 @@ class Test(unittest.TestCase):
 
                 inp=None
                 if(cinput is not None):
-                    inp=cinput[:10,:]
+                    if(type(cinput)==list):
+                        inp=[ci[:10,:] for ci in cinput]
+                    else:
+                        inp=cinput[:10,:]
+
                 res, log_det_new=this_flow.all_layer_inverse(test_sample, log_det, inp)
 
             
@@ -376,7 +401,13 @@ class Test(unittest.TestCase):
                 if(cinput is None):
                     flow_param_structure=this_flow.obtain_flow_param_structure()
                 else:
-                    flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=cinput[:1,:])
+
+                    if(type(cinput)==list):
+                        inp=[ci[:1,:] for ci in cinput]
+                    else:
+                        inp=cinput[:1,:]
+
+                    flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=inp)
                 
                 fps_num=0
 
