@@ -129,7 +129,7 @@ Example: “e2+s1+s2”, describes a joint PDF over a 2-dimensional euclidean sp
 Example: “gg+m+n” to describe a layer structure compatible with the other example “e2+s1+s2”. Two letters mean two consecutive applications of a certain flow layer, 3 letters three etc.
 Each layer holds their own parameters.</p></li>
 <li><p><strong>options_overwrite</strong> (<em>dict</em>) – Dictionary to overwrite default options of individual flow layers.</p></li>
-<li><p><strong>conditional_input_dim</strong> (<em>None/int</em>) – Conditional input dimension if a conditional PDF. None to define non-conditional PDF.</p></li>
+<li><p><strong>conditional_input_dim</strong> (<em>None/int/list</em><em>(</em><em>int</em><em>)</em>) – Conditional input dimension if a conditional PDF. If a list is given, defines conditional input for each sub-pdf. None to define non-conditional PDF.</p></li>
 <li><p><strong>amortization_mlp_dims</strong> (<em>str/list</em><em>(</em><em>str</em><em>)</em>) – Hidden structure of MLP for each sub-manifold.</p></li>
 <li><p><strong>predict_log_normalization</strong> (<em>bool</em>) – Predict log-mean of Poisson distribution</p></li>
 <li><p><strong>joint_poisson_and_pdf_description</strong> (<em>bool</em>) – If predicting log-mean, predict it together with other flow parameters if this is a conditional PDF. Only makes sense when conditional_input_dim is not None.</p></li>
@@ -225,7 +225,7 @@ Each layer holds their own parameters.</p></li>
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>sub_manifolds</strong> (<em>list</em><em>(</em><em>int</em><em>)</em>) – Contains indices of sub-manifolds if entropy should be calculated for marginal PDF of the given sub-manifold. <em>-1</em> stands for the total PDF and is the default.</p></li>
-<li><p><strong>conditional_input</strong> (<em>Tensor/None</em>) – If passed defines the input to the PDF.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – If passed defines the input to the PDF.</p></li>
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.</p></li>
 <li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.</p></li>
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize to use for entropy approximation.</p></li>
@@ -250,7 +250,8 @@ Each layer holds their own parameters.</p></li>
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
 <li><p><strong>x</strong> (<em>Tensor</em>) – Target position to calculate log-probability at. Must be of shape (B,D), where B = batch dimension.</p></li>
-<li><p><strong>conditional_input</strong> (<em>Tensor/None</em>) – Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be
+a list of tensors, one for each sub-PDF, if <em>conditional_input_dim</em> in __init__ is a list of ints.</p></li>
 <li><p><strong>amortization_parameters</strong> (<em>Tensor/None</em>) – If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.</p></li>
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Enforces embedding coordinates in the input <em>x</em>.</p></li>
 <li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Enforces intrinsic coordinates in the input <em>x</em>.</p></li>
@@ -278,7 +279,7 @@ Each layer holds their own parameters.</p></li>
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.init_params">
-<code class="sig-name descname">init_params</code><span class="sig-paren">(</span><em class="sig-param">data=None</em>, <em class="sig-param">damping_factor=1000.0</em>, <em class="sig-param">mvn_min_max_sv_ratio=0.001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.init_params" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">init_params</code><span class="sig-paren">(</span><em class="sig-param">data=None</em>, <em class="sig-param">damping_factor=1000.0</em>, <em class="sig-param">mvn_min_max_sv_ratio=0.0001</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.init_params" title="Permalink to this definition">¶</a></dt>
 <dd><p>Initialize params of the normalizing flow such that the different sub flows play nice with each other and the starting distribution is a reasonable one.
 For the Gaussianization flow, data can be used to initilialize the starting distribution such that it roughly follows the data.</p>
 <dl class="field-list simple">
@@ -319,7 +320,7 @@ For the Gaussianization flow, data can be used to initilialize the starting dist
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
-<li><p><strong>conditional_input</strong> (<em>Tensor/None</em>) – Of shape N x D where N is the batch size and D the input space dimension if given. Else None.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – Tensor of shape B x D where B is the batch size and D the input space dimension if given. Can also be a list of tensors, which must share batch dimensionality. Else None.</p></li>
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize.</p></li>
 <li><p><strong>seed</strong> (<em>None/int</em>) – </p></li>
 <li><p><strong>allow_gradients</strong> (<em>bool</em>) – If False, does not propagate gradients and saves memory by not building the graph. Off by default, so has to be switched on for training.</p></li>
