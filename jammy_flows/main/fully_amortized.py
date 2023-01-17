@@ -70,6 +70,9 @@ class fully_amortized_pdf(nn.Module):
         super().__init__()
 
         self.conditional_input_dim=conditional_input_dim
+
+        assert(type(conditional_input_dim)==int), "Fully amortized PDF requires a single encoding with a single dimension!"
+        
         self.use_amortizable_mlp=amortization_mlp_use_custom_mode
 
 
