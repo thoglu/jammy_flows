@@ -976,6 +976,11 @@ class pdf(nn.Module):
         assert(self.use_as_passthrough_instead_of_pdf == False), "The module is only used as a passthrough of all layers, not as actually evaluating the pdf!"
         if(conditional_input is not None):
             if(type(conditional_input)==list):
+
+                assert(len(self.conditional_input_dim)==len(conditional_input))
+                for ci_ind in range(len(self.conditional_input_dim)):
+                    assert(self.conditional_input_dim[ci_ind]==conditional_input[ci_ind].shape[1]), "Inputs of conditional input vector do not match with pre-defined input_dims!"
+
                 for ci in conditional_input:
                     assert(x.shape[0]==ci.shape[0]), "Evaluating input x and condititional input shape must be similar!"
                     assert(x.is_cuda==ci.is_cuda), ("input tensor *x* and *conditional_input* are on different devices .. resp. cuda flags: 1) x, 2) conditional_input, 3) pdf model", x.is_cuda, ci.is_cuda, next(self.parameters()).is_cuda)
@@ -1015,6 +1020,11 @@ class pdf(nn.Module):
         if conditional_input is not None:
 
             if(type(conditional_input)==list):
+
+                assert(len(self.conditional_input_dim)==len(conditional_input))
+                for ci_ind in range(len(self.conditional_input_dim)):
+                    assert(self.conditional_input_dim[ci_ind]==conditional_input[ci_ind].shape[1]), "Inputs of conditional input vector do not match with pre-defined input_dims!"
+
 
                 for ci_ind, ci in enumerate(conditional_input[:-1]):
 
@@ -1420,6 +1430,11 @@ class pdf(nn.Module):
         ## some crosschecks
         if(conditional_input is not None):
             if(type(conditional_input)==list):
+
+                assert(len(self.conditional_input_dim)==len(conditional_input))
+                for ci_ind in range(len(self.conditional_input_dim)):
+                    assert(self.conditional_input_dim[ci_ind]==conditional_input[ci_ind].shape[1]), "Inputs of conditional input vector do not match with pre-defined input_dims!"
+
                 for ci_ind, ci in enumerate(conditional_input[:-1]):
 
                     assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"
@@ -1803,6 +1818,12 @@ class pdf(nn.Module):
         ## some crosschecks
         if(conditional_input is not None):
             if(type(conditional_input)==list):
+
+                assert(len(self.conditional_input_dim)==len(conditional_input))
+                for ci_ind in range(len(self.conditional_input_dim)):
+                    assert(self.conditional_input_dim[ci_ind]==conditional_input[ci_ind].shape[1]), "Inputs of conditional input vector do not match with pre-defined input_dims!"
+
+
                 for ci_ind, ci in enumerate(conditional_input[:-1]):
 
                     assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"

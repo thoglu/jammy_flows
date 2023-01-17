@@ -170,9 +170,19 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             mask_inner=mask_inner & (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1] ].sum(axis=1) < 1.0)
 
     if (conditional_input is not None):
-        cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
-        if(cinput.is_cuda):
-            eval_positions=eval_positions.to(cinput)
+
+        if(type(conditional_input)==list):
+           
+            cinput=[]
+            for ci in conditional_input:
+                cinput.append(ci.repeat(used_npts**len(mins_maxs), 1)[mask_inner])
+
+            if(cinput[0].is_cuda):
+                eval_positions=eval_positions.to(cinput[0])
+        else:
+            cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
+            if(cinput.is_cuda):
+                eval_positions=eval_positions.to(cinput)
     
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
@@ -543,8 +553,12 @@ def plot_joint_pdf(pdf,
         plot_density = True
 
     if (conditional_input is not None):
-        if (conditional_input.shape[0] > 1):
-            plot_density = False
+        if(type(conditional_input)==list):
+            if (conditional_input[0].shape[0] > 1):
+                plot_density = False
+        else:
+            if (conditional_input.shape[0] > 1):
+                plot_density = False
 
     if (skip_plotting_density):
         plot_density = False
@@ -635,7 +649,11 @@ def plot_joint_pdf(pdf,
     pdf_conditional_input = conditional_input
 
     if (pdf_conditional_input is not None):
-        pdf_conditional_input = pdf_conditional_input[0:1]
+
+        if(type(pdf_conditional_input)==list):
+            pdf_conditional_input=[ci[0:1] for ci in pdf_conditional_input]
+        else:
+            pdf_conditional_input = pdf_conditional_input[0:1]
 
     evalpositions, log_evals, bin_volumes, sin_zen_mask, unreliable_spherical_regions= get_pdf_on_grid(
         pure_float_mms,
@@ -993,13 +1011,36 @@ def visualize_pdf(pdf,
     with torch.no_grad():
       sample_conditional_input = conditional_input
       if (conditional_input is not None):
-          if (len(conditional_input.shape) == 1):
-              sample_conditional_input = sample_conditional_input.unsqueeze(
-                  0)
 
-          if (sample_conditional_input.shape[0] == 1):
-              sample_conditional_input = sample_conditional_input.repeat(
-                  nsamples, 1)
+        if(type(conditional_input)==list):
+
+            sample_conditional_input=[]
+
+            for inp_ind, ci in enumerate(conditional_input):
+
+                this_ci=ci
+
+                if (len(this_ci.shape) == 1):
+                    this_ci=this_ci.unsqueeze(0)
+
+                if (this_ci.shape[0] == 1):
+                    this_ci = this_ci.repeat(nsamples, 1)
+
+
+
+                sample_conditional_input.append(this_ci)
+
+            ci_batch_size=sample_conditional_input[0].shape[0]
+
+        else:
+
+            if (len(conditional_input.shape) == 1):
+                sample_conditional_input = sample_conditional_input.unsqueeze(0)
+
+            if (sample_conditional_input.shape[0] == 1):
+                sample_conditional_input = sample_conditional_input.repeat(nsamples, 1)
+
+            ci_batch_size=sample_conditional_input.shape[0]
 
       if (gridspec is None):
           gridspec = fig.add_gridspec(1, 1)[0, 0]
@@ -1007,16 +1048,24 @@ def visualize_pdf(pdf,
       if(sample_conditional_input is not None):
 
         if(num_iterative_steps>0):
-            assert(sample_conditional_input.shape[0]%num_iterative_steps==0), "Number of total sample points must be divisible by iterative steps!"
             
-            num_per_step=int(sample_conditional_input.shape[0]/num_iterative_steps)
+            assert(ci_batch_size%num_iterative_steps==0), "Number of total sample points must be divisible by iterative steps!"
+            
+            num_per_step=int(ci_batch_size/num_iterative_steps)
             samples=[]
 
             for cur_step in range(num_iterative_steps):
+                
+                if(type(sample_conditional_input)==list):
+                    this_sample_input=[si[cur_step*num_per_step:cur_step*num_per_step+num_per_step] for si in sample_conditional_input]
 
-                cur_samples, _, _, _ = pdf.sample(
-                  conditional_input=sample_conditional_input[cur_step*num_per_step:cur_step*num_per_step+num_per_step],
-                  seed=seed+cur_step if seed is not None else None)
+                    cur_samples, _, _, _ = pdf.sample(
+                      conditional_input=this_sample_input,
+                      seed=seed+cur_step if seed is not None else None)
+                else:
+                    cur_samples, _, _, _ = pdf.sample(
+                      conditional_input=sample_conditional_input[cur_step*num_per_step:cur_step*num_per_step+num_per_step],
+                      seed=seed+cur_step if seed is not None else None)
 
                 samples.append(cur_samples)
 
