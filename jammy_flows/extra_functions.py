@@ -174,7 +174,7 @@ def get_trafo_matrix_mvn(dimension, params, cov_type):
     return numpy.sqrt(sigma)*r
 
         
-def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-3):
+def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4):
 
     ## given an input *data_inits*, this function tries to initialize the gf block parameters
     ## to best match the data intis
