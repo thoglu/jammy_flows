@@ -1002,6 +1002,38 @@ def plot_joint_pdf(pdf,
                     ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
                     ax.set_ylim(visualization_bounds[ind1][0], visualization_bounds[ind1][1])
 
+                    ## always hide labels if left or bottom 
+                    if(ind2==0 and ind1<(dim-1)):
+                        ax.set_xticklabels([])
+
+                        fontsize = ax.get_window_extent().height/5.0
+                        for lab in ax.get_yticklabels():
+                            lab.set_fontsize(fontsize)
+                       
+                    elif((ind1==(dim-1)) and (ind2!=0)):
+                        ax.set_yticklabels([])
+
+                        fontsize = ax.get_window_extent().width/5.0
+                        for lab in ax.get_xticklabels():
+                            lab.set_fontsize(fontsize)
+                            lab.set_rotation(45)
+
+                    elif(ind1<(dim-1) and ind2>0):
+                        ax.set_yticklabels([])
+                        ax.set_xticklabels([])
+
+                    
+                    else:
+
+                        fontsize = ax.get_window_extent().width/5.0
+                        for lab in ax.get_xticklabels():
+                            lab.set_fontsize(fontsize)
+                            lab.set_rotation(45)
+
+                        fontsize = ax.get_window_extent().height/5.0
+                        for lab in ax.get_yticklabels():
+                            lab.set_fontsize(fontsize)
+                    
                     if (hide_labels):
                         ax.set_yticklabels([])
                         ax.set_xticklabels([])
@@ -1032,15 +1064,29 @@ def plot_joint_pdf(pdf,
 
                     ax.hist(samples[:, ind1], bins=histogram_edges[ind1], density=True)
 
+                    
+                    std=numpy.std(samples[:, ind1])
+                    relative_wrt_axwidth=0.5*(visualization_bounds[ind2][1]-visualization_bounds[ind2][0])/std
+
+                    ax.set_title("%.1f" % (relative_wrt_axwidth),fontsize=ax.get_window_extent().width/4.5)
+
                     if (plotted_true_values is not None):
                         ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
                 
                    
                     ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
 
-                    if (hide_labels):
-                        ax.set_yticklabels([])
+                    # 1-d hists do not need y labels
+                    ax.set_yticklabels([])
+                   
+                    if (hide_labels or ind2 < (dim-1)):
+                        
                         ax.set_xticklabels([])
+                    else:
+                        fontsize = ax.get_window_extent().width/5.0
+                        for lab in ax.get_xticklabels():
+                            lab.set_fontsize(fontsize)
+                            lab.set_rotation(45)
 
     
     return subgridspec, total_pdf_integral
@@ -1070,7 +1116,7 @@ def visualize_pdf(pdf,
                   var_names=[],
                   num_iterative_steps=-1,
                   relative_vis_buffer=0.1,
-                  vis_percentiles=[1.0, 99.0]
+                  vis_percentiles=[3.0, 97.0]
                   ):
    
     with torch.no_grad():
