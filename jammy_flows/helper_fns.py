@@ -672,7 +672,8 @@ def plot_joint_pdf(pdf,
                    skip_plotting_samples=False,
                    var_names=[],
                    relative_buffer=0.1,
-                   vis_percentiles=[5.0,95.0]):
+                   vis_percentiles=[3.0,97.0],
+                   show_relative_std=1):
 
     plot_density = False
     dim = len(samples[0])
@@ -1064,11 +1065,11 @@ def plot_joint_pdf(pdf,
 
                     ax.hist(samples[:, ind1], bins=histogram_edges[ind1], density=True)
 
-                    
-                    std=numpy.std(samples[:, ind1])
-                    relative_wrt_axwidth=0.5*(visualization_bounds[ind2][1]-visualization_bounds[ind2][0])/std
+                    if(show_relative_std):
+                        std=numpy.std(samples[:, ind1])
+                        relative_wrt_axwidth=0.5*(visualization_bounds[ind2][1]-visualization_bounds[ind2][0])/std
 
-                    ax.set_title("%.1f" % (relative_wrt_axwidth),fontsize=ax.get_window_extent().width/4.5)
+                        ax.set_title("%.1f" % (relative_wrt_axwidth),fontsize=ax.get_window_extent().width/4.5)
 
                     if (plotted_true_values is not None):
                         ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
@@ -1116,7 +1117,8 @@ def visualize_pdf(pdf,
                   var_names=[],
                   num_iterative_steps=-1,
                   relative_vis_buffer=0.1,
-                  vis_percentiles=[3.0, 97.0]
+                  vis_percentiles=[3.0, 97.0],
+                  show_relative_std=1
                   ):
    
     with torch.no_grad():
@@ -1237,7 +1239,8 @@ def visualize_pdf(pdf,
           skip_plotting_samples=skip_plotting_samples,
           var_names=var_names,
           relative_buffer=relative_vis_buffer,
-          vis_percentiles=vis_percentiles)
+          vis_percentiles=vis_percentiles,
+          show_relative_std=show_relative_std)
         
     
     return samples, new_subgridspec, total_pdf_integral
