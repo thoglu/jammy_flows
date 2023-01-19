@@ -83,7 +83,7 @@ def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0]
                 histogram_edges.append(numpy.linspace(0, 2*numpy.pi, num_bins))
                 cur_index+=1
 
-            elif(int(pdf_def[2])==2):
+            elif(int(pdf_def[1])==2):
 
                 if(s2_norm=="standard"):
 
@@ -977,7 +977,7 @@ def plot_joint_pdf(pdf,
                     if (plot_only_contours == False):
                         ax.hist2d(samples[:, ind2],
                                   samples[:, ind1],
-                                  bins=[histogram_edges[ind2], histogram_edges[ind2]],
+                                  bins=[histogram_edges[ind2], histogram_edges[ind1]],
                                   density=True,
                                   cmap=colormap)
 
@@ -995,13 +995,12 @@ def plot_joint_pdf(pdf,
                         _ = show_sample_contours(
                             ax,
                             new_samples,
-                            bins=[histogram_edges[ind2], histogram_edges[ind2]],
+                            bins=[histogram_edges[ind2], histogram_edges[ind1]],
                             color=contour_color,
                             contour_probs=contour_probs)
-
                     
-                    ax.set_xlim(visualization_bounds[ind1][0], visualization_bounds[ind1][1])
-                    ax.set_ylim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
+                    ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
+                    ax.set_ylim(visualization_bounds[ind1][0], visualization_bounds[ind1][1])
 
                     if (hide_labels):
                         ax.set_yticklabels([])
