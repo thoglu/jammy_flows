@@ -46,7 +46,7 @@
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.flow_options">Other options and functions</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.amortizable_mlp">Amortizable MLP</a></li>
 <li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.layers.bisection_n_newton">Numerical inversion</a></li>
-<li class="toctree-l3"><a class="reference internal" href="#helper-functions">Helper Functions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#module-jammy_flows.helper_fns">Helper Functions</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="#module-jammy_flows.layers.layer_base">Layers</a><ul>
@@ -744,8 +744,26 @@ In order for this to work properly, the function <em>has</em> to be globally dif
 </dd></dl>
 
 </div>
-<div class="section" id="helper-functions">
-<h3>Helper Functions<a class="headerlink" href="#helper-functions" title="Permalink to this headline">¶</a></h3>
+<div class="section" id="module-jammy_flows.helper_fns">
+<span id="helper-functions"></span><h3>Helper Functions<a class="headerlink" href="#module-jammy_flows.helper_fns" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="jammy_flows.helper_fns.get_density_eval_minmax_values">
+<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">get_density_eval_minmax_values</code><span class="sig-paren">(</span><em class="sig-param">samples</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.get_density_eval_minmax_values" title="Permalink to this definition">¶</a></dt>
+<dd><p>Obtain a simple estimate of pdf extent based on min/max values of samples.
+Used to determine a region for density evaluation (not plotting).</p>
+</dd></dl>
+
+<dl class="function">
+<dt id="jammy_flows.helper_fns.obtain_bins_and_visualization_regions">
+<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">obtain_bins_and_visualization_regions</code><span class="sig-paren">(</span><em class="sig-param">samples, model, percentiles=[5.0, 95.0], relative_buffer=0.1, num_bins=50, s2_norm='standard'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.obtain_bins_and_visualization_regions" title="Permalink to this definition">¶</a></dt>
+<dd><p>Uses samples and pdf defs to calculate binning and visualization regions.</p>
+<p>Euclidean:
+Obtain an uneven binning based on Bayesian Blocks and a region that makes sense for visualization based on 1-d percentiles.
+Adds a relative buffer to both sides.</p>
+<p>Other:
+Non-Euclidean manifolds have fixed bounds for binning and visualization, so this is easy.</p>
+</dd></dl>
+
 </div>
 </div>
 <div class="section" id="module-jammy_flows.layers.layer_base">
