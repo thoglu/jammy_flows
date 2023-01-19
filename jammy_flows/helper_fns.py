@@ -9,8 +9,132 @@ import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import copy
+import astropy.stats
 
 from scipy.spatial.transform import Rotation as R
+
+def find_bins(trace, percentiles=[5.0,95.0], num_bins=50):
+
+    perc=numpy.percentile(trace, percentiles)
+
+    bins=list(numpy.linspace(perc[0], perc[1], num_bins-2))
+
+    new_edges=[min(trace)-1e-5]+bins+[max(trace)+1e-5]
+
+    return numpy.array(new_edges)
+
+def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0], relative_buffer=0.1, num_bins=50, s2_norm="standard"):
+    
+    """
+    Uses samples and pdf defs to calculate binning and visualization regions.
+
+    Euclidean:
+    Obtain an uneven binning based on Bayesian Blocks and a region that makes sense for visualization based on 1-d percentiles. 
+    Adds a relative buffer to both sides. 
+    
+    Other:
+    Non-Euclidean manifolds have fixed bounds for binning and visualization, so this is easy.
+    """
+
+    cur_index=0
+
+    visualization_bounds=[]
+    density_eval_bounds=[]
+    histogram_edges=[]
+
+    for pdf_index, pdf_def in enumerate(model.pdf_defs_list):
+
+        if(pdf_def[0]=="e"):
+            dim=int(pdf_def[1:])
+
+            for sub_index in range(cur_index, cur_index+dim):
+
+                np_samples=samples[:,sub_index].cpu().numpy()
+                # vis bounds
+                boundaries=numpy.percentile(np_samples, percentiles)
+
+                relative_extra=relative_buffer*(boundaries[1]-boundaries[0])
+
+                visualization_bounds.append((boundaries[0]-relative_extra, boundaries[1]+relative_extra))
+
+                # density bounds
+                min_val = float(min(samples[:, sub_index]).cpu())
+                max_val = float(max(samples[:, sub_index]).cpu())
+
+                relative_extra=0.2*(max_val-min_val)
+
+                density_eval_bounds.append((min_val-relative_extra, max_val+relative_extra))
+
+                # histo bins
+                #edges = astropy.stats.bayesian_blocks(np_samples, p0=0.1, gamma=0.9)
+
+                ## find bins based on percentiles
+                edges=find_bins(np_samples, percentiles=percentiles, num_bins=num_bins)
+                histogram_edges.append(edges)
+
+            cur_index+=dim
+
+        elif(pdf_def[0]=="s"):
+
+            if(int(pdf_def[1])==1):
+
+                visualization_bounds.append((0,2*numpy.pi))
+                density_eval_bounds.append((0,2*numpy.pi))
+                histogram_edges.append(numpy.linspace(0, 2*numpy.pi, num_bins))
+                cur_index+=1
+
+            elif(int(pdf_def[2])==2):
+
+                if(s2_norm=="standard"):
+
+                    visualization_bounds.append((0,numpy.pi))
+                    visualization_bounds.append((0,2*numpy.pi))
+
+                    density_eval_bounds.append((0,numpy.pi))
+                    density_eval_bounds.append((0,2*numpy.pi))
+
+                    histogram_edges.append(numpy.linspace(0, numpy.pi, num_bins))
+                    histogram_edges.append(numpy.linspace(0, 2*numpy.pi, num_bins))
+
+                else:
+
+                    visualization_bounds.append((0,numpy.pi))
+                    visualization_bounds.append((0,2*numpy.pi))
+
+                    density_eval_bounds.append((0,numpy.pi))
+                    density_eval_bounds.append((0,2*numpy.pi))
+
+                    histogram_edges.append(numpy.linspace(-2.0,2.0, num_bins))
+                    histogram_edges.append(numpy.linspace(-2.0,2.0, num_bins))
+
+                cur_index+=2
+
+        elif(pdf_def[0]=="i"):
+
+            lower=model.layer_list[pdf_index][-1].low_boundary
+            higher=model.layer_list[pdf_index][-1].high_boundary
+
+            visualization_bounds.append((lower,higher))
+        
+            density_eval_bounds.append((lower, higher))
+         
+            histogram_edges.append(numpy.linspace(lower,higher, num_bins))
+           
+        elif(pdf_def[0]=="a"):
+
+            lower=0.0
+            higher=1.0
+
+            dim=dim=int(pdf_def[1:])
+
+            for dindex in range(dim):
+                visualization_bounds.append((lower,higher))
+            
+                density_eval_bounds.append((lower, higher))
+             
+                histogram_edges.append(numpy.linspace(lower,higher, num_bins))
+
+    return visualization_bounds, density_eval_bounds, histogram_edges
 
 
 def calculate_contours(pdf_vals, bin_volumes, probs=[0.68, 0.95]):
@@ -62,12 +186,16 @@ def get_bounds_from_contour(cres, boundary=0.1):
     return cont_min_x, cont_max_x, cont_min_y, cont_max_y
 
 
-def get_minmax_values(samples):
+def get_density_eval_minmax_values(samples):
+    """
+    Obtain a simple estimate of pdf extent based on min/max values of samples.
+    Used to determine a region for density evaluation (not plotting).
+    """
     mins_maxs = []
 
     for ind in range(samples.shape[1]):
-        min_val = min(samples[:, ind])
-        max_val = max(samples[:, ind])
+        min_val = float(min(samples[:, ind]).cpu())
+        max_val = float(max(samples[:, ind]).cpu())
 
         mins_maxs.append((min_val, max_val))
 
@@ -542,7 +670,9 @@ def plot_joint_pdf(pdf,
                    s2_rotate_to_true_value=True,
                    s2_show_gridlines=True,
                    skip_plotting_samples=False,
-                   var_names=[]):
+                   var_names=[],
+                   relative_buffer=0.1,
+                   vis_percentiles=[5.0,95.0]):
 
     plot_density = False
     dim = len(samples[0])
@@ -563,30 +693,18 @@ def plot_joint_pdf(pdf,
     if (skip_plotting_density):
         plot_density = False
 
-    mms = get_minmax_values(samples)
+    ## 
 
-    if (bounds is not None):
-        assert(len(bounds)==len(mms)), "Bounds must be given for every dimension!"
-        mms = bounds
-   
+
+    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf.pdf_defs_list, percentiles=vis_percentiles, relative_buffer=relative_buffer, num_bins=50, s2_norm=s2_norm)
+    
+    if(bounds is not None):
+        visualization_bounds=bounds
 
     ## true positions are typically labels
     plotted_true_values=None
     if(true_values is not None):
       plotted_true_values=copy.deepcopy(true_values)
-
-    ## if bounds contain torch .. change to float
-
-    pure_float_mms = []
-    for dim_index, b in enumerate(mms):
-        new_b = b
-        if (type(b[0]) == torch.Tensor):
-            new_b = [
-                float(b[0].cpu().numpy()),
-                float(b[1].cpu().numpy())
-            ]
-
-        pure_float_mms.append(new_b)
 
     totalpts = total_pdf_eval_pts
     pts_per_dim = int(totalpts**(1.0 / float(dim)))
@@ -656,7 +774,7 @@ def plot_joint_pdf(pdf,
             pdf_conditional_input = pdf_conditional_input[0:1]
 
     evalpositions, log_evals, bin_volumes, sin_zen_mask, unreliable_spherical_regions= get_pdf_on_grid(
-        pure_float_mms,
+        density_eval_bounds,
         pts_per_dim,
         pdf,
         conditional_input=pdf_conditional_input,
@@ -666,7 +784,8 @@ def plot_joint_pdf(pdf,
 
    
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
-   
+    
+
     if (dim == 1):
 
         if (subgridspec is None):
@@ -684,7 +803,7 @@ def plot_joint_pdf(pdf,
                 if(ax_geometry[0]==1 and ax_geometry[1]==1):
                     break
         
-        ax.hist(samples[:, 0], bins=50, density=True)
+        ax.hist(samples[:, 0], bins=histogram_edges[0], density=True)
 
         if (plot_density):
 
@@ -696,6 +815,8 @@ def plot_joint_pdf(pdf,
         if (hide_labels):
             ax.set_yticklabels([])
             ax.set_xticklabels([])
+
+        ax.set_xlim(visualization_bounds[0][0], visualization_bounds[0][1])
 
     elif (dim == 2 and multiplot == False):
      
@@ -713,8 +834,6 @@ def plot_joint_pdf(pdf,
                     break
 
         
-
-        hist_bounds = 50
         #if(bounds is not None):
         #    hist_bounds=[numpy.linspace(bounds[0][0], bounds[0][1], 50),numpy.linspace(bounds[1][0], bounds[1][1], 50) ]
 
@@ -726,13 +845,14 @@ def plot_joint_pdf(pdf,
              
                 ## adjusting bounds like this only makes sense in euclidean space
 
-                sample_bounds = show_sample_contours(ax,
+                _ = show_sample_contours(ax,
                                                         samples,
-                                                        bins=50,
+                                                        bins=histogram_edges,
                                                         color=contour_color,
                                                         contour_probs=contour_probs,
                                                         sin_zen_mask=sin_zen_mask)
-                two_d_bounds_for_better_density=pure_float_mms
+                """
+                two_d_bounds_for_better_density=density_eval_bounds
 
                 for pdf_def in pdf.pdf_defs_list:
                     if("e" in pdf_def):
@@ -752,10 +872,11 @@ def plot_joint_pdf(pdf,
                         two_d_bounds_for_better_density[1][1]+=extra_y
 
                         break
+                """
 
                
                 evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
-                two_d_bounds_for_better_density,
+                density_eval_bounds,
                 pts_per_dim,
                 pdf,
                 conditional_input=pdf_conditional_input,
@@ -779,26 +900,18 @@ def plot_joint_pdf(pdf,
            
             ax.hist2d(samples[:, 0],
                       samples[:, 1],
-                      bins=hist_bounds,
+                      bins=histogram_edges,
                       density=True)
         
-
-        ## plot contours from samples
-
-        plotting_bounds = None
-
         if (contour_probs != [] and skip_plotting_samples==False):
             
-            plotting_bounds = show_sample_contours(ax,
-                                              samples,
-                                              bins=hist_bounds,
-                                              color=contour_color,
-                                              contour_probs=contour_probs,
-                                              sin_zen_mask=sin_zen_mask)
-            
-        ## make sure we use the actual defined bounds if in 2d aswell
-        if(bounds is not None):
-            plotting_bounds=bounds
+            _ = show_sample_contours(ax,
+                                     samples,
+                                     bins=histogram_edges,
+                                     color=contour_color,
+                                     contour_probs=contour_probs,
+                                     sin_zen_mask=sin_zen_mask)
+
 
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
@@ -821,52 +934,15 @@ def plot_joint_pdf(pdf,
 
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
        
-        ## adjust axis bounds
-        print("plotting bounds in 2d ", plotting_bounds)
-        if (plotting_bounds is not None):
-            ax.set_xlim(plotting_bounds[0][0], plotting_bounds[0][1])
-            ax.set_ylim(plotting_bounds[1][0], plotting_bounds[1][1]) 
-        
-        ### overwrite any bounds for spherical
-        if(pdf.pdf_defs_list[0]=="s2"):
-          if(s2_norm=="standard"):
-            ax.set_xlim(0, numpy.pi)
-            ax.set_ylim(0, 2*numpy.pi) 
-          else:
-            ax.set_xlim(-2.0,2.0)
-            ax.set_ylim(-2.0,2.0) 
-        
-            
+        ax.set_xlim(visualization_bounds[0][0], visualization_bounds[0][1])
+        ax.set_ylim(visualization_bounds[1][0], visualization_bounds[1][1]) 
+    
         if (hide_labels):
             ax.set_yticklabels([])
             ax.set_xticklabels([])
        
     else:
 
-        ## overwrite generic s2 bounds
-       
-        plotting_bounds=None
-        if(bounds):
-            plotting_bounds=copy.deepcopy(bounds)
-
-            index_counter=0
-            for pdf_ind, pdf_def in enumerate(pdf.pdf_defs_list):
-                if(pdf_def=="s2"):
-
-                    if(s2_norm=="standard"):
-                        
-                        plotting_bounds[index_counter]=[0.0, numpy.pi]
-                        plotting_bounds[index_counter+1]=[0.0, 2*numpy.pi]
-                    else:
-                        
-                        plotting_bounds[index_counter]=[-2.0, 2.0]
-                        plotting_bounds[index_counter+1]=[-2.0, 2.0]
-
-                    index_counter+=2
-                else:   
-                    index_counter+=int(pdf_def[1:])
-
-      
         ###########
         if (subgridspec is None):
             
@@ -898,14 +974,10 @@ def plot_joint_pdf(pdf,
                     ## make sure background looks similar to histogram empty bins
                     ax.set_facecolor(colormap(0.0))
 
-                    hist_bounds = 50
-                    #if(bounds is not None):
-                    #    hist_bounds=[numpy.linspace(bounds[ind2][0], bounds[ind2][1], 50),numpy.linspace(bounds[ind1][0], bounds[ind1][1], 50) ]
-
                     if (plot_only_contours == False):
                         ax.hist2d(samples[:, ind2],
                                   samples[:, ind1],
-                                  bins=hist_bounds,
+                                  bins=[histogram_edges[ind2], histogram_edges[ind2]],
                                   density=True,
                                   cmap=colormap)
 
@@ -919,22 +991,17 @@ def plot_joint_pdf(pdf,
                         [samples[:, ind2:ind2 + 1], samples[:, ind1:ind1 + 1]],
                         axis=1)
 
-                    used_bounds = None
                     if (contour_probs != []):
-                        used_bounds = show_sample_contours(
+                        _ = show_sample_contours(
                             ax,
                             new_samples,
-                            bins=hist_bounds,
+                            bins=[histogram_edges[ind2], histogram_edges[ind2]],
                             color=contour_color,
                             contour_probs=contour_probs)
 
-                    if (plotting_bounds is not None):
-                        used_bounds = [plotting_bounds[ind2], plotting_bounds[ind1]]
                     
-                    if (autoscale and used_bounds is not None):
-
-                        ax.set_xlim(used_bounds[0][0], used_bounds[0][1])
-                        ax.set_ylim(used_bounds[1][0], used_bounds[1][1])
+                    ax.set_xlim(visualization_bounds[ind1][0], visualization_bounds[ind1][1])
+                    ax.set_ylim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
 
                     if (hide_labels):
                         ax.set_yticklabels([])
@@ -963,18 +1030,14 @@ def plot_joint_pdf(pdf,
 
                     ##############
 
-                    hist_bounds = 50
-                    if (plotting_bounds is not None):
-                        hist_bounds = numpy.linspace(plotting_bounds[ind2][0],
-                                                     plotting_bounds[ind2][1], 50)
-                    ax.hist(samples[:, ind1], bins=hist_bounds, density=True)
+
+                    ax.hist(samples[:, ind1], bins=histogram_edges[ind1], density=True)
 
                     if (plotted_true_values is not None):
                         ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
                 
-                    if (autoscale):
-                        if (plotting_bounds is not None):
-                            ax.set_xlim(plotting_bounds[ind2][0], plotting_bounds[ind2][1])
+                   
+                    ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
 
                     if (hide_labels):
                         ax.set_yticklabels([])
@@ -1006,7 +1069,10 @@ def visualize_pdf(pdf,
                   s2_show_gridlines=True,
                   skip_plotting_samples=False,
                   var_names=[],
-                  num_iterative_steps=-1):
+                  num_iterative_steps=-1,
+                  relative_vis_buffer=0.1,
+                  vis_percentiles=[1.0, 99.0]
+                  ):
    
     with torch.no_grad():
       sample_conditional_input = conditional_input
@@ -1124,7 +1190,9 @@ def visualize_pdf(pdf,
           s2_rotate_to_true_value=s2_rotate_to_true_value,
           s2_show_gridlines=s2_show_gridlines,
           skip_plotting_samples=skip_plotting_samples,
-          var_names=var_names)
+          var_names=var_names,
+          relative_buffer=relative_vis_buffer,
+          vis_percentiles=vis_percentiles)
         
     
     return samples, new_subgridspec, total_pdf_integral
