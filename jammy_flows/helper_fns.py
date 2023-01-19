@@ -696,7 +696,7 @@ def plot_joint_pdf(pdf,
     ## 
 
 
-    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf.pdf_defs_list, percentiles=vis_percentiles, relative_buffer=relative_buffer, num_bins=50, s2_norm=s2_norm)
+    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf, percentiles=vis_percentiles, relative_buffer=relative_buffer, num_bins=50, s2_norm=s2_norm)
     
     if(bounds is not None):
         visualization_bounds=bounds
