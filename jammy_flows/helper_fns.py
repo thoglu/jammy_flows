@@ -9,7 +9,7 @@ import matplotlib.colors as colors
 import matplotlib.gridspec as gridspec
 import matplotlib.cm as cm
 import copy
-import astropy.stats
+#import astropy.stats
 
 from scipy.spatial.transform import Rotation as R
 
