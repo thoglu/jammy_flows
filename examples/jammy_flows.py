@@ -201,6 +201,7 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     cinput=test_data
     if(model.conditional_input_dim is None):
         cinput=None
+
     pdf_res, base_pdf_res, _=model(test_labels, conditional_input=cinput)
 
     dim=test_labels.shape[1]
@@ -251,6 +252,9 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
 
     cov_ax=fig.add_subplot(gridspec[0,num_words])
 
+    ## get overall coverage in beginning
+    exp_cov_probs, actual_cov_probs, _=model.coverage(test_labels, conditional_input=cinput)
+
     for word_index, wid in enumerate(word_ids):
 
         cinput=wid.unsqueeze(0)
@@ -269,6 +273,9 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
             act_cov.append(float(sum(this_coverage<true_twice_llhs[ind]).cpu())/float(len(this_coverage)))
            
         cov_ax.plot(coverage_probs, act_cov, label=r"$p(x|'%s')$ (integral: %.2f)" % (words[word_index],pdf_integral), color=colors[word_index])
+
+    ## plot overall coverage
+    cov_ax.plot(exp_cov_probs, actual_cov_probs, label="all", color="black", lw=2.0)
 
     cov_ax.plot([0.0,1.0],[0.0,1.0], color="k", lw=2.0, ls="--")
     cov_ax.set_xlim(0,1)
@@ -324,14 +331,6 @@ if __name__ == "__main__":
     if(args.gpu):
         test_data=test_data.to(gpu_device)
         test_labels=test_labels.to(gpu_device)
-
-    extra_flow_defs=dict()
-    extra_flow_defs["n"]=dict()
-
-    extra_flow_defs["g"]=dict()
-    extra_flow_defs["g"]["nonlinear_stretch_type"]="classic" 
-
-
 
     cinput=len(args.sentence.split(" "))
     if(args.use_conditional_pdf==0):

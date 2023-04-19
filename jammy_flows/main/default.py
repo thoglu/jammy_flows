@@ -11,6 +11,7 @@ import collections
 import numpy
 import copy
 import sys
+import scipy
 
 from typing import Union
 
@@ -1783,6 +1784,60 @@ class pdf(nn.Module):
         
         return global_amortization_init
 
+    def coverage(self, 
+                target_x,
+                conditional_input=None,
+                amortization_parameters=None, 
+                force_embedding_coordinates=False, 
+                force_intrinsic_coordinates=False,
+                num_percentile_points=100):
+        """
+        Calculates coverage for the base distribution as 2*(log(p(0))-log(p_(z_base)))
+
+        Parameters:
+
+            target_x (Tensor): Target positions to calculate coverage with. Must be of shape (B,D), where B = batch dimension.
+            conditional_input (Tensor/list(Tensor)/None): Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be 
+                              a list of tensors, one for each sub-PDF, if *conditional_input_dim* in __init__ is a list of ints.
+            amortization_parameters (Tensor/None): If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.
+            force_embedding_coordinates (bool): Enforces embedding coordinates in the input *x*.
+            force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the input *x*. 
+            num_percentile_points (int): At how many points along the chi2 do we want to compare true vs expected coverage?
+
+        Returns:
+
+            expected_coverage_probs (Numpy array): Array of expected coverage probabilities.
+            actual_coverage_probs (Numpy array): Array of actual coverage probabilities.
+            actual_twice_llh (Numpy array): Array of twice the log-likelihood difference at the base.
+        """
+
+        # we dont need gradient for coverage
+        with torch.no_grad():
+
+            _, logp_base, _=self.forward(target_x, 
+                    conditional_input=conditional_input,
+                    amortization_parameters=amortization_parameters, 
+                    force_embedding_coordinates=force_embedding_coordinates, 
+                    force_intrinsic_coordinates=force_intrinsic_coordinates)
+            
+            gauss_log_eval_at_0=-(self.total_target_dim_intrinsic/2.0)*numpy.log(2*numpy.pi)
+            actual_twice_llh=2*(gauss_log_eval_at_0-logp_base.cpu().numpy())
+          
+
+        expected_coverage_probs=numpy.linspace(0,1.0,num_percentile_points)
+        expected_twice_llhs=scipy.stats.chi2.ppf(expected_coverage_probs, df=self.total_target_dim_intrinsic)
+     
+        actual_coverage_probs=[]
+
+        for ind,true_cov in enumerate(expected_coverage_probs):
+            
+            # count how many of the calculated llh differences are smaller than expected from true chi2 percentiles
+            actual_coverage_probs.append(float(sum(actual_twice_llh<expected_twice_llhs[ind]))/float(len(actual_twice_llh)))
+
+        return expected_coverage_probs, actual_coverage_probs, actual_twice_llh
+
+       
+
 #### Experimental functions
 #### Some of these functions generalize existing functions and will replace them in future release.
 
@@ -2445,3 +2500,5 @@ class pdf(nn.Module):
             potentially_transformed_vals=potentially_transformed_vals.squeeze(0)
 
         return potentially_transformed_vals, individual_logdets
+
+    
