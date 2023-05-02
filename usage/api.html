@@ -25,11 +25,15 @@
     <nav data-toggle="wy-nav-shift" class="wy-nav-side">
       <div class="wy-side-scroll">
         <div class="wy-side-nav-search" >
-            <a href="../index.html" class="icon icon-home"> jammy_flows
+
+          
+          
+          <a href="../index.html" class="icon icon-home">
+            jammy_flows
           </a>
 <div role="search">
   <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
-    <input type="text" name="q" placeholder="Search docs" />
+    <input type="text" name="q" placeholder="Search docs" aria-label="Search docs" />
     <input type="hidden" name="check_keywords" value="yes" />
     <input type="hidden" name="area" value="default" />
   </form>
@@ -95,7 +99,7 @@
         <div class="rst-content">
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
-      <li><a href="../index.html" class="icon icon-home"></a></li>
+      <li><a href="../index.html" class="icon icon-home" aria-label="Home"></a></li>
       <li class="breadcrumb-item active">API Documentation</li>
       <li class="wy-breadcrumbs-aside">
               <a href="https://github.com/thoglu/jammy_flows/blob/main/docs/source/usage/api.rst" class="fa fa-github"> Edit on GitHub</a>
@@ -213,6 +217,34 @@ Each layer holds their own parameters.</p></li>
 </dd>
 </dl>
 </p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.main.default.pdf.coverage">
+<code class="sig-name descname">coverage</code><span class="sig-paren">(</span><em class="sig-param">target_x, conditional_input=None, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False, num_percentile_points=100, sub_manifolds=[-1]</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.coverage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates coverage for the base distribution via the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>target_x</strong> (<em>Tensor</em>) – Target positions to calculate coverage with. Must be of shape (B,D), where B = batch dimension.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be
+a list of tensors, one for each sub-PDF, if <em>conditional_input_dim</em> in __init__ is a list of ints.</p></li>
+<li><p><strong>amortization_parameters</strong> (<em>Tensor/None</em>) – If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.</p></li>
+<li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Enforces embedding coordinates in the input <em>x</em>.</p></li>
+<li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Enforces intrinsic coordinates in the input <em>x</em>.</p></li>
+<li><p><strong>num_percentile_points</strong> (<em>int</em>) – At how many points along the chi2 do we want to compare true vs expected coverage?</p></li>
+<li><p><strong>sub_manifolds</strong> (<em>list</em><em>(</em><em>int</em><em>)</em>) – Contains indices of sub-manifolds if coverage should be calculated for onditional PDF of the given sub-manifold. <em>-1</em> stands for the total PDF and is the default.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Array of expected coverage probabilities.
+actual_coverage_probs (Numpy array): Array of actual coverage probabilities.
+actual_twice_logprob (Numpy array): Array of twice the log-probability difference at the base.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>expected_coverage_probs (Numpy array)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -1040,10 +1072,10 @@ rotation_mode (str): One of [“angles”, “householder”]. <em>Angles</em> i
 <span id="segmented-2-d-sphere-flow-n"></span><h4>Segmented 2-d sphere flow (“n”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.segmented_sphere_nd" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
 <dt id="jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd">
-<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.segmented_sphere_nd.</code><code class="sig-name descname">segmented_sphere_nd</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='g'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.segmented_sphere_nd.</code><code class="sig-name descname">segmented_sphere_nd</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='ggt'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
 <dt id="jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.__init__">
-<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='g'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.__init__" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">use_moebius_xyz_parametrization=True</em>, <em class="sig-param">num_basis_functions=5</em>, <em class="sig-param">zenith_type_layers='ggt'</em>, <em class="sig-param">max_rank=20</em>, <em class="sig-param">hidden_dims='64'</em>, <em class="sig-param">subspace_mapping='logistic'</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em>, <em class="sig-param">highway_mode=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>A segmented conditional flow that models a flow on the torus and then maps to the sphere. Symbol “n”</p>
 <p>Follows <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>. Seems to be stable when non-conditional, but can be unstable in certain configurations in conditional mode.
 Slight modification, in that instead of the torus one can also choose an infinite torus, whose z-axis is modeled via a Euclidean flow instead of an interval flow.</p>
@@ -1062,6 +1094,49 @@ Slight modification, in that instead of the torus one can also choose an infinit
 </dl>
 </dd></dl>
 
+<dl class="attribute">
+<dt id="jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.num_parameter_list">
+<code class="sig-name descname">num_parameter_list</code><em class="property"> = None</em><a class="headerlink" href="#jammy_flows.layers.spheres.segmented_sphere_nd.segmented_sphere_nd.num_parameter_list" title="Permalink to this definition">¶</a></dt>
+<dd><p>self.flow_dict[“g”] = dict()
+self.flow_dict[“g”][“module”] = gf_block
+self.flow_dict[“g”][“type”] = “e”
+self.flow_dict[“g”][“kwargs”] = dict()
+self.flow_dict[“g”][“kwargs”][“fit_normalization”] = 1
+self.flow_dict[“g”][“kwargs”][“use_permanent_parameters”]=0
+self.flow_dict[“g”][“kwargs”][“num_householder_iter”] = -1
+self.flow_dict[“g”][“kwargs”][“num_kde”] = 10
+self.flow_dict[“g”][“kwargs”][“inverse_function_type”] = “isigmoid”</p>
+<p>self.flow_dict[“g”][“kwargs”][“softplus_for_width”]=0 # use softplus instead of exp to transform log_width -&gt; width
+self.flow_dict[“g”][“kwargs”][“upper_bound_for_widths”]=100 # define an upper bound for the value of widths.. -1 = no upper bound
+self.flow_dict[“g”][“kwargs”][“lower_bound_for_widths”]=0.01 # define a lower bound for the value of widths
+self.flow_dict[“g”][“kwargs”][“clamp_widths”]=0
+self.flow_dict[“g”][“kwargs”][“width_smooth_saturation”]=1 #</p>
+<p>self.flow_dict[“p”] = dict()
+self.flow_dict[“p”][“module”] = psf_block
+self.flow_dict[“p”][“type”] = “e”
+self.flow_dict[“p”][“kwargs”] = dict()
+self.flow_dict[“p”][“kwargs”][“use_permanent_parameters”]=0
+self.flow_dict[“p”][“kwargs”][“num_householder_iter”] = -1
+self.flow_dict[“p”][“kwargs”][“num_transforms”] = 3</p>
+<p>self.flow_dict[“x”] = dict()
+self.flow_dict[“x”][“module”] = euclidean_do_nothing
+self.flow_dict[“x”][“type”] = “e”
+self.flow_dict[“x”][“kwargs”]=dict()</p>
+<p>### interval layers - for these layers, the input (0-pi) only has to be transformed to 0-1 via a cos-transformation</p>
+<p>self.flow_dict[“r”] = dict()
+self.flow_dict[“r”][“module”] = rational_quadratic_spline
+self.flow_dict[“r”][“type”] = “i”
+self.flow_dict[“r”][“kwargs”] = dict()
+self.flow_dict[“r”][“kwargs”][“use_permanent_parameters”]=0
+self.flow_dict[“r”][“kwargs”][“num_basis_elements”]=5
+self.flow_dict[“r”][“kwargs”][“low_boundary”] = 0
+self.flow_dict[“r”][“kwargs”][“high_boundary”] = 1.0</p>
+<p>self.flow_dict[“z”] = dict()
+self.flow_dict[“z”][“module”] = interval_do_nothing
+self.flow_dict[“z”][“type”] = “i”
+self.flow_dict[“z”][“kwargs”]=dict()</p>
+</dd></dl>
+
 </dd></dl>
 
 </div>
@@ -1069,10 +1144,10 @@ Slight modification, in that instead of the torus one can also choose an infinit
 <span id="exponential-map-2-d-sphere-flow-v"></span><h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.exponential_map_s2" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
 <dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2">
-<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.exponential_map_s2.</code><code class="sig-name descname">exponential_map_s2</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.exponential_map_s2.</code><code class="sig-name descname">exponential_map_s2</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
 <dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__">
-<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Uses the spherical exponential map. Symbol: “v”</p>
 <p>Uses linear and quadratic potential as described in <a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a>, and exponential potential as described in <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>.
 Additionally added a spline-based potential.</p>
