@@ -253,7 +253,9 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
     cov_ax=fig.add_subplot(gridspec[0,num_words])
 
     ## get overall coverage in beginning
-    exp_cov_probs, actual_cov_probs, _=model.coverage(test_labels, conditional_input=cinput)
+
+    num_pdfs=len(model.flow_defs_list)
+    cov_dict=model.coverage(test_labels, conditional_input=cinput, sub_manifolds=numpy.arange(-1,num_pdfs))
 
     for word_index, wid in enumerate(word_ids):
 
@@ -275,7 +277,11 @@ def plot_test(test_data, test_labels, model, words, fname="figs/test.png"):
         cov_ax.plot(coverage_probs, act_cov, label=r"$p(x|'%s')$ (integral: %.2f)" % (words[word_index],pdf_integral), color=colors[word_index])
 
     ## plot overall coverage
-    cov_ax.plot(exp_cov_probs, actual_cov_probs, label="all", color="black", lw=2.0)
+    for k in cov_dict["true"].keys():
+        if(type(k)==int):
+            cov_ax.plot(cov_dict["expected"], cov_dict["true"][k], label="all_%d" % k, color="gray", lw=2.0)
+        else:
+            cov_ax.plot(cov_dict["expected"], cov_dict["true"][k], label="all_%s" % k, color="black", lw=2.0)
 
     cov_ax.plot([0.0,1.0],[0.0,1.0], color="k", lw=2.0, ls="--")
     cov_ax.set_xlim(0,1)
@@ -332,6 +338,8 @@ if __name__ == "__main__":
         test_data=test_data.to(gpu_device)
         test_labels=test_labels.to(gpu_device)
 
+    extra_flow_defs=dict()
+    
     cinput=len(args.sentence.split(" "))
     if(args.use_conditional_pdf==0):
         cinput=None

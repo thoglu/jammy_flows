@@ -1790,9 +1790,10 @@ class pdf(nn.Module):
                 amortization_parameters=None, 
                 force_embedding_coordinates=False, 
                 force_intrinsic_coordinates=False,
-                num_percentile_points=100):
+                num_percentile_points=100,
+                sub_manifolds=[-1]):
         """
-        Calculates coverage for the base distribution as 2*(log(p(0))-log(p_(z_base)))
+        Calculates coverage for the base distribution via the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.
 
         Parameters:
 
@@ -1803,38 +1804,52 @@ class pdf(nn.Module):
             force_embedding_coordinates (bool): Enforces embedding coordinates in the input *x*.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the input *x*. 
             num_percentile_points (int): At how many points along the chi2 do we want to compare true vs expected coverage?
+            sub_manifolds (list(int)): Contains indices of sub-manifolds if coverage should be calculated for onditional PDF of the given sub-manifold. *-1* stands for the total PDF and is the default.
 
         Returns:
 
             expected_coverage_probs (Numpy array): Array of expected coverage probabilities.
             actual_coverage_probs (Numpy array): Array of actual coverage probabilities.
-            actual_twice_llh (Numpy array): Array of twice the log-likelihood difference at the base.
+            actual_twice_logprob (Numpy array): Array of twice the log-probability difference at the base.
         """
 
-        # we dont need gradient for coverage
+        return_dict=dict()
+        return_dict["true"]=dict()
+        return_dict["logprob_diffs"]=dict()
+   
+        expected_coverage_probs=numpy.linspace(0,1.0,num_percentile_points)
+        return_dict["expected"]=expected_coverage_probs
+
         with torch.no_grad():
 
-            _, logp_base, _=self.forward(target_x, 
+            _, logp_base, base_points=self.forward(target_x, 
                     conditional_input=conditional_input,
                     amortization_parameters=amortization_parameters, 
                     force_embedding_coordinates=force_embedding_coordinates, 
                     force_intrinsic_coordinates=force_intrinsic_coordinates)
+
+            ## overall coverage
+            if(-1 in sub_manifolds):
+                true_cov, logprob_diffs=extra_functions._calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
+                
+                return_dict["true"]["total"]=true_cov
+                return_dict["logprob_diffs"]["total"]=logprob_diffs
+
+            for sm in sub_manifolds:
+                if(sm==-1):
+                    continue
+
+                if(sm!=-1):
+                    assert(sm>=0 and sm<len(self.pdf_defs_list)), ("Sub manifold index %d is invalid" % sm)
+             
+                sub_logp_base=torch.distributions.Normal(0.0,1.0).log_prob(base_points[:,self.target_dim_indices_intrinsic[sm][0]:self.target_dim_indices_intrinsic[sm][1]]).sum(axis=-1)
+               
+                true_cov, logprob_diffs=extra_functions._calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
             
-            gauss_log_eval_at_0=-(self.total_target_dim_intrinsic/2.0)*numpy.log(2*numpy.pi)
-            actual_twice_llh=2*(gauss_log_eval_at_0-logp_base.cpu().numpy())
-          
+                return_dict["true"][int(sm)]=true_cov
+                return_dict["logprob_diffs"][int(sm)]=logprob_diffs
 
-        expected_coverage_probs=numpy.linspace(0,1.0,num_percentile_points)
-        expected_twice_llhs=scipy.stats.chi2.ppf(expected_coverage_probs, df=self.total_target_dim_intrinsic)
-     
-        actual_coverage_probs=[]
-
-        for ind,true_cov in enumerate(expected_coverage_probs):
-            
-            # count how many of the calculated llh differences are smaller than expected from true chi2 percentiles
-            actual_coverage_probs.append(float(sum(actual_twice_llh<expected_twice_llhs[ind]))/float(len(actual_twice_llh)))
-
-        return expected_coverage_probs, actual_coverage_probs, actual_twice_llh
+        return return_dict
 
        
 

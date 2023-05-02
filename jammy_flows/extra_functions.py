@@ -9,6 +9,7 @@ from .layers import matrix_fns
 from scipy.optimize import minimize
 
 
+
 def log_one_plus_exp_x_to_a_minus_1(x, a):
 
     """
@@ -406,3 +407,23 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4
     
     return all_layers_params
 
+def _calculate_coverage(base_evals, dim, expected_coverage_probs):
+    """
+    Used by main class to calculate coverage for various scenarios.
+
+    Returns: True coverage probs
+             Twice logprobs
+    """
+
+    gauss_log_eval_at_0=-(dim/2.0)*numpy.log(2*numpy.pi)
+    actual_twice_logprob=2*(gauss_log_eval_at_0-base_evals)
+  
+    expected_twice_logprob=scipy.stats.chi2.ppf(expected_coverage_probs, df=dim)
+
+    actual_coverage_probs=[]
+   
+    for ind,true_cov in enumerate(expected_coverage_probs):
+
+        actual_coverage_probs.append(float(sum(actual_twice_logprob<expected_twice_logprob[ind]))/float(len(actual_twice_logprob)))
+
+    return numpy.array(actual_coverage_probs), actual_twice_logprob 
