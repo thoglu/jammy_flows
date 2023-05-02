@@ -135,7 +135,7 @@ opts_dict["n"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "ang
 opts_dict["n"]["kwargs"]["hidden_dims"] = ("64", lambda x: type(x)==str)
 opts_dict["n"]["kwargs"]["num_basis_functions"] = (10, lambda x: x>0)
 opts_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
-opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: (len(list(set(x)))==1) and x[0] in ["r", "g", "p", "x", "z"])
+opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: sum([i in ["r", "g", "p", "x", "z", "t"] for i in x])==len(x) )
 opts_dict["n"]["kwargs"]["max_rank"] = (-1, lambda x: (x==-1) or (x>0))
 opts_dict["n"]["kwargs"]["subspace_mapping"] = ("logistic", ["logistic"])
 opts_dict["n"]["kwargs"]["highway_mode"] = (0, [0,1,2,3,4])
@@ -148,6 +148,8 @@ opts_dict["v"]["kwargs"] = dict()
 opts_dict["v"]["kwargs"]["exp_map_type"] = ("exponential", ["linear", "quadratic", "splines", "exponential"]) ## supported linear  / exponential
 opts_dict["v"]["kwargs"]["num_components"] = (10, lambda x: x>0) ## number of components in convex superposition
 opts_dict["v"]["kwargs"]["natural_direction"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
+opts_dict["v"]["kwargs"]["add_rotation"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
+
 
 # Manifold Continuous normalizing flow
 opts_dict["c"] = dict()

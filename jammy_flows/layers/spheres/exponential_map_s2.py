@@ -78,7 +78,8 @@ class exponential_map_s2(sphere_base.sphere_base):
                  use_permanent_parameters=False, 
                  exp_map_type="linear", 
                  natural_direction=0, 
-                 num_components=10):
+                 num_components=10,
+                 add_rotation=0):
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -91,7 +92,7 @@ class exponential_map_s2(sphere_base.sphere_base):
             natural_direction (int). If 0, log-probability evaluation is faster. If 1, sampling is faster.
             num_components (int): How many components to sum over in the exponential map.
         """
-        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False)
+        super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False, add_rotation=add_rotation)
         
         if(dimension!=2):
             raise Exception("The moebius flow should be used for dimension 2!")
@@ -100,7 +101,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         self.exp_map_type=exp_map_type
         self.natural_direction=natural_direction
         self.num_potential_pars=0
-
+        
         self.num_spline_basis_functions=10
 
         if(self.exp_map_type=="linear" or self.exp_map_type=="quadratic"):
