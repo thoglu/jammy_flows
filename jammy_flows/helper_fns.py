@@ -98,8 +98,8 @@ def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0]
 
                 else:
 
-                    visualization_bounds.append((0,numpy.pi))
-                    visualization_bounds.append((0,2*numpy.pi))
+                    visualization_bounds.append((-2.0,2.0))
+                    visualization_bounds.append((-2.0,2.0))
 
                     density_eval_bounds.append((0,numpy.pi))
                     density_eval_bounds.append((0,2*numpy.pi))
@@ -266,8 +266,9 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
         numpy.resize(
             numpy.array(eval_positions).T,
             (used_npts**len(mins_maxs), len(mins_maxs))))
+
     eval_positions = torch_positions.clone()
-  
+
     mask_inner = torch.ones(len(torch_positions)) == 1
 
     ## check s2 or simplex visualization
@@ -292,6 +293,11 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
                                eval_positions[:, model.
                                               target_dim_indices_intrinsic[ind][0]:model.
                                               target_dim_indices_intrinsic[ind][1]], fix_point=fix_point)
+
+            # need some extra care, it seems sometimes nans can appear in the trafo step (only happened on GPU?)
+            mask_inner=torch.isfinite(eval_positions[:,0]) & mask_inner
+            mask_inner=torch.isfinite(eval_positions[:,1]) & mask_inner
+
         elif("c" in pdf_def):
            
             ## simplex .. mask everything outside allowed region
@@ -311,9 +317,8 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
             if(cinput.is_cuda):
                 eval_positions=eval_positions.to(cinput)
-    
-    log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
+    log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
     ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
     for ind, pdf_def in enumerate(model.pdf_defs_list):
@@ -782,7 +787,6 @@ def plot_joint_pdf(pdf,
         s2_norm=s2_norm,
         s2_rotate_to_true_value=s2_rotate_to_true_value,
         true_values=true_values)
-
    
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
     
@@ -811,7 +815,7 @@ def plot_joint_pdf(pdf,
             ax.plot(evalpositions[:, 0], numpy.exp(log_evals), color="k")
 
         if (true_values is not None):
-            ax.axvline(true_values[0], color="red", lw=2.0)
+            ax.axvline(true_values[0].cpu().numpy(), color="red", lw=2.0)
 
         if (hide_labels):
             ax.set_yticklabels([])
@@ -833,70 +837,12 @@ def plot_joint_pdf(pdf,
 
                 if(ax_geometry[0]==1 and ax_geometry[1]==1):
                     break
+        if(plot_density):
+            plot_density_with_contours(ax, log_evals, evalpositions,
+                                     bin_volumes, pts_per_dim)
 
-        
-        #if(bounds is not None):
-        #    hist_bounds=[numpy.linspace(bounds[0][0], bounds[0][1], 50),numpy.linspace(bounds[1][0], bounds[1][1], 50) ]
-
-        ## plot the density and contours from density
-        if (plot_density):
-
-            
-            if (contour_probs != [] and skip_plotting_samples==False):
-             
-                ## adjusting bounds like this only makes sense in euclidean space
-
-                _ = show_sample_contours(ax,
-                                                        samples,
-                                                        bins=histogram_edges,
-                                                        color=contour_color,
-                                                        contour_probs=contour_probs,
-                                                        sin_zen_mask=sin_zen_mask)
-                """
-                two_d_bounds_for_better_density=density_eval_bounds
-
-                for pdf_def in pdf.pdf_defs_list:
-                    if("e" in pdf_def):
-
-                        two_d_bounds_for_better_density=sample_bounds
-
-                        x_width=two_d_bounds_for_better_density[0][1]-two_d_bounds_for_better_density[0][0]
-                        y_width=two_d_bounds_for_better_density[1][1]-two_d_bounds_for_better_density[1][0]
-
-                        extra_x=x_width*0.2
-                        extra_y=y_width*0.2
-
-                        two_d_bounds_for_better_density[0][0]-=extra_x
-                        two_d_bounds_for_better_density[0][1]+=extra_x
-
-                        two_d_bounds_for_better_density[1][0]-=extra_y
-                        two_d_bounds_for_better_density[1][1]+=extra_y
-
-                        break
-                """
-
-               
-                evalpositions_2d, log_evals_2d, bin_volumes_2d, _, _= get_pdf_on_grid(
-                density_eval_bounds,
-                pts_per_dim,
-                pdf,
-                conditional_input=pdf_conditional_input,
-                s2_norm=s2_norm,
-                s2_rotate_to_true_value=s2_rotate_to_true_value,
-                true_values=true_values)
-             
-                plot_density_with_contours(ax, log_evals_2d, evalpositions_2d,
-                                         bin_volumes_2d, pts_per_dim)
-
-            else:
-              
-              plot_density_with_contours(ax, log_evals, evalpositions,
-                                         bin_volumes, pts_per_dim)
-        
         ## plot a histogram density from samples
 
-
-       
         if ( (plot_only_contours == False) and (plot_density == False) and (skip_plotting_samples==False)):
            
             ax.hist2d(samples[:, 0],
