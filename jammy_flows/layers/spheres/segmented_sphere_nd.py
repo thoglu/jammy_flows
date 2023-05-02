@@ -7,8 +7,10 @@ from . import moebius_1d
 from ..bisection_n_newton import inverse_bisection_n_newton
 from ...amortizable_mlp import AmortizableMLP
 from ...extra_functions import list_from_str, find_init_pars_of_chained_blocks
+from ... import flow_options
 
 from ..euclidean.gaussianization_flow import gf_block
+from ..euclidean.multivariate_normal import mvn_block
 from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 from ..intervals.interval_do_nothing import interval_do_nothing
@@ -27,7 +29,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
                  use_permanent_parameters=False, 
                  use_moebius_xyz_parametrization=True, 
                  num_basis_functions=5, 
-                 zenith_type_layers="g", 
+                 zenith_type_layers="ggt", 
                  max_rank=20, 
                  hidden_dims="64", 
                  subspace_mapping="logistic", ## ONLY one option at the moment
@@ -79,12 +81,11 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         self.zenith_type_layer_list=nn.ModuleList()
         self.num_parameter_list=[]
 
-        self.flow_dict = dict()
+        #self.flow_dict = copy.deepcopy(opts_dict)
 
         ### TODO: change to passthrough PDF like in simplex
         
-        ### euclidean layers - for these layers the input (0 - pi) has to be transformed to a real line first
-
+        """
         self.flow_dict["g"] = dict()
         self.flow_dict["g"]["module"] = gf_block
         self.flow_dict["g"]["type"] = "e"
@@ -130,16 +131,70 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         self.flow_dict["z"]["module"] = interval_do_nothing
         self.flow_dict["z"]["type"] = "i"
         self.flow_dict["z"]["kwargs"]=dict()
+        """
+        ### euclidean layers - for these layers the input (0 - pi) has to be transformed to a real line first
+            
+        self.flow_dict=dict()
+
+        self.flow_dict["g"] = dict()
+        self.flow_dict["g"]["module"] = gf_block
+        self.flow_dict["g"]["type"] = "e"
+        self.flow_dict["g"]["kwargs"] = flow_options.obtain_default_options("g")
+        del self.flow_dict["g"]["kwargs"]["replace_first_sigmoid_with_icdf"]
+        del self.flow_dict["g"]["kwargs"]["skip_model_offset"]
+
+        self.flow_dict["t"] = dict()
+        self.flow_dict["t"]["module"] = mvn_block
+        self.flow_dict["t"]["type"] = "e"
+        self.flow_dict["t"]["kwargs"] = flow_options.obtain_default_options("t")
+        del self.flow_dict["t"]["kwargs"]["skip_model_offset"]
+
+        self.flow_dict["p"] = dict()
+        self.flow_dict["p"]["module"] = psf_block
+        self.flow_dict["p"]["type"] = "e"
+        self.flow_dict["p"]["kwargs"] = flow_options.obtain_default_options("p")
+        del self.flow_dict["p"]["kwargs"]["skip_model_offset"]
+
+        self.flow_dict["x"] = dict()
+        self.flow_dict["x"]["module"] = euclidean_do_nothing
+        self.flow_dict["x"]["type"] = "e"
+        self.flow_dict["x"]["kwargs"]=dict()
+
+        self.flow_dict["r"] = dict()
+        self.flow_dict["r"]["module"] = rational_quadratic_spline
+        self.flow_dict["r"]["type"] = "i"
+        self.flow_dict["r"]["kwargs"] = flow_options.obtain_default_options("r")
+
+        self.flow_dict["z"] = dict()
+        self.flow_dict["z"]["module"] = interval_do_nothing
+        self.flow_dict["z"]["type"] = "i"
+        self.flow_dict["z"]["kwargs"]=dict()
+            
+        ## overwrite options
+
+        self.flow_dict["g"]["kwargs"]["lower_bound_for_widths"]=0.01
+        self.flow_dict["g"]["kwargs"]["upper_bound_for_widths"]=1.0
+        self.flow_dict["g"]["kwargs"]["fit_normalization"]=0
+
+        self.flow_dict["t"]["kwargs"]["cov_type"]="full"
+
+        self.flow_dict["r"]["kwargs"]["low_boundary"] = 0
+        self.flow_dict["r"]["kwargs"]["high_boundary"] = 1.0
+
+        for k in self.flow_dict.keys():
+            self.flow_dict[k]["kwargs"]["use_permanent_parameters"]=0
 
 
         self.zenith_type_layer_defs=zenith_type_layers
-
+        print("ZENITH TYPE LAYERS ", zenith_type_layers)
         if("z" in self.zenith_type_layer_defs or "r" in self.zenith_type_layer_defs):
             self.subspace_is_euclidean=False
             assert("x" not in self.zenith_type_layer_defs)
             assert("g" not in self.zenith_type_layer_defs)
             assert("p" not in self.zenith_type_layer_defs)
-        if("g" in self.zenith_type_layer_defs or "p" in self.zenith_type_layer_defs or "x" in self.zenith_type_layer_defs):
+            assert("t" not in self.zenith_type_layer_defs)
+
+        if("g" in self.zenith_type_layer_defs or "p" in self.zenith_type_layer_defs or "x" in self.zenith_type_layer_defs or "t" in self.zenith_type_layer_defs):
             self.subspace_is_euclidean=True
             assert("z" not in self.zenith_type_layer_defs)
             assert("r" not in self.zenith_type_layer_defs)
