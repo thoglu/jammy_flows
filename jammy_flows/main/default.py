@@ -1512,13 +1512,16 @@ class pdf(nn.Module):
                 data_type=predefined_target_input.dtype
                 used_sample_size=predefined_target_input.shape[0]
               
-
+            """
             log_gauss_evals = torch.distributions.MultivariateNormal(
                 torch.zeros(self.total_base_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_base_dim)
                 .type(data_type)
                 .to(used_device),
             ).log_prob(predefined_target_input)
+            """
+
+            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(predefined_target_input).sum(dim=-1)
 
         else:
 
@@ -1530,13 +1533,18 @@ class pdf(nn.Module):
             std_normal_samples = (
                 torch.from_numpy(std_normal).type(data_type).to(used_device)
             )
+
+            """
             log_gauss_evals = torch.distributions.MultivariateNormal(
                 torch.zeros(self.total_base_dim).type(data_type).to(used_device),
                 covariance_matrix=torch.eye(self.total_base_dim)
                 .type(data_type)
                 .to(used_device),
             ).log_prob(std_normal_samples)
+            """
 
+            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples).sum(dim=-1)
+            
             x = std_normal_samples
 
         log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
