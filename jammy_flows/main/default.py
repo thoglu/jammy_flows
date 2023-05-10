@@ -12,6 +12,7 @@ import numpy
 import copy
 import sys
 import scipy
+import math
 
 from typing import Union
 
@@ -1939,17 +1940,9 @@ class pdf(nn.Module):
                 data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
-        #if(seed is not None):
-        #    numpy.random.seed(seed)
-
-        #std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device) if conditional_input is None else torch.randn(size=(data_summary.shape[0], self.total_base_dim), dtype=data_type, device=used_device)
-        std_normal_samples = torch.randn(size=(samplesize, self.total_base_dim), dtype=data_type, device=used_device)
-        if(conditional_input is not None):
-            if(type(conditional_input)==list):
-                std_normal_samples=std_normal_samples.repeat(int(conditional_input[0].shape[0]), 1)
-            else:
-                std_normal_samples=std_normal_samples.repeat(int(conditional_input.shape[0]), 1)
-
+       
+        std_normal_samples = torch.randn(size=(samplesize*batch_size, self.total_base_dim), dtype=data_type, device=used_device)
+        
         ## save the easy cases in dict
         base_evals_dict=dict()
 
@@ -1967,12 +1960,8 @@ class pdf(nn.Module):
                 this_dim=self.base_dim_indices[mf_dim][1]-self.base_dim_indices[mf_dim][0]
                 this_mask=slice(0, this_dim)
         
-            log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(this_dim).type(data_type).to(used_device),
-                covariance_matrix=torch.eye(this_dim)
-                .type(data_type)
-                .to(used_device),
-            ).log_prob(std_normal_samples[:, this_mask])
+            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples[:, this_mask]).sum(dim=-1)
+             
 
             if(mf_dim==-1):
                 base_evals_dict["total"]=log_gauss_evals
@@ -1999,7 +1988,7 @@ class pdf(nn.Module):
             ## transform all base samples forward
             
             targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-            
+                    
 
             for sub_mf in sub_manifolds:
                 ## also calculate total
@@ -2042,6 +2031,7 @@ class pdf(nn.Module):
 
                     fillup_difference=int(targets.shape[1])-int(joint_repeated.shape[1])
                     
+                    ## fill up the rest (after current sub-mf) with ones so we get "some coordinates" in those to call all_layer_inverse
                     filled_up=torch.cat([joint_repeated, torch.ones(joint_repeated.shape[0], fillup_difference).to(repeated_final)], dim=1)
 
                     if(data_summary is None):
@@ -2054,23 +2044,272 @@ class pdf(nn.Module):
 
                     this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
 
-                    log_gauss_evals_base = torch.distributions.MultivariateNormal(
-                        torch.zeros(this_base_dim).type(data_type).to(used_device),
-                        covariance_matrix=torch.eye(this_base_dim)
-                        .type(data_type)
-                        .to(used_device),
-                    ).log_prob(new_base_vals[:, self.base_dim_indices[sub_mf][0]:self.base_dim_indices[sub_mf][1]])
-                    
-                    
+                    log_gauss_evals_base=torch.distributions.Normal(0.0,1.0).log_prob(new_base_vals[:, self.base_dim_indices[sub_mf][0]:self.base_dim_indices[sub_mf][1]]).sum(dim=-1)
+                        
                     log_probs=(log_gauss_evals_base+log_det_dict_individual[sub_mf]).reshape(-1,samplesize, samplesize)
                     
-                  
                     log_probs=torch.logsumexp(log_probs, dim=-1)-numpy.log(float(samplesize))
-                   
+                    
                     entropy_dict[sub_mf]=-log_probs.mean(dim=1)
                    
 
         return entropy_dict
+
+    def entropy_iterative(self, 
+                sub_manifolds=[-1], 
+                conditional_input=None,
+                force_embedding_coordinates=True, 
+                force_intrinsic_coordinates=False,
+                samplesize=100,
+                iterative_samplesize=10,
+                max_iterative_batchsize=20,
+                device=torch.device("cpu"),
+                return_samples=False,
+                verbose=False):
+
+        """
+        Calculates entropy of the PDF in an iterative manner. By iterating potentially both over target samples of later sub-pdfs, and over batch items, memory is saved
+        and larger samplesizes (> a few 100 - 1000s) can be calculated. Probably only necessary for large sample sizes of later sub-pdfs, not of the first sub-pdf or the total PDF.
+    
+        Parameters:
+            sub_manifolds (list(int)): Contains indices of sub-manifolds if entropy should be calculated for marginal PDF of the given sub-manifold. *-1* stands for the total PDF and is the default.
+            conditional_input (Tensor/list(Tensor)/None): If passed defines the input to the PDF.
+            force_embedding_coordinates (bool): Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.
+            force_intrinsic_coordinates (bool): Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.
+            samplesize (int): Samplesize to use for entropy approximation.
+            iterative_samplesize (int): Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.
+            max_iterative_batchsize (int): The max number of batch samples evaluated simultaneously. 
+            device (torch.device): Device to use.
+            return_samples (bool): Return the samples that are generated to calculate the entropy? Samples are returned as B*num_samples X sample_dim, so the effective batch dimension is B*num_samples.
+
+        Returns:
+            dict
+                Dictionary containing entropy for each index defined in parameter *sub_manifolds*. If *-1* was given in *sub_manifolds*, the resulting entropy is stored under the *total* key.
+            
+            Tensor
+                Only returned if *return_samples* is set to True. A tensor that contains the generated samples used to calculate the entropy.
+        """
+
+        data_type = torch.float64
+        data_summary = None
+        used_device=device
+
+        assert(samplesize % iterative_samplesize == 0), ("Sample size must be divisble by iterative sample size!", samplesize, iterative_samplesize)
+
+        ## some crosschecks
+        if(conditional_input is not None):
+            if(type(conditional_input)==list):
+
+                assert(len(self.conditional_input_dim)==len(conditional_input))
+                for ci_ind in range(len(self.conditional_input_dim)):
+                    assert(self.conditional_input_dim[ci_ind]==conditional_input[ci_ind].shape[1]), "Inputs of conditional input vector do not match with pre-defined input_dims!"
+
+
+                for ci_ind, ci in enumerate(conditional_input[:-1]):
+
+                    assert(ci.shape[0]==conditional_input[ci_ind].shape[0]), "Conditional input batch sizes do not agree!"
+                    assert(ci.dtype==conditional_input[ci_ind].dtype), "Conditional input types do not match!"
+                    assert(ci.device==conditional_input[ci_ind].device), "Conditional input devices do not match!"
+
+        if(force_embedding_coordinates==False):
+            print("#### CAUTION: Calculating entropy without forcing embedding coordinates. This might lead to undesired and wrong entropies when using manifold PDFs!#############")
+            #raise Exception()
+        use_marginal_subdims=False
+        ## make sure the settings are self consistent
+        for subdim in sub_manifolds:
+            if(subdim!=-1):
+                assert(subdim>=0 and subdim < len(self.layer_list))
+                use_marginal_subdims=True
+
+        # no conditional input means batch size of *1*
+        batch_size=1
+
+        if conditional_input is not None:
+
+            assert(self.conditional_input_dim is not None)
+
+            if(type(conditional_input)==list):
+
+                data_type = conditional_input[0].dtype
+                used_device = conditional_input[0].device
+                
+                # a list of data summaries for the next functions
+                data_summary=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+
+                batch_size=conditional_input[0].shape[0]
+            else:
+
+                data_type = conditional_input.dtype
+                used_device = conditional_input.device
+                
+                # this behavior is a little differnet than in standard sample .. we sample for every conditional input multiple times
+                data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
+
+                batch_size=conditional_input.shape[0]
+        else:
+            assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
+      
+        std_normal_samples = torch.randn(size=(samplesize*batch_size, self.total_base_dim), dtype=data_type, device=used_device)
+        
+        ## save the easy cases in dict
+        base_evals_dict=dict()
+
+        for mf_dim in sub_manifolds:
+            if(mf_dim>=1):
+                continue
+
+            if(mf_dim==-1):
+            
+                this_mask=slice(0, self.total_base_dim)
+                this_dim=self.total_base_dim
+
+            elif(mf_dim==0):
+
+                this_dim=self.base_dim_indices[mf_dim][1]-self.base_dim_indices[mf_dim][0]
+                this_mask=slice(0, this_dim)
+        
+           
+            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples[:, this_mask]).sum(dim=-1)
+                
+
+            if(mf_dim==-1):
+                base_evals_dict["total"]=log_gauss_evals
+            elif(mf_dim==0):
+                base_evals_dict[0]=log_gauss_evals
+     
+        entropy_dict=dict()
+
+        
+        if(use_marginal_subdims==False):
+            ## just calculate normal entropy by summing over samples
+            
+            targets, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+           
+            entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict["total"]).reshape(-1,samplesize).mean(dim=1)
+            
+        else:
+
+            ## make sure we go all the way to the end by including -1 if it is not there
+            sub_manifolds_here=sub_manifolds
+            if(-1 not in sub_manifolds):
+                sub_manifolds_here=[-1]+sub_manifolds
+
+            ## transform all base samples forward
+            
+            targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            
+            for sub_mf in sub_manifolds:
+
+                if(verbose):
+                    print("---> calculating entropy for index ", sub_mf)
+
+                ## also calculate total
+                if(-1 == sub_mf):
+                    
+                    entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict_fw["total"]).reshape(-1, samplesize).mean(dim=1)
+                elif(0==sub_mf):
+                 
+                    entropy_dict[0]=-(base_evals_dict[0]-log_det_dict_fw[0]).reshape(-1, samplesize).mean(dim=1)
+                   
+                else:
+
+                    max_target_first_index=0
+                   
+                    for lower_mf in range(sub_mf):
+
+                        if(force_embedding_coordinates):
+                            max_target_first_index+=self.target_dims_embedded[lower_mf]
+                        elif(force_intrinsic_coordinates):
+                            max_target_first_index+=self.target_dims_intrinsic[lower_mf]
+                        else:
+                            max_target_first_index+=self.target_dims[lower_mf]
+                    
+
+                    num_iterative_steps=samplesize//iterative_samplesize
+
+                    num_batch_iterative_steps=math.ceil(float(batch_size)/float(max_iterative_batchsize))
+                    if(max_iterative_batchsize>=batch_size):
+                        num_batch_iterative_steps=1
+
+
+                    ## the number of effective items per batch is just the samplesize at this point
+                    per_batch_number_of_items=samplesize
+
+                    all_log_probs=[]
+
+                    if(verbose):
+                        print("---> number of batch iterative steps: ", num_batch_iterative_steps)
+                        print("---> number of iterative steps per batch: ", num_iterative_steps)
+                        print("------> total: ", num_batch_iterative_steps*num_iterative_steps)
+
+                    for this_batch_sub_iter in range(num_batch_iterative_steps):
+                        
+                        
+                        log_probs=[]
+
+                        cur_batch_slice=slice(this_batch_sub_iter*max_iterative_batchsize*per_batch_number_of_items,this_batch_sub_iter*max_iterative_batchsize*per_batch_number_of_items+max_iterative_batchsize*per_batch_number_of_items)
+
+                        for cur_step in range(num_iterative_steps):
+
+                            if(verbose):
+                                print(this_batch_sub_iter, cur_step)
+
+                            ## this construction correctly orders both cases of conditional input and no conditional input
+                            repeated_targets_first=targets[cur_batch_slice, :max_target_first_index].unsqueeze(0).reshape(-1, samplesize, max_target_first_index).repeat(1,iterative_samplesize,1)
+                            repeated_targets_first=repeated_targets_first.reshape(-1, max_target_first_index)
+                            
+                            if(force_embedding_coordinates):
+                                repeated_final=targets[cur_batch_slice, self.target_dim_indices_embedded[sub_mf][0]:self.target_dim_indices_embedded[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices_embedded[sub_mf][1]-self.target_dim_indices_embedded[sub_mf][0])[:,cur_step*iterative_samplesize:cur_step*iterative_samplesize+iterative_samplesize,:].repeat_interleave(samplesize, dim=1)
+                                repeated_final=repeated_final.reshape(-1, self.target_dim_indices_embedded[sub_mf][1]-self.target_dim_indices_embedded[sub_mf][0])
+                            elif(force_intrinsic_coordinates):
+                                repeated_final=targets[cur_batch_slice, self.target_dim_indices_intrinsic[sub_mf][0]:self.target_dim_indices_intrinsic[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices_intrinsic[sub_mf][1]-self.target_dim_indices_intrinsic[sub_mf][0])[:,cur_step*iterative_samplesize:cur_step*iterative_samplesize+iterative_samplesize,:].repeat_interleave(samplesize, dim=1)
+                                repeated_final=repeated_final.reshape(-1, self.target_dim_indices_intrinsic[sub_mf][1]-self.target_dim_indices_intrinsic[sub_mf][0])
+                            else:
+                                repeated_final=targets[cur_batch_slice, self.target_dim_indices[sub_mf][0]:self.target_dim_indices[sub_mf][1]].unsqueeze(0).reshape(-1, samplesize, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0])[:,cur_step*iterative_samplesize:cur_step*iterative_samplesize+iterative_samplesize,:].repeat_interleave(samplesize, dim=1)
+                                repeated_final=repeated_final.reshape(-1, self.target_dim_indices[sub_mf][1]-self.target_dim_indices[sub_mf][0])
+                            
+                            assert(repeated_targets_first.shape[0]>0), "Weird, no remaining items.. maybe the // operator behavior changed."
+                            
+                          
+                            ########################
+                           
+                            joint_repeated=torch.cat([repeated_targets_first, repeated_final], dim=1)
+
+                            fillup_difference=int(targets.shape[1])-int(joint_repeated.shape[1])
+                            
+                            ## fill up the rest (after current sub-mf) with ones so we get "some coordinates" in those to call all_layer_inverse
+                            filled_up=torch.cat([joint_repeated, torch.ones(joint_repeated.shape[0], fillup_difference).to(repeated_final)], dim=1)
+
+                            if(data_summary is None):
+                                new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, None, sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                            elif(type(data_summary)==list):
+                                new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, [ds[cur_batch_slice].repeat_interleave(iterative_samplesize, dim=0) for ds in data_summary], sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+                            else:
+                                new_base_vals, log_det_dict_individual=self.all_layer_inverse_individual_subdims(filled_up, data_summary[cur_batch_slice].repeat_interleave(iterative_samplesize, dim=0), sub_manifolds=[sub_mf], force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+
+
+                            this_base_dim=self.base_dim_indices[sub_mf][1]-self.base_dim_indices[sub_mf][0]
+
+                            log_gauss_evals_base=torch.distributions.Normal(0.0,1.0).log_prob(new_base_vals[:, self.base_dim_indices[sub_mf][0]:self.base_dim_indices[sub_mf][1]]).sum(dim=-1)
+                            
+                           
+                            this_log_probs=(log_gauss_evals_base+log_det_dict_individual[sub_mf]).reshape(-1,iterative_samplesize, samplesize).logsumexp(dim=-1)-numpy.log(float(samplesize))
+                          
+                            log_probs.append(this_log_probs)
+
+                        log_probs=torch.cat(log_probs, dim=1)
+
+                        all_log_probs.append(log_probs)
+
+
+                    all_log_probs = torch.cat(all_log_probs, dim=0)
+                       
+                    entropy_dict[sub_mf]=-all_log_probs.mean(dim=1)
+                   
+        if(return_samples):
+            return entropy_dict, targets
+        else:
+            return entropy_dict
 
     def all_layer_inverse_individual_subdims(self, 
                                              x, 
