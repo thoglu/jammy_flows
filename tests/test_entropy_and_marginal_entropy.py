@@ -6,6 +6,7 @@ import numpy
 import pylab
 import torch.autograd.functional
 import random
+import time
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -310,7 +311,7 @@ class Test(unittest.TestCase):
 
             cinput=None
             if("conditional_input_dim" in init[1].keys()):
-                rvec=numpy.random.normal(size=(2,init[1]["conditional_input_dim"]))*1000.0
+                rvec=numpy.random.normal(size=(4,init[1]["conditional_input_dim"]))*1000.0
                 cinput=torch.from_numpy(rvec)
 
             with torch.no_grad():
@@ -357,12 +358,34 @@ class Test(unittest.TestCase):
                         print("total ", entropy_dict_total)
 
                         seed_everything(1)
-
+                       
                         entropy_dict_total_n_subs=this_flow.entropy(samplesize=cur_samplesize, 
                                                        sub_manifolds=[-1]+list(range(num_sub_manifolds)), 
                                                        force_embedding_coordinates=emb_option[0], 
                                                        force_intrinsic_coordinates=emb_option[1],
                                                        conditional_input=cinput)
+                      
+                        if(cur_samplesize==10 and num_sub_manifolds>1):
+
+                            seed_everything(1)
+                            
+                         
+                            ## also compare to iterative entropy formula
+                            entropy_dict_total_n_subs_iterative=this_flow.entropy_iterative(samplesize=cur_samplesize, 
+                                                            iterative_samplesize=2,
+                                                            max_iterative_batchsize=3,
+                                                           sub_manifolds=[-1]+list(range(num_sub_manifolds)), 
+                                                           force_embedding_coordinates=emb_option[0], 
+                                                           force_intrinsic_coordinates=emb_option[1],
+                                                           conditional_input=cinput)
+                            
+                            assert( (entropy_dict_total_n_subs[1]!=entropy_dict_total_n_subs_iterative[1]).sum()==0)
+
+                            if(num_sub_manifolds==3):
+
+                                assert( (entropy_dict_total_n_subs[2]==entropy_dict_total_n_subs_iterative[2]).sum()!=0), (entropy_dict_total_n_subs[2],entropy_dict_total_n_subs_iterative[2])
+
+
 
 
                         compare_two_arrays(entropy_dict_total_n_subs["total"],entropy_dict_total["total"], "total", "total_from_subs", diff_value=1e-12)
@@ -401,9 +424,7 @@ class Test(unittest.TestCase):
                                                            force_embedding_coordinates=emb_option[0], 
                                                            force_intrinsic_coordinates=emb_option[1],
                                                            conditional_input=cinput[1:,:])
-                                print(entropy_dict_total)
-                                print(entropy_dict_1)
-                                print(entropy_dict_2)
+                               
                                 for other_sub_mfa in cur_sub_manifold_opt:
                                     #for sub_manifold in entropy_dict.keys():
                                     assert( torch.abs(entropy_dict[other_sub_mfa][0]-entropy_dict_1[other_sub_mfa][0])<1e-12), (torch.abs(entropy_dict[other_sub_mfa][0]-entropy_dict_1[other_sub_mfa][0]))
