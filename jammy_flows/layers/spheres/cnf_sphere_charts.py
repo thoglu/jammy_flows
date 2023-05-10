@@ -150,7 +150,8 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         num_charts=6, 
         solver="rk4", 
         atol=1e-7,
-        rtol=1e-7):
+        rtol=1e-7,
+        step_size=1.0/32.0):
 
         """
         Continuous manifold normalizing flow - Symbol: "c"
@@ -165,8 +166,9 @@ class cnf_sphere_charts(sphere_base.sphere_base):
             cnf_network_highway_mode (int): Highway connectivity mode of MLP.
             num_charts (int): How many charts to use.
             solver (str): One of ["rk4", "dopri5", "dopri8", "bosh3", "fehlberg2", "adaptive_heun", "euler", "midpoint"].
-            atol (float): Absolute tolerance.
-            rtol (float): Relative tolerance.
+            atol (float): Absolute tolerance. (Used for adaptive solvers like dopri)
+            rtol (float): Relative tolerance. (Used for adaptive solvers like dopri)
+            step_size (float): Step size for fixed step solvers (like rk4, euler).
 
         """
 
@@ -199,7 +201,7 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         self.solver = solver
         self.atol = atol
         self.rtol = rtol
-        self.solver_options = {'step_size': 1/16}
+        self.solver_options = {'step_size': step_size}
         self.man = sphere
         self.num_charts=num_charts
             
@@ -227,8 +229,10 @@ class cnf_sphere_charts(sphere_base.sphere_base):
         tangval = self.man.log(loc, z)
 
         logpz_t = 0
-        
-        scale = -1 if reverse else 1
+            
+        #### Apparently the scale does not have to be reversed .. log-dets are automatically reversed by switching the times
+        #scale = -1 if reverse else 1
+        scale=1
 
         for time in integration_times:
             chartproj = SphereProj(self.func, loc, extra_inputs=extra_inputs)

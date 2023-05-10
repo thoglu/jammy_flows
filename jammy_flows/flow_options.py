@@ -163,6 +163,7 @@ opts_dict["c"]["kwargs"]["cnf_network_rank"] = (-1, lambda x:  (x==-1) or x>0) #
 opts_dict["c"]["kwargs"]["solver"] = ("dopri5", ["rk4", "dopri5", "dopri8", "bosh3", "fehlberg2", "adaptive_heun", "euler", "midpoint"]) ## 
 opts_dict["c"]["kwargs"]["rtol"] = (1e-7, lambda x: (x>0) & (x<1)) ## 
 opts_dict["c"]["kwargs"]["atol"] = (1e-7, lambda x: (x>0) & (x<1)) ## 
+opts_dict["c"]["kwargs"]["step_size"] = (1.0/32.0, lambda x: (x>0) )  ## 
 
 """
 Interval flows
