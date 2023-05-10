@@ -7,6 +7,7 @@ import scipy
 from .layers.euclidean import gaussianization_flow, multivariate_normal
 from .layers import matrix_fns
 from scipy.optimize import minimize
+import scipy.stats as stats
 
 
 
@@ -418,7 +419,7 @@ def _calculate_coverage(base_evals, dim, expected_coverage_probs):
     gauss_log_eval_at_0=-(dim/2.0)*numpy.log(2*numpy.pi)
     actual_twice_logprob=2*(gauss_log_eval_at_0-base_evals)
   
-    expected_twice_logprob=scipy.stats.chi2.ppf(expected_coverage_probs, df=dim)
+    expected_twice_logprob=stats.chi2.ppf(expected_coverage_probs, df=dim)
 
     actual_coverage_probs=[]
    
