@@ -275,6 +275,37 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 </dd></dl>
 
 <dl class="method">
+<dt id="jammy_flows.main.default.pdf.entropy_iterative">
+<code class="sig-name descname">entropy_iterative</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, iterative_samplesize=10, max_iterative_batchsize=20, device=device(type='cpu'), return_samples=False, verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy_iterative" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates entropy of the PDF in an iterative manner. By iterating potentially both over target samples of later sub-pdfs, and over batch items, memory is saved
+and larger samplesizes (&gt; a few 100 - 1000s) can be calculated. Probably only necessary for large sample sizes of later sub-pdfs, not of the first sub-pdf or the total PDF.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>sub_manifolds</strong> (<em>list</em><em>(</em><em>int</em><em>)</em>) – Contains indices of sub-manifolds if entropy should be calculated for marginal PDF of the given sub-manifold. <em>-1</em> stands for the total PDF and is the default.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – If passed defines the input to the PDF.</p></li>
+<li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.</p></li>
+<li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.</p></li>
+<li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize to use for entropy approximation.</p></li>
+<li><p><strong>iterative_samplesize</strong> (<em>int</em>) – Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.</p></li>
+<li><p><strong>max_iterative_batchsize</strong> (<em>int</em>) – The max number of batch samples evaluated simultaneously.</p></li>
+<li><p><strong>device</strong> (<em>torch.device</em>) – Device to use.</p></li>
+<li><p><strong>return_samples</strong> (<em>bool</em>) – Return the samples that are generated to calculate the entropy? Samples are returned as B*num_samples X sample_dim, so the effective batch dimension is B*num_samples.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>dict</dt><dd><p>Dictionary containing entropy for each index defined in parameter <em>sub_manifolds</em>. If <em>-1</em> was given in <em>sub_manifolds</em>, the resulting entropy is stored under the <em>total</em> key.</p>
+</dd>
+<dt>Tensor</dt><dd><p>Only returned if <em>return_samples</em> is set to True. A tensor that contains the generated samples used to calculate the entropy.</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
 <dt id="jammy_flows.main.default.pdf.forward">
 <code class="sig-name descname">forward</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">conditional_input=None</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.forward" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates log-probability at the target <em>x</em>. Also returns some other quantities that are calculated as a consequence.</p>
@@ -1169,10 +1200,10 @@ Additionally added a spline-based potential.</p>
 <span id="chart-based-continuous-2-d-sphere-flow-c"></span><h4>Chart-based continuous 2-d sphere flow (“c”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.cnf_sphere_charts" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
 <dt id="jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts">
-<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.cnf_sphere_charts.</code><code class="sig-name descname">cnf_sphere_charts</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">cnf_network_hidden_dims='64-64'</em>, <em class="sig-param">cnf_network_rank=0</em>, <em class="sig-param">cnf_network_highway_mode=1</em>, <em class="sig-param">num_charts=6</em>, <em class="sig-param">solver='rk4'</em>, <em class="sig-param">atol=1e-07</em>, <em class="sig-param">rtol=1e-07</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.cnf_sphere_charts.</code><code class="sig-name descname">cnf_sphere_charts</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">cnf_network_hidden_dims='64-64'</em>, <em class="sig-param">cnf_network_rank=0</em>, <em class="sig-param">cnf_network_highway_mode=1</em>, <em class="sig-param">num_charts=6</em>, <em class="sig-param">solver='rk4'</em>, <em class="sig-param">atol=1e-07</em>, <em class="sig-param">rtol=1e-07</em>, <em class="sig-param">step_size=0.03125</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
 <dt id="jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts.__init__">
-<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">cnf_network_hidden_dims='64-64'</em>, <em class="sig-param">cnf_network_rank=0</em>, <em class="sig-param">cnf_network_highway_mode=1</em>, <em class="sig-param">num_charts=6</em>, <em class="sig-param">solver='rk4'</em>, <em class="sig-param">atol=1e-07</em>, <em class="sig-param">rtol=1e-07</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts.__init__" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">cnf_network_hidden_dims='64-64'</em>, <em class="sig-param">cnf_network_rank=0</em>, <em class="sig-param">cnf_network_highway_mode=1</em>, <em class="sig-param">num_charts=6</em>, <em class="sig-param">solver='rk4'</em>, <em class="sig-param">atol=1e-07</em>, <em class="sig-param">rtol=1e-07</em>, <em class="sig-param">step_size=0.03125</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.cnf_sphere_charts.cnf_sphere_charts.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Continuous manifold normalizing flow - Symbol: “c”</p>
 <p>Code implementation of “Neural manifold ordinary differential equations” (<a class="reference external" href="https://arxiv.org/abs/2006.10254">https://arxiv.org/abs/2006.10254</a>).
 Mostly adapted from <a class="reference external" href="https://github.com/CUAI/Neural-Manifold-Ordinary-Differential-Equations">https://github.com/CUAI/Neural-Manifold-Ordinary-Differential-Equations</a>.</p>
@@ -1184,8 +1215,9 @@ Mostly adapted from <a class="reference external" href="https://github.com/CUAI/
 <li><p><strong>cnf_network_highway_mode</strong> (<em>int</em>) – Highway connectivity mode of MLP.</p></li>
 <li><p><strong>num_charts</strong> (<em>int</em>) – How many charts to use.</p></li>
 <li><p><strong>solver</strong> (<em>str</em>) – One of [“rk4”, “dopri5”, “dopri8”, “bosh3”, “fehlberg2”, “adaptive_heun”, “euler”, “midpoint”].</p></li>
-<li><p><strong>atol</strong> (<em>float</em>) – Absolute tolerance.</p></li>
-<li><p><strong>rtol</strong> (<em>float</em>) – Relative tolerance.</p></li>
+<li><p><strong>atol</strong> (<em>float</em>) – Absolute tolerance. (Used for adaptive solvers like dopri)</p></li>
+<li><p><strong>rtol</strong> (<em>float</em>) – Relative tolerance. (Used for adaptive solvers like dopri)</p></li>
+<li><p><strong>step_size</strong> (<em>float</em>) – Step size for fixed step solvers (like rk4, euler).</p></li>
 </ul>
 </dd>
 </dl>
