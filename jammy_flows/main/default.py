@@ -14,6 +14,8 @@ import sys
 import scipy
 import math
 
+from scipy.special import iv, i0, i1
+
 from typing import Union
 
 ## used to peek into param generator which can be empty
@@ -2063,7 +2065,8 @@ class pdf(nn.Module):
                 samplesize=100,
                 iterative_samplesize=10,
                 max_iterative_batchsize=20,
-                device=torch.device("cpu"),
+                dtype=None,
+                device=None,
                 return_samples=False,
                 verbose=False):
 
@@ -2079,8 +2082,10 @@ class pdf(nn.Module):
             samplesize (int): Samplesize to use for entropy approximation.
             iterative_samplesize (int): Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.
             max_iterative_batchsize (int): The max number of batch samples evaluated simultaneously. 
-            device (torch.device): Device to use.
+            dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
+            device (torch.device): If given, uses this device. Otherwise uses device from parameters.
             return_samples (bool): Return the samples that are generated to calculate the entropy? Samples are returned as B*num_samples X sample_dim, so the effective batch dimension is B*num_samples.
+            verbose (bool): Adds some extra prints if given.
 
         Returns:
             dict
@@ -2090,9 +2095,14 @@ class pdf(nn.Module):
                 Only returned if *return_samples* is set to True. A tensor that contains the generated samples used to calculate the entropy.
         """
 
-        data_type = torch.float64
+        data_type, used_device=self.obtain_current_dtype_n_device()
+
+        if(device is not None):
+            used_device=device
+        if(dtype is not None):
+            data_type=dtype
+
         data_summary = None
-        used_device=device
 
         assert(samplesize % iterative_samplesize == 0), ("Sample size must be divisble by iterative sample size!", samplesize, iterative_samplesize)
 
@@ -2762,5 +2772,287 @@ class pdf(nn.Module):
             potentially_transformed_vals=potentially_transformed_vals.squeeze(0)
 
         return potentially_transformed_vals, individual_logdets
+
+    def obtain_current_dtype_n_device(self):
+
+        ## peek into first parameter vector
+        try:
+            first = next(self.parameters())
+        except StopIteration:
+            first = None
+
+        if(first is None):
+            ## model contains no parameters
+            return None, None
+
+        else:
+            return first.dtype, first.device
+
+    def marginal_moments(self, 
+                         conditional_input=None, 
+                         samplesize=50, 
+                         iterative_samplesize=10, 
+                         max_iterative_batchsize=20,
+                         mises_abs_precision=1e-7, 
+                         calc_kl_diff_and_entropic_quantities=False,
+                         dtype=None,
+                         device=None,
+                         verbose=False):
+        """
+        Calculate the first and second central moments of the marginal distributions. For Euclidean manifolds it calculates a Gaussian approximation, for spherical distributions calculates
+        a von-Mises approximation. Because these are the respective maximum entropy distributions, their entropy should always be larger than the original distribution.
+        We can also calculate the kl divergence and cross entropy between the exact distribution and its approximation, by switching on the *calc_kl_diff_and_entropic_quantities* flag.
+
+        Parameters:
+            conditional_input (Tensor/list(Tensor)/None): If passed defines the input to the PDF.
+            samplesize (int): Samplesize to use per event for moment approximation.
+            iterative_samplesize (int): Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.
+            max_iterative_batchsize (int): The max number of batch samples evaluated simultaneously. 
+            mises_abs_precision (float): The absolute precision used break out the loop for the mises distribution second moment estimation.
+            calc_kl_diff_and_entropic_quantities (bool): Flag that determines if we also calculate the KL divergence between the respective marginal distribution and its respective 2nd-order approximation. Also includes the cross entropy.
+            dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
+            device (torch.device): If given, uses this device. Otherwise uses device from parameters.
+            verbose (bool): Some extra print statements on runtime.
+
+        Returns:
+
+            dict
+                Dictionary containing moments and potentially entropies and KL-divergence between approximation and marginal distributions for each marginal distribution.
+                The index indicates which marginal distribution. Means on the sphere are given in embedding coordinates and in angle coordinates. For example:
+
+                mean_0 = mean of first marginal in embedding coordinates
+                mean_0_angles = mean of first marginal in angle coordinates
+                varlike_0 = covariance (Gaussian/Euclidean) or concentration parameter (Fisher-von Mises/spherical)
+                entropy_0 = entropy of first marginal distribution
+                kl_diff_exact_approx_0 = KL divergence between exact distribution and 2nd-order approximation
+                cross_entropy_0 = cross entropy between exact distribution and 2nd-order approximation
+                ...
+                mean_1 = mean of second marginal
+                ...
+                ...
+                entropy_total = total entropy (only total quantity calculated because it is essentially free)
+
+           
+        """
+
+        def newton_iter(arg, p, normed_length_summed_pts):
+            """
+            p is the Euclidean embedding dimension: p=3 -> 2-d sphere, p=2 -> 1-d circle
+            """
+            ## p = 2 -> p/2-1 = 0, p/2 = 1
+            ## p = 3 -> p/2-1 = 0.5, p/2 = 1.5
+
+            if(p==2):
+
+                a_p_k=i1(arg)/i0(arg)
+
+                return arg- ((a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (1.0/arg)*a_p_k))
+
+               
+            elif(p==3):
+
+                a_p_k=iv(1.5, arg)/iv(0.5, arg)
+
+                return arg- ( (a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (2.0/arg)*a_p_k) )
+
+        
+
+        used_dtype, used_device=self.obtain_current_dtype_n_device()
+
+        if(device is not None):
+            used_device=device
+        if(dtype is not None):
+            used_dtype=dtype
+
+        initial_batch_size=1
+
+        if(type(conditional_input)==list):   
+
+            initial_batch_size=conditional_input[0].shape[0]
+
+            assert(conditional_input[0].dtype == used_dtype)
+            assert(conditional_input[0].device == used_device)
+            
+        else:
+
+            initial_batch_size=conditional_input.shape[0]
+
+            assert(conditional_input[0].dtype == used_dtype)
+            assert(conditional_input[0].device == used_device)
+
+
+
+        return_dict=dict()
+
+        if(verbose):
+            tbef=time.time()
+
+        with torch.no_grad():
+        
+            entropy_dict=None
+
+            if(calc_kl_diff_and_entropic_quantities):
+                # also calculate total entropy [-1], because it is no extra cost 
+                entropy_dict, samples=self.entropy_iterative(sub_manifolds=[-1]+list(range(len(self.pdf_defs_list))), 
+                                                                 conditional_input=conditional_input,
+                                                                 samplesize=samplesize,
+                                                                 iterative_samplesize=iterative_samplesize,
+                                                                 max_iterative_batchsize=max_iterative_batchsize,
+                                                                 device=used_device,
+                                                                 dtype=used_dtype,
+                                                                 return_samples=True,
+                                                                 verbose=verbose)
+
+           
+
+            
+            else:
+                
+                # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
+
+                if(type(conditional_input)==list):  
+                    data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+                else:
+                    data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
+
+                samples,_,_,_=self.sample(conditional_input=data_summary_repeated, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
+
+            target_dim_embedded=self.total_target_dim_embedded
+
+            samples=samples.unsqueeze(1).reshape(initial_batch_size, -1, target_dim_embedded)
+
+            if(verbose):
+                print("1) sampling took ",time.time()-tbef)
+
+            for sub_pdf_dim, sub_pdf_def in enumerate(self.pdf_defs_list):
+
+                this_mean=None
+                this_var=None
+                approx_entropy=None
+                cross_entropy=None
+                kl_diff=None
+
+
+                these_subsamples=samples[:, :, self.target_dim_indices_embedded[sub_pdf_dim][0]:self.target_dim_indices_embedded[sub_pdf_dim][1]]
+
+                if("e" in sub_pdf_def):
+
+                    this_mean=torch.mean(these_subsamples, dim=1,keepdims=True)
+
+                    subtracted_samples=these_subsamples-this_mean
+                  
+                    this_var=(torch.einsum("...ij, ...ik -> ...ijk", subtracted_samples,subtracted_samples).sum(dim=1)/(samplesize-1))
+
+                   
+                    # collapse unneded dimension
+                    this_mean=this_mean.squeeze(1)
+
+                    approx_entropy=0.5*torch.log(2*numpy.pi*torch.linalg.det(this_var))
+
+                    ## flatten cov matrices for storage
+                    #this_var=this_var.flatten(start_dim=1)
+
+                    if(calc_kl_diff_and_entropic_quantities):
+
+                        log_probs = torch.distributions.MultivariateNormal(
+                            this_mean.unsqueeze(1),
+                            covariance_matrix=this_var.unsqueeze(1)
+                        ).log_prob(these_subsamples)
+
+
+                        cross_entropy=-log_probs.mean(dim=1)
+
+                        
+                        kl_diff=cross_entropy-entropy_dict[sub_pdf_dim]
+
+                       
+                elif("s" in sub_pdf_def):
+
+                    ## data summation mean
+                    sample_sum=torch.sum(these_subsamples, dim=1)
+                    sample_sum_length=(sample_sum**2).sum(dim=1, keepdims=True).sqrt()
+                    
+                    ## mean vec on sphere
+                    this_mean=sample_sum/(sample_sum_length)
+
+                    angle_mean,_=self.transform_target_space(this_mean, 0.0, transform_from="embedding", transform_to="default")
+
+                    return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean
+
+                    normalized_length_R=sample_sum_length/samplesize
+
+                    if("1" in sub_pdf_def):
+                        p=2
+                    elif("2" in sub_pdf_def):
+                        p=3
+
+                    last_vec=normalized_length_R*(p-normalized_length_R**2)/(1-normalized_length_R**2)
+                    
+                    max_iter=20
+        
+                    new_diff=None
+
+                    for i in range(max_iter):
+
+                        new_vec=newton_iter(last_vec, p, normalized_length_R)
+
+                        new_diff=torch.abs(new_vec-last_vec)
+
+                        if(new_diff.max()<mises_abs_precision):
+                            last_vec=new_vec
+                            break
+
+                        last_vec=new_vec
+                    
+                    this_var=last_vec
+
+                    if(p==2):
+
+                        c_p_k=1.0/(2*numpy.pi*i0(this_var))
+                        a_p_k=i1(this_var)/i0(this_var)
+
+                    elif(p==3):
+
+                        
+                        c_p_k=this_var**(0.5)/( (2*numpy.pi)**1.5 * iv(0.5, this_var))
+                       
+                        #c_p_k*=1e-5
+                        a_p_k=iv(1.5, this_var)/iv(0.5, this_var)
+
+                        
+
+                    approx_entropy=(-torch.log(c_p_k)-this_var*a_p_k).squeeze(1)
+               
+                    if(calc_kl_diff_and_entropic_quantities):
+
+                        ## logprobs of fisher-mises
+                        log_exp_facs=(these_subsamples*this_mean.unsqueeze(1)).sum(axis=2,keepdims=True)*this_var.unsqueeze(1)
+                        log_probs=log_exp_facs+torch.log(c_p_k.unsqueeze(1))
+
+                        ## cross entropy (true->approx)
+                        cross_entropy=-log_probs.mean(dim=1).squeeze(1)
+                       
+                        kl_diff=cross_entropy-entropy_dict[sub_pdf_dim]
+  
+                else:
+                    raise Exception("Unsupported sub pdf type for marginal moment calculation!", sub_pdf_def)
+
+                return_dict["mean_%d"%sub_pdf_dim]=this_mean
+                return_dict["varlike_%d"%sub_pdf_dim]=this_var
+               
+                if(entropy_dict is not None):
+                    return_dict["entropy_%d" % sub_pdf_dim]=entropy_dict[sub_pdf_dim]
+                    return_dict["cross_entropy_%d" % sub_pdf_dim]=cross_entropy
+                    return_dict["kl_diff_exact_approx_%d" % sub_pdf_dim]=kl_diff
+
+                return_dict["approx_entropy_%d" % sub_pdf_dim]=approx_entropy
+                
+            if(entropy_dict is not None):
+                return_dict["entropy_total"]=entropy_dict["total"]
+
+        if(verbose):
+            print("total infernce took ",time.time()-tbef)
+
+        return return_dict
 
     
