@@ -97,7 +97,9 @@ class ODEfunc(nn.Module):
         with torch.set_grad_enabled(True):
             y.requires_grad_(True)
             t.requires_grad_(True)
+         
             dy = self.diffeq(t, y)
+          
             divergence = divergence_bf(dy, y).unsqueeze(-1)
 
         return tuple([dy, -divergence])
@@ -123,7 +125,9 @@ class SphereProj(nn.Module):
         """
         y = self.man.exp(self.loc, x)
         val = self.man.jacoblog(self.loc, y) @ self.base_func(t, y, extra_inputs=self.extra_inputs).unsqueeze(-1)
-        val = val.squeeze()
+        
+        # we only want to squeeze last dim here
+        val = val.squeeze(-1)
         return val
 
 
