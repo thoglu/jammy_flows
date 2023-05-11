@@ -13,6 +13,7 @@ import copy
 import sys
 import scipy
 import math
+import time
 
 from scipy.special import iv, i0, i1
 
@@ -1946,7 +1947,7 @@ class pdf(nn.Module):
                 data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
 
                 batch_size=conditional_input.shape[0]
-                
+
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
        
