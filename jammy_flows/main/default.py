@@ -1921,6 +1921,8 @@ class pdf(nn.Module):
                 assert(subdim>=0 and subdim < len(self.layer_list))
                 use_marginal_subdims=True
 
+        batch_size=1
+
         if conditional_input is not None:
 
             assert(self.conditional_input_dim is not None)
@@ -1933,6 +1935,8 @@ class pdf(nn.Module):
                 # a list of data summaries for the next functions
                 data_summary=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
 
+                batch_size=conditional_input[0].shape[0]
+
             else:
 
                 data_type = conditional_input.dtype
@@ -1940,6 +1944,9 @@ class pdf(nn.Module):
                 
                 # this behavior is a little differnet than in standard sample .. we sample for every conditional input multiple times
                 data_summary=conditional_input.repeat_interleave(samplesize, dim=0)
+
+                batch_size=conditional_input.shape[0]
+                
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
        
