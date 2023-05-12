@@ -2839,16 +2839,16 @@ class pdf(nn.Module):
 
             if(p==2):
 
-                a_p_k=i1(arg.cpu())/i0(arg.cpu())
+                a_p_k=i1(arg)/i0(arg)
 
-                return arg.cpu()- ((a_p_k-normed_length_summed_pts.cpu())/(1.0-a_p_k**2- (1.0/arg.cpu())*a_p_k))
+                return arg- ((a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (1.0/arg)*a_p_k))
 
                
             elif(p==3):
 
-                a_p_k=iv(1.5, arg.cpu())/iv(0.5, arg.cpu())
+                a_p_k=iv(1.5, arg)/iv(0.5, arg)
 
-                return arg.cpu()- ( (a_p_k-normed_length_summed_pts.cpu())/(1.0-a_p_k**2- (2.0/arg.cpu())*a_p_k) )
+                return arg- ( (a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (2.0/arg)*a_p_k) )
 
         
 
@@ -2981,25 +2981,29 @@ class pdf(nn.Module):
                     elif("2" in sub_pdf_def):
                         p=3
 
-                    last_vec=normalized_length_R*(p-normalized_length_R**2)/(1-normalized_length_R**2)
+                    last_vec=(normalized_length_R*(p-normalized_length_R**2)/(1-normalized_length_R**2))
                     
                     max_iter=20
         
                     new_diff=None
 
+                    last_vec_cpu=last_vec.cpu()
+                    cpu_length=normalized_length_R.cpu()
+
                     for i in range(max_iter):
 
-                        new_vec=newton_iter(last_vec, p, normalized_length_R).to(last_vec)
+                        new_vec=newton_iter(last_vec_cpu, p,cpu_length)
 
-                        new_diff=torch.abs(new_vec-last_vec)
+                        new_diff=torch.abs(new_vec-last_vec_cpu)
 
                         if(new_diff.max()<mises_abs_precision):
-                            last_vec=new_vec
+                            last_vec_cpu=new_vec
                             break
 
-                        last_vec=new_vec
-                    
-                    this_var=last_vec
+                        last_vec_cpu=new_vec
+                        
+                    ## set back to device before newton iters
+                    this_var=last_vec_cpu.to(angle_mean)
 
                     if(p==2):
 
