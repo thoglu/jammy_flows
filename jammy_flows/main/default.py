@@ -1725,12 +1725,12 @@ class pdf(nn.Module):
                         if(type(mlp_predictor)== amortizable_mlp.AmortizableMLP):
                            
                             if(self.amortize_everything):
-                                desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params.type(mlp_predictor[-1].bias.data.dtype), prev_damping_factor=damping_factor)
+                                desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params, prev_damping_factor=damping_factor)
                                 num_uvb_pars=mlp_predictor.num_amortization_params
                                 global_amortization_init[global_amortization_index:global_amortization_index+num_uvb_pars]=desired_uvb_params
                                 global_amortization_index+=num_uvb_pars
                             else:
-                                mlp_predictor.initialize_uvbs(fix_final_bias=these_params.type(mlp_predictor[-1].bias.data.dtype), prev_damping_factor=damping_factor)
+                                mlp_predictor.initialize_uvbs(fix_final_bias=these_params, prev_damping_factor=damping_factor)
 
                         else:
                             # initialize all layers

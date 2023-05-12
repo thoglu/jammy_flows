@@ -22,13 +22,13 @@ class simplex_base(layer_base.layer_base):
 
         ## M defines the projection onto canonical simplex from base simplex
         ## See https://arxiv.org/pdf/2008.05456.pdf
-        self.M=torch.zeros((self.dimension,self.dimension+1), dtype=torch.float64)
+        self.M=torch.zeros((self.dimension,self.dimension+1))
         self.M[:,0]=-1.0
-        self.M[:,1:]=torch.eye(self.dimension, dtype=torch.float64)
+        self.M[:,1:]=torch.eye(self.dimension)
 
         ## M_reverse = M^t*(M*M^t)**-1  = (1/(d+1)) * C where C is d+1 X d, has d on the diagonal in the lower symmetric (dxd) part and -1 everywhere else
         ## projects from the canonical simples back to base simplex
-        self.M_reverse=torch.ones((self.dimension+1,self.dimension), dtype=torch.float64)*-1.0
+        self.M_reverse=torch.ones((self.dimension+1,self.dimension))*-1.0
 
         for ind in range(self.dimension):
             self.M_reverse[1+ind,ind]=self.dimension
@@ -37,7 +37,7 @@ class simplex_base(layer_base.layer_base):
 
         ###############
 
-        self.canonical_one_hot=torch.zeros(self.dimension+1, dtype=torch.float64)
+        self.canonical_one_hot=torch.zeros(self.dimension+1)
         self.canonical_one_hot[0]=1.0
 
 
@@ -145,7 +145,7 @@ class simplex_base(layer_base.layer_base):
 
         ## (1,0,0,...)+ 1X2 * 2XN
 
-        mm_result=self.canonical_one_hot.to(x.device)+torch.matmul(x, self.M.to(x.device))
+        mm_result=self.canonical_one_hot.type(x.dtype).to(x.device)+torch.matmul(x, self.M.type(x.dtype).to(x.device))
 
         ## area increases by sqrt(dim+1)
         log_det=log_det+0.5*numpy.log(self.dimension+1)
@@ -158,7 +158,7 @@ class simplex_base(layer_base.layer_base):
 
         ## (1,0,0,...)+ 1X2 * 2XN
 
-        mm_result=torch.matmul(x-self.canonical_one_hot.to(x.device), self.M_reverse.to(x.device))
+        mm_result=torch.matmul(x-self.canonical_one_hot.type(x.dtype).to(x.device), self.M_reverse.type(x.dtype).to(x.device))
 
         ## area decreases by sqrt(dim+1)
         log_det=log_det-0.5*numpy.log(self.dimension+1)

@@ -45,7 +45,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
         self.total_param_num=self.total_num_inner_flow_params
 
         if(use_permanent_parameters):
-            self.inner_flow_params = nn.Parameter(torch.randn(1, self.total_num_inner_flow_params).type(torch.double))
+            self.inner_flow_params = nn.Parameter(torch.randn(1, self.total_num_inner_flow_params))
     
 
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
@@ -114,8 +114,6 @@ class inner_loop_simplex(simplex_base.simplex_base):
     
 
     #############################################################################
-
-    ## implement the following by specific euclidean child layers
 
     #def _init_params(self, params):
 
