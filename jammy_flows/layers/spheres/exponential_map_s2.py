@@ -858,7 +858,8 @@ class exponential_map_s2(sphere_base.sphere_base):
        
         
         if(extra_inputs is not None):
-            potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
+
+            potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)
         else:
             potential_pars=self.potential_pars.to(x)
 
@@ -900,11 +901,11 @@ class exponential_map_s2(sphere_base.sphere_base):
             #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-
+            
         
 
         if(extra_inputs is not None):
-            potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
+            potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)
         else:
             potential_pars=self.potential_pars.to(x)
         

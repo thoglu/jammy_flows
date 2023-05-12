@@ -101,7 +101,7 @@ class sphere_base(layer_base.layer_base):
 
             else:
 
-                mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim])
+                mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim]).to(x)
                 mat_pars=mat_pars.repeat(x.shape[0],1,1)
 
             return self.compute_householder_matrix(mat_pars, hh_dim, device=device)
