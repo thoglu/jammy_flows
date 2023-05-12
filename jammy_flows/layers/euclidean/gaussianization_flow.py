@@ -165,7 +165,7 @@ class gf_block(euclidean_base.euclidean_base):
 
                 if(self.dimension>1):
                     self.triangle_trafo_pars = nn.Parameter(
-                        torch.randn(num_triangle_params).type(torch.double).unsqueeze(0)
+                        torch.randn(num_triangle_params).unsqueeze(0)
                     )
            
         elif(self.rotation_mode=="householder"):
@@ -185,10 +185,10 @@ class gf_block(euclidean_base.euclidean_base):
             if self.use_householder:
                 if(use_permanent_parameters):
                     self.vs = nn.Parameter(
-                        torch.randn(self.householder_iter, dimension).type(torch.double).unsqueeze(0)
+                        torch.randn(self.householder_iter, dimension).unsqueeze(0)
                     )
-                else:
-                    self.vs = torch.zeros(self.householder_iter, dimension).type(torch.double).unsqueeze(0) 
+                #else:
+                #    self.vs = torch.zeros(self.householder_iter, dimension).type(torch.double).unsqueeze(0) 
 
                 self.num_householder_params=self.householder_iter*self.dimension
 
@@ -205,7 +205,7 @@ class gf_block(euclidean_base.euclidean_base):
                 #assert(self.dimension==2), "requires 2 dims at the moment"
 
                 if(use_permanent_parameters):
-                    self.angle_pars=nn.Parameter(torch.randn((1, self.num_angle_pars)).type(torch.double))
+                    self.angle_pars=nn.Parameter(torch.randn((1, self.num_angle_pars)))
 
         elif(self.rotation_mode=="cayley"):
             self.num_cayley_pars=0
@@ -219,7 +219,7 @@ class gf_block(euclidean_base.euclidean_base):
                 assert(self.dimension==2), "Cayley requires 2 dims at the moment"
 
                 if(use_permanent_parameters):
-                    self.cayley_pars=nn.Parameter(torch.randn((1, 1)).type(torch.double))
+                    self.cayley_pars=nn.Parameter(torch.randn((1, 1)))
 
 
         ## number of KDE components per dimension
@@ -238,7 +238,7 @@ class gf_block(euclidean_base.euclidean_base):
         if(self.nonlinear_stretch_type=="classic"):
             ## means
             if use_permanent_parameters:
-                self.kde_means = nn.Parameter(torch.randn(self.num_kde-self.center_mean, self.dimension).type(torch.double).unsqueeze(0))
+                self.kde_means = nn.Parameter(torch.randn(self.num_kde-self.center_mean, self.dimension).unsqueeze(0))
 
             ## increase params per (kde-center_mean)*dim
             self.total_param_num+=(self.num_kde-self.center_mean)*self.dimension
@@ -250,7 +250,7 @@ class gf_block(euclidean_base.euclidean_base):
             #self.kde_log_widths = torch.zeros(num_kde, dimension).type(torch.double).unsqueeze(0)
             if(use_permanent_parameters):
                 self.kde_log_widths = nn.Parameter(
-                    torch.ones(num_kde, dimension).type(torch.double).unsqueeze(0) * self.init_log_width
+                    torch.ones(num_kde, dimension).unsqueeze(0) * self.init_log_width
                 )
 
             ## increase params per kde*dim
@@ -323,7 +323,7 @@ class gf_block(euclidean_base.euclidean_base):
             if(fit_normalization):
 
                 if(use_permanent_parameters):
-                    self.kde_log_weights = nn.Parameter(torch.randn(num_kde, self.dimension).type(torch.double).unsqueeze(0))
+                    self.kde_log_weights = nn.Parameter(torch.randn(num_kde, self.dimension).unsqueeze(0))
 
 
                 self.total_param_num+=self.num_params_datapoints
@@ -345,12 +345,12 @@ class gf_block(euclidean_base.euclidean_base):
             
 
             ## shape to B X KDE index dim X dimension
-            self.kde_log_skew_exponents=torch.DoubleTensor([0.0]).view(1,1,1)
-            self.kde_skew_signs=torch.DoubleTensor([1.0])
+            self.kde_log_skew_exponents=torch.Tensor([0.0]).view(1,1,1)
+            self.kde_skew_signs=torch.Tensor([1.0])
 
             if(self.add_skewness):
 
-                self.kde_skew_signs=torch.ones( (1,self.num_kde,1)).type(torch.double)
+                self.kde_skew_signs=torch.ones( (1,self.num_kde,1))
 
                 num_negative=int(float(self.num_kde)/2.0)
 
@@ -359,12 +359,9 @@ class gf_block(euclidean_base.euclidean_base):
 
                 if(use_permanent_parameters):
                     self.kde_log_skew_exponents = nn.Parameter(
-                        torch.randn(self.num_kde, dimension).type(torch.double).unsqueeze(0)
+                        torch.randn(self.num_kde, dimension).unsqueeze(0)
                     )
                 
-                #else:
-                #    self.skew_exponents = torch.zeros(self.num_kde, dimension).type(torch.double).unsqueeze(0) 
-
                 ## with 0.1 and 9.0 the function maps 0 to 0 approximately -> 0 -> 1 in normal exponent space, the starting point we want
                 self.exponent_regulator=generate_log_function_bounded_in_logspace(min_val_normal_space=0.1, max_val_normal_space=9.0, center=True)
                 self.total_param_num+=self.num_params_datapoints
@@ -372,10 +369,10 @@ class gf_block(euclidean_base.euclidean_base):
         elif(self.nonlinear_stretch_type=="rq_splines"):
 
             if(use_permanent_parameters):
-                self.log_widths = nn.Parameter(torch.randn(self.dimension, self.num_kde).type(torch.double).unsqueeze(0))
-                self.log_heights = nn.Parameter(torch.randn(self.dimension, self.num_kde).type(torch.double).unsqueeze(0))
-                self.log_derivatives = nn.Parameter(torch.randn(self.dimension, self.num_kde+1).type(torch.double).unsqueeze(0))
-                self.boundary_points=nn.Parameter(torch.randn(self.dimension, 4).type(torch.double).unsqueeze(0))  
+                self.log_widths = nn.Parameter(torch.randn(self.dimension, self.num_kde).unsqueeze(0))
+                self.log_heights = nn.Parameter(torch.randn(self.dimension, self.num_kde).unsqueeze(0))
+                self.log_derivatives = nn.Parameter(torch.randn(self.dimension, self.num_kde+1).unsqueeze(0))
+                self.boundary_points=nn.Parameter(torch.randn(self.dimension, 4).unsqueeze(0))  
 
            
             self.total_param_num+=(self.num_kde*self.dimension)*2+(self.num_kde+1)*self.dimension
@@ -419,7 +416,7 @@ class gf_block(euclidean_base.euclidean_base):
         if(self.add_skewness):
             ## differentiate CDF/SF for +/- skewed distributions (they mirror each other)
 
-            log_cdfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double, device=x.device)
+            log_cdfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=x.dtype, device=x.device)
 
             pos_mask=skew_signs[0,:,0]>0
         
@@ -432,7 +429,7 @@ class gf_block(euclidean_base.euclidean_base):
 
             ####
 
-            log_sfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=torch.double, device=x.device)
+            log_sfs=torch.zeros( (x.shape[0], means.shape[1], means.shape[2]), dtype=x.dtype, device=x.device)
 
             ## positive sfs
             log_sfs.masked_scatter_(pos_mask[None,:,None], extra_functions.log_one_plus_exp_x_to_a_minus_1(-common_x_argument[:,pos_mask,:], skew_exponents[:,pos_mask,:]))
@@ -458,7 +455,7 @@ class gf_block(euclidean_base.euclidean_base):
 
     def compute_householder_matrix(self, vs):
 
-        Q = torch.eye(self.dimension, device=vs.device).type(torch.double).unsqueeze(0).repeat(vs.shape[0], 1,1)
+        Q = torch.eye(self.dimension, device=vs.device).type(vs.dtype).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
         for i in range(self.householder_iter):
         
@@ -466,7 +463,7 @@ class gf_block(euclidean_base.euclidean_base):
             
             v = v / v.norm(dim=1).unsqueeze(-1)
 
-            Qi = torch.eye(self.dimension, device=vs.device).type(torch.double).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
+            Qi = torch.eye(self.dimension, device=vs.device).type(vs.dtype).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
 
             Q = torch.bmm(Q, Qi)
 
@@ -476,7 +473,7 @@ class gf_block(euclidean_base.euclidean_base):
     def sigmoid_inv_error_pass_w_params(self, x, datapoints, log_widths, log_norms, skew_exponents, skew_signs):
 
         log_cdf_l, log_sf_l, _=self.logistic_kernel_log_pdf_quantities(x, datapoints,log_widths,log_norms, skew_exponents, skew_signs, calculate_pdf=False)  
-
+      
         return self.sigmoid_inv_error_pass_given_cdf_sf(log_cdf_l, log_sf_l)
 
     def sigmoid_inv_error_pass_given_cdf_sf(self, log_cdf_l, log_sf_l):
@@ -486,17 +483,17 @@ class gf_block(euclidean_base.euclidean_base):
 
             ## super easy inverse function which can be written in terms of log_cdf and log_sf, which makes it numerically stable!
 
-         
+          
             return -log_sf_l+log_cdf_l
 
 
         else:
-
+          
             cdf_l=torch.exp(log_cdf_l)
 
             if("partly" in self.inverse_function_type):
 
-                cdf_mask = ((cdf_l > self.pade_approximation_bound) & (cdf_l < 1 - (self.pade_approximation_bound))).double()
+                cdf_mask = ((cdf_l > self.pade_approximation_bound) & (cdf_l < 1 - (self.pade_approximation_bound))).type(log_cdf_l.dtype)
                 ## intermediate CDF values
                 cdf_l_good = cdf_l * cdf_mask + 0.5 * (1. - cdf_mask)
                 return_val = normal_dist.icdf(cdf_l_good)
@@ -528,12 +525,12 @@ class gf_block(euclidean_base.euclidean_base):
 
                    
                 ## very HIGH CDF values
-                cdf_mask_right = (cdf_l >= 1. - (self.pade_approximation_bound)).double()
+                cdf_mask_right = (cdf_l >= 1. - (self.pade_approximation_bound)).type(log_cdf_l.dtype)
                 cdf_l_bad_right_log = (total_factor) * cdf_mask_right + (-1.) * (1. - cdf_mask_right)
                 return_val += (cdf_l_bad_right_log)*cdf_mask_right
 
                 ## very LOW CDF values
-                cdf_mask_left = (cdf_l <= self.pade_approximation_bound).double()
+                cdf_mask_left = (cdf_l <= self.pade_approximation_bound).type(log_cdf_l.dtype)
                 cdf_l_bad_left_log = (total_factor) * cdf_mask_left + (-1.) * (1. - cdf_mask_left)
                 return_val += (-1.0*cdf_l_bad_left_log)*cdf_mask_left
 
@@ -556,7 +553,7 @@ class gf_block(euclidean_base.euclidean_base):
 
                 total_factor=torch.sqrt(pos_entry)
 
-                mask_neg=(cdf_l<=0.5).double()
+                mask_neg=(cdf_l<=0.5).type(log_cdf_l.dtype)
 
                 return (-1.0*total_factor)*mask_neg+(1.0-mask_neg)*total_factor
 
@@ -583,7 +580,7 @@ class gf_block(euclidean_base.euclidean_base):
 
             if("partly" in self.inverse_function_type):
 
-                cdf_mask = ((cdf_l > self.pade_approximation_bound) & (cdf_l < 1 - (self.pade_approximation_bound))).double()
+                cdf_mask = ((cdf_l > self.pade_approximation_bound) & (cdf_l < 1 - (self.pade_approximation_bound))).type(log_cdf_l.dtype)
                 cdf_l_good = cdf_l * cdf_mask + 0.5 *( 1.-cdf_mask)
                 derivative=cdf_mask*(numpy.log((numpy.sqrt(2*numpy.pi)))+torch.erfinv(2*cdf_l_good-1.0)**2+log_pdf)
 
@@ -615,7 +612,7 @@ class gf_block(euclidean_base.euclidean_base):
                     total_factor=log_total-log_sf_l-log_cdf_l
 
 
-                    mask_neg=(cdf_l<=0.5).double()
+                    mask_neg=(cdf_l<=0.5).type(log_cdf_l.dtype)
                     extra_plus_minus_factor=torch.log((1.0-2*cdf_l)*mask_neg+(-1.0+2*cdf_l)*(1-mask_neg))
 
                     total_factor=total_factor+extra_plus_minus_factor
@@ -627,11 +624,11 @@ class gf_block(euclidean_base.euclidean_base):
                     total_factor=total_factor.masked_fill(bad_deriv_mask, numpy.log(2.506628))
 
                         
-                cdf_mask_right = (cdf_l >= 1. - (self.pade_approximation_bound)).double()
+                cdf_mask_right = (cdf_l >= 1. - (self.pade_approximation_bound)).type(log_cdf_l.dtype)
                 cdf_l_bad_right_log = total_factor * cdf_mask_right  -0.5*(1.0-cdf_mask_right)
                 derivative += cdf_mask_right*(cdf_l_bad_right_log+log_pdf)
                 # 3) Step3: invert BAD small CDF
-                cdf_mask_left = (cdf_l <= self.pade_approximation_bound).double()
+                cdf_mask_left = (cdf_l <= self.pade_approximation_bound).type(log_cdf_l.dtype)
                 cdf_l_bad_left_log = total_factor * cdf_mask_left  -0.5*(1.0-cdf_mask_left)
                 derivative+=cdf_mask_left*(cdf_l_bad_left_log+log_pdf)
 
@@ -733,10 +730,12 @@ class gf_block(euclidean_base.euclidean_base):
         elif(self.rotation_mode=="householder"):
            
             if self.use_householder:
-                this_vs=self.vs.to(x)
-                if(extra_inputs is not None):
-                    
-                    this_vs=this_vs+torch.reshape(extra_inputs[:,:self.num_householder_params], [-1, self.vs.shape[1], self.vs.shape[2]])
+                
+                if(extra_inputs is None):
+                    this_vs=self.vs.to(x)
+                else:
+                   
+                    this_vs=torch.reshape(extra_inputs[:,:self.num_householder_params], [-1, self.householder_iter, self.dimension])
 
                     
                     extra_input_counter+=self.num_householder_params
@@ -913,14 +912,14 @@ class gf_block(euclidean_base.euclidean_base):
         device=z.device
 
         flow_params, rotation_params=self._obtain_usable_flow_params(z, extra_inputs=extra_inputs)
-
+       
         if(self.nonlinear_stretch_type=="classic"):
-        
+           
             res=bn.inverse_bisection_n_newton_joint_func_and_grad(self.sigmoid_inv_error_pass_w_params, self.sigmoid_inv_error_pass_combined_val_n_normal_derivative, z, flow_params[0], flow_params[1],flow_params[2],flow_params[3],flow_params[4], min_boundary=lower, max_boundary=upper, num_bisection_iter=25, num_newton_iter=20)
             log_deriv=self.sigmoid_inv_error_pass_log_derivative_w_params(res, flow_params[0], flow_params[1], flow_params[2], flow_params[3], flow_params[4])
 
             log_det=log_det-log_deriv.sum(axis=-1)
-
+           
         elif(self.nonlinear_stretch_type=="rq_splines"):
            
             res, log_deriv=spline_fns.rational_quadratic_spline_with_linear_extension(z.unsqueeze(-1), 

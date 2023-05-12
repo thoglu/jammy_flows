@@ -76,21 +76,21 @@ class psf_block(euclidean_base.euclidean_base):
         init_log_value=-0.1053605156 # 0.9
 
         if use_permanent_parameters:
-            self.log_widths1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
+            self.log_widths1 = nn.Parameter(torch.ones(num_transforms, self.dimension).unsqueeze(0)*init_log_value)
        
 
         if use_permanent_parameters:
-            self.log_widths2 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
+            self.log_widths2 = nn.Parameter(torch.ones(num_transforms, self.dimension).unsqueeze(0)*init_log_value)
        
         if use_permanent_parameters:
-            self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
+            self.means1 = nn.Parameter(torch.ones(num_transforms, self.dimension).unsqueeze(0)*0.1)
         
         
         if use_permanent_parameters:
-            self.means2 = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*0.1)
+            self.means2 = nn.Parameter(torch.ones(num_transforms, self.dimension).unsqueeze(0)*0.1)
         
         if use_permanent_parameters:
-            self.log_exponent = nn.Parameter(torch.ones(num_transforms, self.dimension).type(torch.double).unsqueeze(0)*init_log_value)
+            self.log_exponent = nn.Parameter(torch.ones(num_transforms, self.dimension).unsqueeze(0)*init_log_value)
        
      
         self.num_householder_params=0
@@ -99,7 +99,7 @@ class psf_block(euclidean_base.euclidean_base):
             
             if(use_permanent_parameters):
                 self.vs = nn.Parameter(
-                    torch.randn(self.householder_iter, dimension).type(torch.double).unsqueeze(0)
+                    torch.randn(self.householder_iter, dimension).unsqueeze(0)
                 )
            
             self.num_householder_params=self.householder_iter*self.dimension
@@ -145,7 +145,7 @@ class psf_block(euclidean_base.euclidean_base):
 
     def compute_householder_matrix(self, vs, device=torch.device("cpu")):
 
-        Q = torch.eye(self.dimension, device=device).type(torch.double).unsqueeze(0).repeat(vs.shape[0], 1,1)
+        Q = torch.eye(self.dimension, device=device).type(vs.dtype).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
         for i in range(self.householder_iter):
         
@@ -153,7 +153,7 @@ class psf_block(euclidean_base.euclidean_base):
             
             v = v / v.norm(dim=1).unsqueeze(-1)
 
-            Qi = torch.eye(self.dimension, device=device).type(torch.double).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
+            Qi = torch.eye(self.dimension, device=device).type(vs.dtype).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
 
             Q = torch.bmm(Q, Qi)
 

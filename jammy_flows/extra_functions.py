@@ -102,12 +102,12 @@ def get_loss_fn(target_matrix, num_householder_iter=-1):
 
     dim=target_matrix.shape[0]
 
-    
+    gblock=gaussianization_flow.gf_block(dim, num_householder_iter=num_householder_iter, use_permanent_parameters=True)
+    used_shape=gblock.vs.shape
+
     def compute_matching_distance(a):
 
-        gblock=gaussianization_flow.gf_block(dim, num_householder_iter=num_householder_iter)
-
-        hh_pars=torch.from_numpy(numpy.reshape(a, gblock.vs.shape))
+        hh_pars=torch.from_numpy(numpy.reshape(a, used_shape))
         mat=gblock.compute_householder_matrix(hh_pars).squeeze(0).detach().numpy()
 
         test_vec=numpy.ones(dim)
@@ -197,7 +197,7 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4
             tot_num_expected_params+=cur_layer.total_param_num
             # normal default layer init if not data present
             if(data is None):
-                all_layers_params.append(cur_layer.get_desired_init_parameters().type(torch.float64))
+                all_layers_params.append(cur_layer.get_desired_init_parameters())
                 continue
 
             ## param order .. householder / means / width / normaliaztion
@@ -244,7 +244,7 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4
                 #### set mvn params
                 param_list.append(torch.from_numpy(res["x"]).to(data))
 
-                inverse_trafo_matrix=torch.from_numpy(get_trafo_matrix_mvn(dim, res["x"], cur_layer.cov_type)).unsqueeze(0)
+                inverse_trafo_matrix=torch.from_numpy(get_trafo_matrix_mvn(dim, res["x"], cur_layer.cov_type)).unsqueeze(0).to(data)
 
                 batch_rotation_matrix=inverse_trafo_matrix.repeat(cur_data.shape[0], 1,1)
 
@@ -286,13 +286,13 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4
                             this_vs=torch.randn(cur_layer.dimension*cur_layer.householder_iter).to(data)
                             param_list.append(this_vs)
 
-                        gblock=gaussianization_flow.gf_block(dim, num_householder_iter=cur_layer.householder_iter)
+                        gblock=gaussianization_flow.gf_block(dim, num_householder_iter=cur_layer.householder_iter, use_permanent_parameters=True)
 
                         hh_pars=this_vs.reshape(gblock.vs.shape)
                         
                         rotation_matrix=gblock.compute_householder_matrix(hh_pars)
                         rotation_matrix=rotation_matrix.repeat(cur_data.shape[0], 1,1)
-                        
+                       
                         ## inverted matrix
                         cur_data = torch.bmm(rotation_matrix.permute(0,2,1), cur_data.unsqueeze(-1)).squeeze(-1)
                 elif(cur_layer.rotation_mode=="angles"):
@@ -398,7 +398,7 @@ def find_init_pars_of_chained_blocks(layer_list, data, mvn_min_max_sv_ratio=1e-4
             else:
 
                 ## default transformation .. importantly WITHOUT mean shift (with the _ in front), since the mean shift was done earlier
-                param_list.append(cur_layer._get_desired_init_parameters().type(torch.float64))
+                param_list.append(cur_layer._get_desired_init_parameters())
                 
             all_layers_params.append(torch.cat(param_list))
 

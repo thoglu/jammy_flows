@@ -8,7 +8,7 @@ def obtain_lower_triangular_matrix_and_logdet(dimension, single_log_diagonal_ent
     ## all variances are the same
     if(cov_type=="identity"):
 
-        return torch.eye(dimension, dtype=torch.float64).unsqueeze(0), 0.0
+        return torch.eye(dimension).unsqueeze(0), 0.0
 
     elif(cov_type=="diagonal_symmetric"):
         assert(single_log_diagonal_entry is not None)
@@ -61,7 +61,7 @@ def obtain_inverse_lower_triangular_matrix_and_logdet(dimension, single_log_diag
 
     if(cov_type=="identity"):
 
-        return torch.eye(dimension, dtype=torch.float64).unsqueeze(0), 0.0
+        return torch.eye(dimension).unsqueeze(0), 0.0
 
     elif(cov_type=="diagonal_symmetric"):
         assert(single_log_diagonal_entry is not None)

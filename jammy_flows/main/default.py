@@ -136,9 +136,6 @@ class pdf(nn.Module):
         ## initialize params
         self.init_params()
 
-        ## initialize with double precision
-        self.double()
-
     def read_model_definition(self, 
                               pdf_defs, 
                               flow_defs, 
@@ -374,9 +371,9 @@ class pdf(nn.Module):
                                                  For autoregressive PDFs with log-lambda prediction, use fully amortized PDFs."
 
             if self.force_permanent_parameters_in_first_subpdf:
-                self.log_normalization=nn.Parameter(torch.randn(1).type(torch.double).unsqueeze(0))
+                self.log_normalization=nn.Parameter(torch.randn(1).unsqueeze(0))
             else:
-                self.log_normalization=torch.zeros(1).type(torch.double).unsqueeze(0)
+                self.log_normalization=torch.zeros(1).unsqueeze(0)
 
         self.update_embedding_structure()
 
@@ -1010,15 +1007,23 @@ class pdf(nn.Module):
     def obtain_flow_param_structure(self, 
                                     conditional_input=None, 
                                     predefined_target_input=None, 
-                                    seed=None):
+                                    seed=None,
+                                    dtype=None,
+                                    device=None):
         """
         Obtain values of flow parameters for given input along with their name. For debugging and plotting purposes mostly.
         """
 
-        data_type = torch.float64
+        data_type, used_device=self.obtain_current_dtype_n_device()
+
+        if(device is not None):
+            used_device=device
+        if(dtype is not None):
+            data_type=dtype
+
         data_summary = None
         used_sample_size = 1
-        used_device=torch.device("cpu")
+        
 
         this_layer_param_structure=collections.OrderedDict()
 
@@ -1188,6 +1193,7 @@ class pdf(nn.Module):
                amortization_parameters=None, 
                force_embedding_coordinates=False, 
                force_intrinsic_coordinates=False,
+               dtype=None,
                device=None):
         """ 
         Samples from the (conditional) PDF. 
@@ -1200,8 +1206,9 @@ class pdf(nn.Module):
             amortization_parameters (Tensor/None): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates for the sample.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates for the sample.
-            device (torch device/None): Default is None, since the device can usually be inferred. Has to be given when layers are used that do not contain parameters and no conditional parameters are available. 
-        
+            dtype (torch dtype): Dtype and device are normally inferred by parameters or conditional input. If no parameters are part of the 
+            device (torch.device): If given, uses this device. Otherwise uses device from parameters.
+
         Returns:
 
             Tensor
@@ -1226,7 +1233,8 @@ class pdf(nn.Module):
                                                                                          amortization_parameters=amortization_parameters, 
                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
-                                                                                         device=device)
+                                                                                         device=device,
+                                                                                         dtype=dtype)
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1238,7 +1246,8 @@ class pdf(nn.Module):
                                                                                              amortization_parameters=amortization_parameters, 
                                                                                              force_embedding_coordinates=force_embedding_coordinates, 
                                                                                              force_intrinsic_coordinates=force_intrinsic_coordinates,
-                                                                                             device=device)
+                                                                                             device=device,
+                                                                                             dtype=dtype)
            
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1398,6 +1407,7 @@ class pdf(nn.Module):
                        amortization_parameters=None, 
                        force_embedding_coordinates=False, 
                        force_intrinsic_coordinates=False,
+                       dtype=None,
                        device=None):
         """
         Obtains a sample from the Multivariate Standard Normal, evaluates it and passes it through forward machinery. 
@@ -1412,7 +1422,8 @@ class pdf(nn.Module):
             amortization_parameters (bool): Used to amortize the whole PDF. Otherwise None.
             force_embedding_coordinates (bool): Enforces embedding coordinates in the output sample.
             force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the output sample.
-            device (torch device/None): Default is None, since the device can usually be inferred. Has to be given when layers are used that do not contain parameters and no conditional parameters are available. 
+            dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
+            device (torch.device): If given, uses this device. Otherwise uses device from parameters.
 
         Returns:
 
@@ -1426,11 +1437,7 @@ class pdf(nn.Module):
                 Log-pdf evaluation in base space
         """
 
-
-       
-        data_type = torch.float64
         used_sample_size = samplesize
-        used_device=None
 
         ## some crosschecks
         if(conditional_input is not None):
@@ -1471,23 +1478,14 @@ class pdf(nn.Module):
 
         else:
             ## if one blindly uses next() on an empty param generator, it throws an error
-            res=peek(self.parameters()) 
+            data_type, used_device=self.obtain_current_dtype_n_device()
 
-            if(res is None):
-                assert(device is not None), "Using a layer without parameters. Need to infer device from parameter *device* for sampling, but parameter is None!"
-
+            if(device is not None):
                 used_device=device
-            else:
-                used_device=res.device
+            if(dtype is not None):
+                data_type=dtype
 
-        ## if device is given, one last overwrite and check that manual device agrees with other params
-        if(device is not None):
-            used_device=device
-            if(self.amortize_everything is not None):
-                assert(used_device == amortization_parameters.device), "Defined keyword *device* does not match device of amortization params!"
-
-            if conditional_input is not None:
-                assert(used_device==conditional_input.device), "Defined keyword *device* does not match device of conditional input params!"
+        assert( (data_type is not None) and (used_device is not None)), "DType and/or device is None. This can only happen if layers without any parameters are used. In this case, you have to define dtype and device as keyword arguments!"
 
         x=None
         log_gauss_evals=0.0
@@ -1516,15 +1514,6 @@ class pdf(nn.Module):
                 data_type=predefined_target_input.dtype
                 used_sample_size=predefined_target_input.shape[0]
               
-            """
-            log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(self.total_base_dim).type(data_type).to(used_device),
-                covariance_matrix=torch.eye(self.total_base_dim)
-                .type(data_type)
-                .to(used_device),
-            ).log_prob(predefined_target_input)
-            """
-
             log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(predefined_target_input).sum(dim=-1)
 
         else:
@@ -1537,15 +1526,6 @@ class pdf(nn.Module):
             std_normal_samples = (
                 torch.from_numpy(std_normal).type(data_type).to(used_device)
             )
-
-            """
-            log_gauss_evals = torch.distributions.MultivariateNormal(
-                torch.zeros(self.total_base_dim).type(data_type).to(used_device),
-                covariance_matrix=torch.eye(self.total_base_dim)
-                .type(data_type)
-                .to(used_device),
-            ).log_prob(std_normal_samples)
-            """
 
             log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples).sum(dim=-1)
             
@@ -1674,7 +1654,7 @@ class pdf(nn.Module):
         global_amortization_index=0
        
         if(self.amortize_everything):
-            global_amortization_init=torch.zeros(self.total_number_amortizable_params, dtype=torch.float64)
+            global_amortization_init=torch.zeros(self.total_number_amortizable_params)
 
         with torch.no_grad():
             ## 0) check data
@@ -1698,13 +1678,13 @@ class pdf(nn.Module):
                     
                     params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
 
-                    params_list.append(params.type(torch.float64))
+                    params_list.append(params)
 
                 else:
                     
                     this_list=[]
                     for l in this_layer_list:
-                        this_list.append(l.get_desired_init_parameters().type(torch.float64))
+                        this_list.append(l.get_desired_init_parameters())
 
                     params_list.append(torch.cat(this_list))
 
@@ -1739,18 +1719,18 @@ class pdf(nn.Module):
                             if(self.join_poisson_and_pdf_description):
                                 if(ind==0):
                                     log_lambda_init=0.1
-                                    these_params=torch.cat([these_params, torch.Tensor([log_lambda_init])])
+                                    these_params=torch.cat([these_params, torch.Tensor([log_lambda_init]).type(mlp_predictor[-1].bias.data.dtype)])
 
                         ## custom low-rank MLPs - initialization is done inside the custom MLP class
                         if(type(mlp_predictor)== amortizable_mlp.AmortizableMLP):
                            
                             if(self.amortize_everything):
-                                desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params, prev_damping_factor=damping_factor)
+                                desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params.type(mlp_predictor[-1].bias.data.dtype), prev_damping_factor=damping_factor)
                                 num_uvb_pars=mlp_predictor.num_amortization_params
                                 global_amortization_init[global_amortization_index:global_amortization_index+num_uvb_pars]=desired_uvb_params
                                 global_amortization_index+=num_uvb_pars
                             else:
-                                mlp_predictor.initialize_uvbs(fix_final_bias=these_params, prev_damping_factor=damping_factor)
+                                mlp_predictor.initialize_uvbs(fix_final_bias=these_params.type(mlp_predictor[-1].bias.data.dtype), prev_damping_factor=damping_factor)
 
                         else:
                             # initialize all layers
@@ -1771,7 +1751,7 @@ class pdf(nn.Module):
                                 
                             # finally overwrite bias to be equivalent to desired parameters at initialization
                             
-                            mlp_predictor[-1].bias.data=these_params.data#torch.ones_like(these_params.data)*0.44  # .copy_(torch.randn(these_params.shape))
+                            mlp_predictor[-1].bias.data=these_params.data.type(mlp_predictor[-1].bias.data.dtype)#torch.ones_like(these_params.data)*0.44  # .copy_(torch.randn(these_params.shape))
 
                     else:
                         ## threre is no MLP - initialize parameters of flows directly
@@ -1874,7 +1854,8 @@ class pdf(nn.Module):
                 force_embedding_coordinates=True, 
                 force_intrinsic_coordinates=False,
                 samplesize=100,
-                device=torch.device("cpu")):
+                dtype=None,
+                device=None):
 
         """
         Calculates entropy of the PDF.
@@ -1885,7 +1866,8 @@ class pdf(nn.Module):
             force_embedding_coordinates (bool): Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.
             force_intrinsic_coordinates (bool): Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.
             samplesize (int): Samplesize to use for entropy approximation.
-            device (torch.device): Device to use.
+            dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
+            device (torch.device): If given, uses this device. Otherwise uses device from parameters.
 
         Returns:
             dict
@@ -1893,10 +1875,15 @@ class pdf(nn.Module):
 
         """
 
-        data_type = torch.float64
-        data_summary = None
-        used_device=device
+        data_type, used_device=self.obtain_current_dtype_n_device()
 
+        if(device is not None):
+            used_device=device
+        if(dtype is not None):
+            data_type=dtype
+
+        data_summary = None
+     
         ## some crosschecks
         if(conditional_input is not None):
             if(type(conditional_input)==list):
@@ -2852,16 +2839,16 @@ class pdf(nn.Module):
 
             if(p==2):
 
-                a_p_k=i1(arg)/i0(arg)
+                a_p_k=i1(arg.cpu())/i0(arg.cpu())
 
-                return arg- ((a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (1.0/arg)*a_p_k))
+                return arg.cpu()- ((a_p_k-normed_length_summed_pts.cpu())/(1.0-a_p_k**2- (1.0/arg.cpu())*a_p_k))
 
                
             elif(p==3):
 
-                a_p_k=iv(1.5, arg)/iv(0.5, arg)
+                a_p_k=iv(1.5, arg.cpu())/iv(0.5, arg.cpu())
 
-                return arg- ( (a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (2.0/arg)*a_p_k) )
+                return arg.cpu()- ( (a_p_k-normed_length_summed_pts.cpu())/(1.0-a_p_k**2- (2.0/arg.cpu())*a_p_k) )
 
         
 
@@ -3002,7 +2989,7 @@ class pdf(nn.Module):
 
                     for i in range(max_iter):
 
-                        new_vec=newton_iter(last_vec, p, normalized_length_R)
+                        new_vec=newton_iter(last_vec, p, normalized_length_R).to(last_vec)
 
                         new_diff=torch.abs(new_vec-last_vec)
 

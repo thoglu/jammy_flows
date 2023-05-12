@@ -274,14 +274,14 @@ class mvn_block(euclidean_base.euclidean_base):
         if(self.cov_type=="diagonal_symmetric"):
 
             ## means
-            desired_param_vec.append(torch.zeros(1,dtype=torch.float64))
+            desired_param_vec.append(torch.zeros(1))
 
         elif(self.cov_type=="diagonal"):
-            desired_param_vec.append(torch.zeros(self.dimension,dtype=torch.float64))
+            desired_param_vec.append(torch.zeros(self.dimension))
 
         elif(self.cov_type=="full"):
-            desired_param_vec.append(torch.zeros(self.dimension,dtype=torch.float64))
-            desired_param_vec.append(torch.zeros(int(self.dimension*(self.dimension-1)/2) ,dtype=torch.float64))
+            desired_param_vec.append(torch.zeros(self.dimension))
+            desired_param_vec.append(torch.zeros(int(self.dimension*(self.dimension-1)/2)))
 
         return torch.cat(desired_param_vec)
 

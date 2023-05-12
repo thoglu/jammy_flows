@@ -34,10 +34,10 @@ class spline_1d(sphere_base.sphere_base):
         self.total_param_num+=self.num_basis_functions*self.num_omega_pars
 
         if(use_permanent_parameters):
-            self.moebius_pars=nn.Parameter(torch.randn(self.num_basis_functions,self.num_omega_pars).type(torch.double).unsqueeze(0))
+            self.moebius_pars=nn.Parameter(torch.randn(self.num_basis_functions,self.num_omega_pars).unsqueeze(0))
             
         else:
-            self.moebius_pars=torch.zeros(self.num_basis_functions,self.num_omega_pars).type(torch.double).unsqueeze(0)
+            self.moebius_pars=torch.zeros(self.num_basis_functions,self.num_omega_pars).unsqueeze(0)
 
         ## natural direction means no bisection in the forward pass, but in the backward pass
         self.natural_direction=natural_direction

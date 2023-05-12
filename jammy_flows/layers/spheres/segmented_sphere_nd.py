@@ -531,7 +531,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
         if(gf_init):
 
             ## flat data between 0 to pi in every dim
-            pseudo_data=torch.rand((1000, self.dimension-1)).type(torch.float64)
+            pseudo_data=torch.rand((1000, self.dimension-1))
 
             ## get the corresponding distribution in the euclidean space
         

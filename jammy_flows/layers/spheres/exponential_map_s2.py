@@ -125,10 +125,8 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         ## potential parameters
         if(self.use_permanent_parameters):
-            self.potential_pars=nn.Parameter(torch.randn(self.num_potential_pars, self.num_components).type(torch.double).unsqueeze(0))
-        else:
-            self.potential_pars=torch.zeros(self.num_potential_pars, self.num_components).type(torch.double).unsqueeze(0)
-
+            self.potential_pars=nn.Parameter(torch.randn(self.num_potential_pars, self.num_components).unsqueeze(0))
+       
         self.mu_norm_function=generate_normalization_function(stretch_factor=10.0, max_value=1.0)
 
         self.exponent_log_norm_function=generate_log_function_bounded_in_logspace(min_val_normal_space=1.0, max_val_normal_space=30.0, center=False)
@@ -858,10 +856,11 @@ class exponential_map_s2(sphere_base.sphere_base):
         [x,log_det]=inputs
         
        
-        potential_pars=self.potential_pars.to(x)
+        
         if(extra_inputs is not None):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
-      
+        else:
+            potential_pars=self.potential_pars.to(x)
 
         if(self.always_parametrize_in_embedding_space==False):
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
@@ -902,11 +901,12 @@ class exponential_map_s2(sphere_base.sphere_base):
 
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
-        potential_pars=self.potential_pars.to(x)
+        
 
         if(extra_inputs is not None):
             potential_pars=potential_pars+extra_inputs.reshape(x.shape[0], self.potential_pars.shape[1], self.potential_pars.shape[2])
-
+        else:
+            potential_pars=self.potential_pars.to(x)
         
 
         if(self.natural_direction):
@@ -959,8 +959,10 @@ class exponential_map_s2(sphere_base.sphere_base):
         Implemented by Euclidean sublayers.
         """
 
-        potential_pars=self.potential_pars
+        
         if(extra_inputs is not None):
-            potential_pars=potential_pars+extra_inputs
+            potential_pars=extra_inputs
+        else:
+            potential_pars=self.potential_pars
 
         param_dict[extra_prefix+"potential_pars"]=potential_pars.data

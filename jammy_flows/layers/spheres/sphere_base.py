@@ -68,7 +68,7 @@ class sphere_base(layer_base.layer_base):
                 #assert(self.dimension==2), "requires 2 dims at the moment"
 
                 if(use_permanent_parameters):
-                    self.householder_params=nn.Parameter(torch.randn((1, self.num_householder_params)).type(torch.double))
+                    self.householder_params=nn.Parameter(torch.randn((1, self.num_householder_params)))
 
             else:
                 self.num_householder_params=0
@@ -80,12 +80,12 @@ class sphere_base(layer_base.layer_base):
                 if(self.use_permanent_parameters):
 
                     self.householder_params=nn.Parameter(
-                        torch.randn(self.num_householder_params).type(torch.double)
+                        torch.randn(self.num_householder_params)
                     )
 
-                else:
+                #else:
 
-                    self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
+                #    self.householder_params=torch.zeros(self.num_householder_params).type(torch.double).unsqueeze(0)
 
     
 
@@ -142,7 +142,7 @@ class sphere_base(layer_base.layer_base):
 
     def compute_householder_matrix(self, vs, dim,device=torch.device("cpu")):
 
-        Q = torch.eye(dim, device=device).type(torch.double).unsqueeze(0).repeat(vs.shape[0], 1,1)
+        Q = torch.eye(dim, device=device).type(vs.dtype).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
         for i in range(1):
         
@@ -150,7 +150,7 @@ class sphere_base(layer_base.layer_base):
             
             v = v / v.norm(dim=1).unsqueeze(-1)
 
-            Qi = torch.eye(dim, device=device).type(torch.double).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
+            Qi = torch.eye(dim, device=device).type(vs.dtype).unsqueeze(0) - 2 * torch.bmm(v, v.permute(0, 2, 1))
 
             Q = torch.bmm(Q, Qi)
 
