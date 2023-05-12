@@ -3003,23 +3003,23 @@ class pdf(nn.Module):
                         last_vec_cpu=new_vec
                         
                     ## set back to device before newton iters
-                    this_var=last_vec_cpu.to(angle_mean)
+                    this_var=last_vec_cpu
 
                     if(p==2):
 
-                        c_p_k=1.0/(2*numpy.pi*i0(this_var))
-                        a_p_k=i1(this_var)/i0(this_var)
+                        c_p_k=(1.0/(2*numpy.pi*i0(this_var))).to(angle_mean)
+                        a_p_k=(i1(this_var)/i0(this_var)).to(angle_mean)
 
                     elif(p==3):
 
                         
-                        c_p_k=this_var**(0.5)/( (2*numpy.pi)**1.5 * iv(0.5, this_var))
+                        c_p_k=(this_var**(0.5)/( (2*numpy.pi)**1.5 * iv(0.5, this_var))).to(angle_mean)
                        
                         #c_p_k*=1e-5
-                        a_p_k=iv(1.5, this_var)/iv(0.5, this_var)
+                        a_p_k=(iv(1.5, this_var)/iv(0.5, this_var)).to(angle_mean)
 
+                    this_var=this_var.to(angle_mean)
                         
-
                     approx_entropy=(-torch.log(c_p_k)-this_var*a_p_k).squeeze(1)
                
                     if(calc_kl_diff_and_entropic_quantities):
