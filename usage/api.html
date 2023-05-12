@@ -251,7 +251,7 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.entropy">
-<code class="sig-name descname">entropy</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, device=device(type='cpu')</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">entropy</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, dtype=None, device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates entropy of the PDF.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -261,7 +261,8 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.</p></li>
 <li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.</p></li>
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize to use for entropy approximation.</p></li>
-<li><p><strong>device</strong> (<em>torch.device</em>) – Device to use.</p></li>
+<li><p><strong>dtype</strong> (<em>torch dtype</em>) – If given, uses this dtype. Otherwise uses dtype from parameters.</p></li>
+<li><p><strong>device</strong> (<em>torch.device</em>) – If given, uses this device. Otherwise uses device from parameters.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
@@ -422,7 +423,7 @@ entropy_total = total entropy (only total quantity calculated because it is esse
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.sample">
-<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em>, <em class="sig-param">device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.sample" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em>, <em class="sig-param">dtype=None</em>, <em class="sig-param">device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.sample" title="Permalink to this definition">¶</a></dt>
 <dd><p>Samples from the (conditional) PDF.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -434,7 +435,8 @@ entropy_total = total entropy (only total quantity calculated because it is esse
 <li><p><strong>amortization_parameters</strong> (<em>Tensor/None</em>) – Used to amortize the whole PDF. Otherwise None.</p></li>
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Enforces embedding coordinates for the sample.</p></li>
 <li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Enforces intrinsic coordinates for the sample.</p></li>
-<li><p><strong>device</strong> (<em>torch device/None</em>) – Default is None, since the device can usually be inferred. Has to be given when layers are used that do not contain parameters and no conditional parameters are available.</p></li>
+<li><p><strong>dtype</strong> (<em>torch dtype</em>) – Dtype and device are normally inferred by parameters or conditional input. If no parameters are part of the</p></li>
+<li><p><strong>device</strong> (<em>torch.device</em>) – If given, uses this device. Otherwise uses device from parameters.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns</dt>
