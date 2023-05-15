@@ -348,7 +348,7 @@ def inverse_bisection_n_newton_sphere(combined_func,
     prev[:,2]=-1.0
   
     for i in range(num_newton_iter):
-        
+      
         phi_res, _, jac_phi,_=combined_func(prev, *args)
 
 
@@ -356,19 +356,99 @@ def inverse_bisection_n_newton_sphere(combined_func,
 
         res_vec=-torch.bmm(jac_phi.permute(0,2,1), target_arg.unsqueeze(2)).squeeze(-1)#*basic_pot_func.unsqueeze(1).unsqueeze(2)
 
-
         grad_norm=(res_vec**2).sum(axis=1, keepdims=True).sqrt()
 
-        
-        new_vs,_=find_tangent_func(prev, -(res_vec/grad_norm).squeeze(-1))
-
-        
+       
+        new_vs,alpha=find_tangent_func(prev, -(res_vec/grad_norm).squeeze(-1))
+      
         gpnew=(new_vs*res_vec).sum(axis=1,keepdims=True)
         
         projection_2=fn_eval/gpnew
 
         projection_2=-projection_2
 
-        prev=basic_exponential_map_func(prev, new_vs, projection_2)
+        ## set to 0 once we reach 0
+        
+        ## leave early if possible
+        if( projection_2.max() < 1e-12):
+          
+            break
+
+        #print("proj 2 ", projection_2[19])
+        prev=basic_exponential_map_func(prev, new_vs, 0.1*projection_2)
+       
+    return prev
+
+
+def inverse_bisection_n_newton_sphere_fast(combined_func, 
+                                      find_tangent_func, 
+                                      basic_exponential_map_func, 
+                                      target_arg, 
+                                      *args, 
+                                      num_newton_iter=25):
+    """
+    Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
+    In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
+    Distributing the points randomly on the sphere doesn't really help, so every point is initialized just at (0,0,1).
+    In order for this to work properly, the function *has* to be globally diffeomorphic, so the exponential map has to follow the conditions outlined in 
+    https://arxiv.org/abs/0906.0874 (Sei 2009).
+
+    Parameters:
+    
+        combined_func (function): A function that returns the (x,y,z) unit vector and its jacobian.
+        find_tangent_func (function): A funtion to calculate the tangent at a given point along a certain direction.
+        target_arg (float Tensor): The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.
+        *args (list): Any extra arguments passed to *func*.
+        num_newton_iter (int): Number of Newton iterations.
+
+    Returns:
+
+        Tensor
+            The inverse of the exponential map.
+
+    """
+    
+    prev=torch.zeros_like(target_arg)
+    prev[:,2]=-1.0
+
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool, device=target_arg.device)
+        
+    broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
+
+    for i in range(num_newton_iter):
+    
+        phi_res, _, jac_phi,_=combined_func(prev[above_tolerance_mask], *[a[above_tolerance_mask] if(broadcasting_bool_args[arg_index] == True) else a for arg_index, a in enumerate(args)])
+
+        
+        fn_eval=-(phi_res*target_arg[above_tolerance_mask]).sum(axis=-1, keepdims=True)+1.0
+
+        res_vec=-torch.bmm(jac_phi.permute(0,2,1), target_arg[above_tolerance_mask].unsqueeze(2)).squeeze(-1)#*basic_pot_func.unsqueeze(1).unsqueeze(2)
+
+        grad_norm=(res_vec**2).sum(axis=1, keepdims=True).sqrt()
+
+        new_vs,alpha=find_tangent_func(prev[above_tolerance_mask], -(res_vec/grad_norm).squeeze(-1))
+       
+        gpnew=(new_vs*res_vec).sum(axis=1,keepdims=True)
+        
+        projection_2=fn_eval/gpnew
+
+        projection_2=-projection_2
+
+        ## set to 0 once we reach 0
+        projection_2=torch.where(alpha==0, 0.0, projection_2)
+
+
+        prev[above_tolerance_mask]=basic_exponential_map_func(prev[above_tolerance_mask], new_vs, 0.4*projection_2)
+
+
+        # check if any of the projections are below tolerance so we can switch them off for next iteration
+        new_tolerance_mask=(torch.abs(projection_2[:,0]))>=1e-12
+    
+        above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
+
+     
+        if(above_tolerance_mask.sum()==0):
+            
+            break
        
     return prev

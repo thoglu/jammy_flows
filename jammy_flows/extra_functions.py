@@ -428,3 +428,131 @@ def _calculate_coverage(base_evals, dim, expected_coverage_probs):
         actual_coverage_probs.append(float(sum(actual_twice_logprob<expected_twice_logprob[ind]))/float(len(actual_twice_logprob)))
 
     return numpy.array(actual_coverage_probs), actual_twice_logprob 
+
+
+def recheck_sampling(pdf, 
+                      old_targets,
+                      old_base_targets,
+                      old_target_pdf_evals,
+                      old_base_pdf_evals,
+                      sub_manifolds=None,
+                      failsafe_crosscheck_tolerance=None,
+                      conditional_input=None,
+                      amortization_parameters=None,
+                      force_embedding_coordinates=False,
+                      force_intrinsic_coordinates=False,
+                      dtype=None,
+                      device=None):
+
+    """
+    This function is used in _obtain_sample or the entropy functions after *all_layer_forward_inividual_subdims* to recheck the sampling process.
+    Relevant for precise v-flow sampling on the sphere which can have numerical instabilities.
+    """
+
+    if(failsafe_crosscheck_tolerance):
+
+        if(sub_manifolds is not None):
+            # ok we use the function in the context of local forwards
+            # make sure the total PDF is also there... we need it for the crosscheck
+
+            assert("total" in old_target_pdf_evals)
+            assert("total" in old_base_pdf_evals)
+
+            used_old_pdf_evals=old_target_pdf_evals["total"]
+            used_old_base_pdf_evals=old_base_pdf_evals["total"]
+
+        else:
+            used_old_pdf_evals=old_target_pdf_evals
+            used_old_base_pdf_evals=old_base_pdf_evals
+
+        with torch.no_grad():
+
+            ## check if we need some resampling at all by doing a roundtrip
+            log_pdf_target_new,log_pdf_base_new,new_base_targets=pdf.forward(old_targets, conditional_input=conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+
+            new_sample,_,_,_=pdf._obtain_sample( 
+                       conditional_input=conditional_input, 
+                       predefined_target_input=new_base_targets, 
+                       seed=None, 
+                       amortization_parameters=amortization_parameters, 
+                       force_embedding_coordinates=force_embedding_coordinates, 
+                       force_intrinsic_coordinates=force_intrinsic_coordinates,
+                       failsafe_crosscheck_tolerance=None,
+                       dtype=dtype,
+                       device=device)
+
+            ## deviation of base values
+            base_dev_mask=torch.abs(new_base_targets-old_base_targets)>failsafe_crosscheck_tolerance
+
+            ## devaition of samples
+            sample_dev_mask=torch.abs(new_sample-old_targets)>failsafe_crosscheck_tolerance
+    
+            ## deviation of target eval
+            deviation_mask=torch.abs(log_pdf_target_new-used_old_pdf_evals)>failsafe_crosscheck_tolerance
+
+
+            ## add base sample devs
+            for sd in range(new_base_targets.shape[1]):
+                deviation_mask=sample_dev_mask[:,sd] | deviation_mask
+
+            ## add target sample devs
+            for sd in range(new_base_targets.shape[1]):
+                deviation_mask=base_dev_mask[:,sd] | deviation_mask
+          
+            num_deviations=deviation_mask.sum()
+
+        if(num_deviations>0):
+
+            new_cinput=None
+            new_amortization_parameters=None
+
+            if(conditional_input is not None):
+                if(type(conditional_input)==list):
+                    new_cinput=[ci[deviation_mask] for ci in conditional_input]
+                else:
+                    new_cinput=conditional_input[deviation_mask]
+
+            if(new_amortization_parameters is not None):
+                new_amortization_parameters=amortization_parameters[deviation_mask]
+
+            if(sub_manifolds):
+                ## individual forw9oio98ko.p.,.,ö0ßm,ard functions (used in entropy calculation)
+
+                resampled_new_target, resampled_std_normal_samples, resampled_return_pdf, resampled_log_gauss_evals =pdf.all_layer_forward_individual_subdims_incl_sampling(new_cinput, num_deviations, failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates, dtype=dtype, device=device)
+                
+                old_targets=torch.masked_scatter(input=old_targets, mask=deviation_mask[:,None], source=resampled_new_target)
+                old_base_targets=torch.masked_scatter(input=old_base_targets, mask=deviation_mask[:,None], source=resampled_std_normal_samples)
+
+                for k in resampled_return_pdf:
+                    
+                    old_target_pdf_evals[k]=torch.masked_scatter(input=old_target_pdf_evals[k], mask=deviation_mask, source=resampled_return_pdf[k])
+                    old_base_pdf_evals[k]=torch.masked_scatter(input=old_base_pdf_evals[k], mask=deviation_mask, source=resampled_log_gauss_evals[k])
+
+                return old_targets, old_base_targets, old_target_pdf_evals, old_base_pdf_evals
+
+            else:
+                ## standard sampling
+                resampled_new_target, resampled_std_normal_samples, resampled_return_pdf, resampled_log_gauss_evals = pdf._obtain_sample( 
+                           conditional_input=new_cinput, 
+                           predefined_target_input=None, 
+                           samplesize=num_deviations, 
+                           seed=None, 
+                           amortization_parameters=new_amortization_parameters, 
+                           force_embedding_coordinates=force_embedding_coordinates, 
+                           force_intrinsic_coordinates=force_intrinsic_coordinates,
+                           failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
+                           dtype=dtype,
+                           device=device)
+
+
+                old_targets=torch.masked_scatter(input=old_targets, mask=deviation_mask[:,None], source=resampled_new_target)
+                old_base_targets=torch.masked_scatter(input=old_base_targets, mask=deviation_mask[:,None], source=resampled_std_normal_samples)
+
+                old_target_pdf_evals=torch.masked_scatter(input=old_target_pdf_evals, mask=deviation_mask, source=resampled_return_pdf)
+                old_base_pdf_evals=torch.masked_scatter(input=old_base_pdf_evals, mask=deviation_mask, source=resampled_log_gauss_evals)
+
+
+                return old_targets, old_base_targets, old_target_pdf_evals, old_base_pdf_evals
+
+    return None, None, None, None
+

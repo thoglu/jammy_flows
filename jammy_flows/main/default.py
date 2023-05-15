@@ -1193,6 +1193,7 @@ class pdf(nn.Module):
                amortization_parameters=None, 
                force_embedding_coordinates=False, 
                force_intrinsic_coordinates=False,
+               failsafe_crosscheck_tolerance=None,
                dtype=None,
                device=None):
         """ 
@@ -1233,8 +1234,10 @@ class pdf(nn.Module):
                                                                                          amortization_parameters=amortization_parameters, 
                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                         failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
                                                                                          device=device,
                                                                                          dtype=dtype)
+
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1246,6 +1249,7 @@ class pdf(nn.Module):
                                                                                              amortization_parameters=amortization_parameters, 
                                                                                              force_embedding_coordinates=force_embedding_coordinates, 
                                                                                              force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                             failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
                                                                                              device=device,
                                                                                              dtype=dtype)
            
@@ -1407,6 +1411,7 @@ class pdf(nn.Module):
                        amortization_parameters=None, 
                        force_embedding_coordinates=False, 
                        force_intrinsic_coordinates=False,
+                       failsafe_crosscheck_tolerance=None,
                        dtype=None,
                        device=None):
         """
@@ -1535,8 +1540,36 @@ class pdf(nn.Module):
         
         new_targets, log_det=self.all_layer_forward(x, log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
 
+        ## failsafe crosscheck?
+
+        return_log_pdf=-log_det + log_gauss_evals
+
+        if(failsafe_crosscheck_tolerance):
+
+            assert(predefined_target_input is None), "Failsafe does not work with predefined input!"
+            
+            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, log_gauss_evals_prop=extra_functions.recheck_sampling(self, 
+                      new_targets,
+                      std_normal_samples,
+                      return_log_pdf,
+                      log_gauss_evals,
+                      failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
+                      conditional_input=conditional_input,
+                      amortization_parameters=amortization_parameters,
+                      force_embedding_coordinates=force_embedding_coordinates,
+                      force_intrinsic_coordinates=force_intrinsic_coordinates,
+                      dtype=data_type,
+                      device=used_device)
+
+            if(new_targets_prop is not None):
+                new_targets=new_targets_prop
+                std_normal_samples=std_normal_samples_prop
+                return_log_pdf=return_log_pdf_prop
+                log_gauss_evals=log_gauss_evals_prop
+            
+
         ## -logdet because log_det in sampling is derivative of forward function d/dx(f), but log_p requires derivative of backward function d/dx(f^-1) whcih flips the sign here
-        return new_targets, std_normal_samples, -log_det + log_gauss_evals, log_gauss_evals
+        return new_targets, std_normal_samples, return_log_pdf, log_gauss_evals
 
     def get_total_embedding_dim(self):
         """Returns embedding dimension of the overall PDF."""
@@ -1854,6 +1887,7 @@ class pdf(nn.Module):
                 force_embedding_coordinates=True, 
                 force_intrinsic_coordinates=False,
                 samplesize=100,
+                failsafe_crosscheck_tolerance=None,
                 dtype=None,
                 device=None):
 
@@ -1866,6 +1900,7 @@ class pdf(nn.Module):
             force_embedding_coordinates (bool): Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.
             force_intrinsic_coordinates (bool): Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.
             samplesize (int): Samplesize to use for entropy approximation.
+            failsafe_crosscheck_tolerance (float / None): If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.
             dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
             device (torch.device): If given, uses this device. Otherwise uses device from parameters.
 
@@ -1937,43 +1972,22 @@ class pdf(nn.Module):
 
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
-       
-        std_normal_samples = torch.randn(size=(samplesize*batch_size, self.total_base_dim), dtype=data_type, device=used_device)
-        
-        ## save the easy cases in dict
-        base_evals_dict=dict()
 
-        for mf_dim in sub_manifolds:
-            if(mf_dim>=1):
-                continue
-
-            if(mf_dim==-1):
-            
-                this_mask=slice(0, self.total_base_dim)
-                this_dim=self.total_base_dim
-
-            elif(mf_dim==0):
-
-                this_dim=self.base_dim_indices[mf_dim][1]-self.base_dim_indices[mf_dim][0]
-                this_mask=slice(0, this_dim)
-        
-            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples[:, this_mask]).sum(dim=-1)
-             
-
-            if(mf_dim==-1):
-                base_evals_dict["total"]=log_gauss_evals
-            elif(mf_dim==0):
-                base_evals_dict[0]=log_gauss_evals
-     
         entropy_dict=dict()
 
       
         if(use_marginal_subdims==False):
             ## just calculate normal entropy by summing over samples
             
-            _, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-           
-            entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict["total"]).reshape(-1,samplesize).mean(dim=1)
+            _, _, log_pdf_dict, _=self.all_layer_forward_individual_subdims_incl_sampling(data_summary, 
+                                                                                          samplesize*batch_size, 
+                                                                                          failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance, 
+                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                          dtype=data_type,
+                                                                                          device=used_device)
+
+            entropy_dict["total"]=-(log_pdf_dict["total"]).reshape(-1,samplesize).mean(dim=1)
             
         else:
 
@@ -1984,17 +1998,25 @@ class pdf(nn.Module):
 
             ## transform all base samples forward
             
-            targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            targets, _, log_pdf_dict, _=self.all_layer_forward_individual_subdims_incl_sampling(data_summary, 
+                                                                                          samplesize*batch_size, 
+                                                                                          failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance, 
+                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                          dtype=data_type,
+                                                                                          device=used_device)
+
+            #targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
                     
 
             for sub_mf in sub_manifolds:
                 ## also calculate total
                 if(-1 == sub_mf):
                     
-                    entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict_fw["total"]).reshape(-1, samplesize).mean(dim=1)
+                    entropy_dict["total"]=-(log_pdf_dict["total"]).reshape(-1, samplesize).mean(dim=1)
                 elif(0==sub_mf):
                  
-                    entropy_dict[0]=-(base_evals_dict[0]-log_det_dict_fw[0]).reshape(-1, samplesize).mean(dim=1)
+                    entropy_dict[0]=-(log_pdf_dict[0]).reshape(-1, samplesize).mean(dim=1)
                 else:
 
                     max_target_first_index=0
@@ -2060,6 +2082,7 @@ class pdf(nn.Module):
                 samplesize=100,
                 iterative_samplesize=10,
                 max_iterative_batchsize=20,
+                failsafe_crosscheck_tolerance=None,
                 dtype=None,
                 device=None,
                 return_samples=False,
@@ -2077,6 +2100,7 @@ class pdf(nn.Module):
             samplesize (int): Samplesize to use for entropy approximation.
             iterative_samplesize (int): Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.
             max_iterative_batchsize (int): The max number of batch samples evaluated simultaneously. 
+            failsafe_crosscheck_tolerance (float / None): If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.
             dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
             device (torch.device): If given, uses this device. Otherwise uses device from parameters.
             return_samples (bool): Return the samples that are generated to calculate the entropy? Samples are returned as B*num_samples X sample_dim, so the effective batch dimension is B*num_samples.
@@ -2126,6 +2150,10 @@ class pdf(nn.Module):
                 assert(subdim>=0 and subdim < len(self.layer_list))
                 use_marginal_subdims=True
 
+
+        ## always use marginal subdims
+        use_marginal_subdims=True
+
         # no conditional input means batch size of *1*
         batch_size=1
 
@@ -2153,45 +2181,25 @@ class pdf(nn.Module):
                 batch_size=conditional_input.shape[0]
         else:
             assert(self.conditional_input_dim is None), "We require conditional input, since this is a conditional PDF."
-      
-        std_normal_samples = torch.randn(size=(samplesize*batch_size, self.total_base_dim), dtype=data_type, device=used_device)
-        
-        ## save the easy cases in dict
-        base_evals_dict=dict()
 
-        for mf_dim in sub_manifolds:
-            if(mf_dim>=1):
-                continue
-
-            if(mf_dim==-1):
-            
-                this_mask=slice(0, self.total_base_dim)
-                this_dim=self.total_base_dim
-
-            elif(mf_dim==0):
-
-                this_dim=self.base_dim_indices[mf_dim][1]-self.base_dim_indices[mf_dim][0]
-                this_mask=slice(0, this_dim)
-        
-           
-            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples[:, this_mask]).sum(dim=-1)
-                
-
-            if(mf_dim==-1):
-                base_evals_dict["total"]=log_gauss_evals
-            elif(mf_dim==0):
-                base_evals_dict[0]=log_gauss_evals
-     
         entropy_dict=dict()
 
         
         if(use_marginal_subdims==False):
             ## just calculate normal entropy by summing over samples
             
-            targets, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-           
-            entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict["total"]).reshape(-1,samplesize).mean(dim=1)
+            #targets, log_det_dict=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
             
+            targets, _, log_pdf_dict, _=self.all_layer_forward_individual_subdims_incl_sampling(data_summary, 
+                                                                                          samplesize*batch_size, 
+                                                                                          failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance, 
+                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                          dtype=data_type,
+                                                                                          device=used_device)
+
+            entropy_dict["total"]=-(log_pdf_dict["total"]).reshape(-1,samplesize).mean(dim=1)
+        
         else:
 
             ## make sure we go all the way to the end by including -1 if it is not there
@@ -2201,8 +2209,15 @@ class pdf(nn.Module):
 
             ## transform all base samples forward
             
-            targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
-            
+            #targets, log_det_dict_fw=self.all_layer_forward_individual_subdims(std_normal_samples, data_summary, sub_manifolds=sub_manifolds_here, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+            targets, _, log_pdf_dict, _=self.all_layer_forward_individual_subdims_incl_sampling(data_summary, 
+                                                                                          samplesize*batch_size, 
+                                                                                          failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance, 
+                                                                                          force_embedding_coordinates=force_embedding_coordinates, 
+                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                                                          dtype=data_type,
+                                                                                          device=used_device)
+
             for sub_mf in sub_manifolds:
 
                 if(verbose):
@@ -2211,10 +2226,10 @@ class pdf(nn.Module):
                 ## also calculate total
                 if(-1 == sub_mf):
                     
-                    entropy_dict["total"]=-(base_evals_dict["total"]-log_det_dict_fw["total"]).reshape(-1, samplesize).mean(dim=1)
+                    entropy_dict["total"]=-(log_pdf_dict["total"]).reshape(-1, samplesize).mean(dim=1)
                 elif(0==sub_mf):
                  
-                    entropy_dict[0]=-(base_evals_dict[0]-log_det_dict_fw[0]).reshape(-1, samplesize).mean(dim=1)
+                    entropy_dict[0]=-(log_pdf_dict[0]).reshape(-1, samplesize).mean(dim=1)
                    
                 else:
 
@@ -2506,9 +2521,85 @@ class pdf(nn.Module):
 
         return base_pos, log_det_dict
 
+    def all_layer_forward_individual_subdims_incl_sampling(self, 
+                                       data_summary,
+                                       total_samplesize,
+                                       failsafe_crosscheck_tolerance=None,
+                                       force_embedding_coordinates=False, 
+                                       force_intrinsic_coordinates=False,
+                                       amortization_parameters=None,
+                                       dtype=None,
+                                       device=None
+                                       ):
+
+        std_normal_samples = torch.randn(size=(total_samplesize, self.total_base_dim), dtype=dtype, device=device)
+        
+        ## save the easy cases in dict
+        base_evals_dict=dict()
+
+        ## get all manfiolds + total
+        sub_manifolds=list(range(len(self.pdf_defs_list)))+[-1]
+      
+        for mf_dim in sub_manifolds:
+           
+            if(mf_dim==-1):
+            
+                this_mask=slice(0, self.total_base_dim)
+
+            else:
+
+                this_mask=slice(self.base_dim_indices[mf_dim][0], self.base_dim_indices[mf_dim][1])
+        
+           
+            log_gauss_evals=torch.distributions.Normal(0.0,1.0).log_prob(std_normal_samples[:, this_mask]).sum(dim=-1)
+                
+            if(mf_dim==-1):
+                base_evals_dict["total"]=log_gauss_evals
+            else:
+                base_evals_dict[mf_dim]=log_gauss_evals
+
+
+
+        new_targets, logdet_per_manifold=self.all_layer_forward_individual_subdims(std_normal_samples, 
+                                                  data_summary, 
+                                                  force_embedding_coordinates=force_embedding_coordinates, 
+                                                  force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                  sub_manifolds=sub_manifolds,
+                                                  amortization_parameters=amortization_parameters)
+
+ 
+        return_log_pdf=dict()
+        for k in logdet_per_manifold:
+            return_log_pdf[k]=base_evals_dict[k]-logdet_per_manifold[k]
+
+        if(failsafe_crosscheck_tolerance):
+            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, base_evals_dict_prop=extra_functions.recheck_sampling(self, 
+                      new_targets,
+                      std_normal_samples,
+                      return_log_pdf,
+                      base_evals_dict,
+                      sub_manifolds=sub_manifolds,
+                      failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
+                      conditional_input=data_summary,
+                      amortization_parameters=amortization_parameters,
+                      force_embedding_coordinates=force_embedding_coordinates,
+                      force_intrinsic_coordinates=force_intrinsic_coordinates,
+                      dtype=dtype,
+                      device=device)
+
+            if(new_targets_prop is not None):
+                new_targets=new_targets_prop
+                std_normal_samples=std_normal_samples_prop
+                return_log_pdf=return_log_pdf_prop
+                base_evals_dict=base_evals_dict_prop
+
+
+        return new_targets, std_normal_samples, return_log_pdf, base_evals_dict
+
+
     def all_layer_forward_individual_subdims(self, 
                                        x,
-                                       data_summary,  
+                                       data_summary,
                                        force_embedding_coordinates=False, 
                                        force_intrinsic_coordinates=False,
                                        sub_manifolds=[-1],
@@ -2707,6 +2798,40 @@ class pdf(nn.Module):
                 for k in logdet_per_manifold.keys():
                     logdet_per_manifold[k]=logdet_per_manifold[k]+embedding_log_dets[k]
 
+            """
+            ### 
+            if(failsafe_crosscheck_tolerance):
+
+                ## inverse and another forward
+
+                raise Exception()
+                
+                with torch.no_grad():
+                    new_base, bw_logdet_dict=self.all_layer_inverse_individual_subdims(res, 
+                                                 data_summary, 
+                                                 amortization_parameters=amortization_parameters, 
+                                                 force_embedding_coordinates=force_embedding_coordinates, 
+                                                 force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                                 sub_manifolds=sub_manifolds)
+
+                    ## and another forward
+
+                   second_res, fw_logdet_dict=self.all_layer_forward_individual_subdims(
+                                       new_base,
+                                       data_summary,
+                                       failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
+                                       force_embedding_coordinates=force_embedding_coordinates, 
+                                       force_intrinsic_coordinates=force_intrinsic_coordinates,
+                                       sub_manifolds=sub_manifolds,
+                                       amortization_parameters=amortization_parameters
+                                       )
+
+
+            """
+
+
+
+
             return res, logdet_per_manifold
 
     def transform_target_space_individual_subdims(self, target, transform_from="default", transform_to="embedding"):
@@ -2790,6 +2915,7 @@ class pdf(nn.Module):
                          max_iterative_batchsize=20,
                          mises_abs_precision=1e-7, 
                          calc_kl_diff_and_entropic_quantities=False,
+                         failsafe_crosscheck_tolerance=None,
                          dtype=None,
                          device=None,
                          verbose=False):
@@ -2805,6 +2931,7 @@ class pdf(nn.Module):
             max_iterative_batchsize (int): The max number of batch samples evaluated simultaneously. 
             mises_abs_precision (float): The absolute precision used break out the loop for the mises distribution second moment estimation.
             calc_kl_diff_and_entropic_quantities (bool): Flag that determines if we also calculate the KL divergence between the respective marginal distribution and its respective 2nd-order approximation. Also includes the cross entropy.
+            failsafe_crosscheck_tolerance (float / None): If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.
             dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
             device (torch.device): If given, uses this device. Otherwise uses device from parameters.
             verbose (bool): Some extra print statements on runtime.
@@ -2893,6 +3020,7 @@ class pdf(nn.Module):
                                                                  samplesize=samplesize,
                                                                  iterative_samplesize=iterative_samplesize,
                                                                  max_iterative_batchsize=max_iterative_batchsize,
+                                                                 failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
                                                                  device=used_device,
                                                                  dtype=used_dtype,
                                                                  return_samples=True,

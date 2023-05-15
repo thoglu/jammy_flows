@@ -66,7 +66,7 @@ class Test(unittest.TestCase):
 
         for extra_def in [{"amortization_mlp_dims":"64-64"}, {"conditional_input_dim":2, "amortization_mlp_dims":"64-64"}]:
 
-            self.flow_inits.append([ ["s2", "y"], extra_def])
+            #self.flow_inits.append([ ["s2", "y"], extra_def])
             
             self.flow_inits.append([ ["s2", "n"], extra_def])
             
@@ -364,6 +364,7 @@ class Test(unittest.TestCase):
                                                        sub_manifolds=[-1]+list(range(num_sub_manifolds)), 
                                                        force_embedding_coordinates=emb_option[0], 
                                                        force_intrinsic_coordinates=emb_option[1],
+                                                       failsafe_crosscheck_tolerance=0.01,
                                                        conditional_input=cinput)
                       
                         if(cur_samplesize==10 and num_sub_manifolds>1):

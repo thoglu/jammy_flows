@@ -5,7 +5,7 @@ import numpy
 from . import sphere_base
 from . import moebius_1d
 from .. import spline_fns
-from ..bisection_n_newton import inverse_bisection_n_newton_sphere
+from ..bisection_n_newton import inverse_bisection_n_newton_sphere, inverse_bisection_n_newton_sphere_fast
 from ...amortizable_mlp import AmortizableMLP
 from ...extra_functions import list_from_str
 
@@ -14,6 +14,7 @@ from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 
 from ...extra_functions import NONLINEARITIES
 
+from .cnf_specific import utils
 
 import sys
 import os
@@ -79,7 +80,8 @@ class exponential_map_s2(sphere_base.sphere_base):
                  exp_map_type="linear", 
                  natural_direction=0, 
                  num_components=10,
-                 add_rotation=0):
+                 add_rotation=0,
+                 max_num_newton_iter=1000):
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -91,6 +93,8 @@ class exponential_map_s2(sphere_base.sphere_base):
             exp_map_type (str): Defines the potential of the exponential map. One of ["linear", "quadratic", "exponential", "splines"].
             natural_direction (int). If 0, log-probability evaluation is faster. If 1, sampling is faster.
             num_components (int): How many components to sum over in the exponential map.
+            add_rotation (int): Add a rotation after the main flow?.
+            num_newton_iter (int): Number of newton iterations.
         """
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False, add_rotation=add_rotation)
         
@@ -100,6 +104,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         self.num_components=num_components
         self.exp_map_type=exp_map_type
         self.natural_direction=natural_direction
+        self.max_num_newton_iter=max_num_newton_iter
         self.num_potential_pars=0
         
         self.num_spline_basis_functions=10
@@ -477,6 +482,10 @@ class exponential_map_s2(sphere_base.sphere_base):
         """
         Expoential map at base point X with tangent vec v_unit with normalization v_norm.
         """
+
+       
+        #return start*torch.cos(v_norm)+v_new*utils.sindiv(v_norm)#*torch.sin(v_norm)
+
         return start*torch.cos(v_norm)+v_unit*torch.sin(v_norm)
 
     def unnormalized_logarithmic_map(self, base, unnormalized_target, return_jacobian=False,jacobian_on_unnormalized_target=None):
@@ -490,7 +499,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         cos_alpha=(normalized_target*b).sum(axis=1,keepdims=True)
         alpha=torch.arccos(cos_alpha)
-
+       
         normalized_tangent_vec=(normalized_target-b*cos_alpha)/torch.sin(alpha)
 
         # project unnormalized target on tangent vector
@@ -537,10 +546,9 @@ class exponential_map_s2(sphere_base.sphere_base):
 
             return normalized_tangent_vec, projection
 
+    """
     def basic_logarithmic_map(self, base, target):
-        """
-        Logarithmic map at base point "base" towards "target".
-        """
+        
 
         assert(len(base.shape)==len(target.shape)), (base.shape, target.shape)
        
@@ -554,7 +562,33 @@ class exponential_map_s2(sphere_base.sphere_base):
         normalized_tangent_vec=(target-base*cos_alpha)/torch.sin(alpha)
 
         return normalized_tangent_vec, alpha
+    """
 
+    def basic_logarithmic_map(self, base, target):
+        
+
+        assert(len(base.shape)==len(target.shape)), (base.shape, target.shape)
+      
+        alternative_base=torch.zeros_like(base)
+        alternative_base[:,0]=1.0
+
+        cos_alpha=(target*base).sum(axis=1,keepdims=True)
+        alternative_cos_alpha=(target*alternative_base).sum(axis=1,keepdims=True)
+
+        converged_mask=cos_alpha>=1
+
+        cos_alpha=torch.masked_scatter(input=cos_alpha, mask=converged_mask, source=alternative_cos_alpha[converged_mask])
+        alpha=torch.arccos(cos_alpha)
+        
+        used_base=torch.masked_scatter(input=base, mask=converged_mask, source=alternative_base[converged_mask[:,0]])
+
+        normalized_tangent_vec=(target-used_base*cos_alpha)/torch.sin(alpha)
+
+        ## set alphas to 0 where we are close
+        alpha=torch.masked_scatter(input=alpha, mask=converged_mask, source=torch.zeros_like(alternative_cos_alpha)[converged_mask])
+
+        return normalized_tangent_vec, alpha
+   
    
 
     def get_exp_map_and_jacobian(self, x, potential_pars):
@@ -587,7 +621,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
             scaling_beta=potential_pars[:,4:5,:].exp()
 
-            
+           
 
             pure_grad_vec=(weights*normalized_mu*torch.exp(scaling_beta*(x_times_mu-1.0))).sum(axis=-1)
 
@@ -696,8 +730,10 @@ class exponential_map_s2(sphere_base.sphere_base):
         tangent_vec, tangent_vec_norm, tangent_vec_jac, tangent_vec_norm_jac=self.unnormalized_logarithmic_map(x, pure_grad_vec, jacobian_on_unnormalized_target=pure_grad_vec_jacobian, return_jacobian=True)
 
         # calculate exponential map
-        total_exp_map_result=self.basic_exponential_map(x, tangent_vec, tangent_vec_norm)
 
+        #print("tangent vec ", tangent_vec[19], tangent_vec_norm[19])
+        total_exp_map_result=self.basic_exponential_map(x, tangent_vec, tangent_vec_norm)
+        #print("RESULT ", total_exp_map_result[19])
         ## unnormed_tangent_vec
         #unnormed_tangent_vec=tangent_vec*tangent_vec_norm
         
@@ -855,7 +891,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         [x,log_det]=inputs
         
-       
+        assert(x.dtype==torch.float64), "V flow requires float64, otherwise it often will not converge correctly!"
         
         if(extra_inputs is not None):
 
@@ -869,7 +905,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         if(self.natural_direction):
 
 
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.basic_logarithmic_map, self.basic_exponential_map, x, potential_pars )
+            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian, self.basic_logarithmic_map, self.basic_exponential_map, x, potential_pars, num_newton_iter=self.max_num_newton_iter )
 
             _, jac_squared, _,_=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
@@ -879,12 +915,13 @@ class exponential_map_s2(sphere_base.sphere_base):
 
 
             result, new_projected, new_standard,_=self.get_exp_map_and_jacobian(x, potential_pars)
-
+            
             _,ld_res=torch.slogdet(new_projected)
                 
             log_det_update=0.5*ld_res
 
             log_det=log_det+log_det_update
+
 
         if(self.always_parametrize_in_embedding_space==False):
             # embedding to intrinsic
@@ -895,13 +932,15 @@ class exponential_map_s2(sphere_base.sphere_base):
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
         #print("calculating forward flow ?!")
         [x,log_det]=inputs
+
+        assert(x.dtype==torch.float64), "V flow requires float64, otherwise it often will not converge correctly!"
         
         if(self.always_parametrize_in_embedding_space==False):
             # s2 flow is defined in embedding space,
             #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-            
+
         
 
         if(extra_inputs is not None):
@@ -917,12 +956,16 @@ class exponential_map_s2(sphere_base.sphere_base):
             log_det=log_det+0.5*slog_det
 
         else:
-            result=inverse_bisection_n_newton_sphere(self.get_exp_map_and_jacobian,self.basic_logarithmic_map,  self.basic_exponential_map, x, potential_pars )
+
+           
+
+            result=inverse_bisection_n_newton_sphere_fast(self.get_exp_map_and_jacobian,self.basic_logarithmic_map,  self.basic_exponential_map, x, potential_pars, num_newton_iter=self.max_num_newton_iter )
 
             _, jac_squared, _,_=self.get_exp_map_and_jacobian(result, potential_pars)
             sign, slog_det=torch.slogdet(jac_squared)
            
             log_det=log_det-0.5*slog_det
+
 
         if(self.always_parametrize_in_embedding_space==False):
             result, log_det=self.eucl_to_spherical_embedding(result, log_det)
