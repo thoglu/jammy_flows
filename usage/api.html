@@ -251,7 +251,7 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.entropy">
-<code class="sig-name descname">entropy</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, dtype=None, device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">entropy</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, failsafe_crosscheck_tolerance=None, dtype=None, device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates entropy of the PDF.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -261,6 +261,7 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 <li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Forces embedding coordinates in entropy calculation. Should always be true for correct manifold entropies.</p></li>
 <li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Forces intrinsic coordinates in entropy calculation. Should always be false for correct manifold entropies.</p></li>
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize to use for entropy approximation.</p></li>
+<li><p><strong>failsafe_crosscheck_tolerance</strong> (<em>float / None</em>) – If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.</p></li>
 <li><p><strong>dtype</strong> (<em>torch dtype</em>) – If given, uses this dtype. Otherwise uses dtype from parameters.</p></li>
 <li><p><strong>device</strong> (<em>torch.device</em>) – If given, uses this device. Otherwise uses device from parameters.</p></li>
 </ul>
@@ -277,7 +278,7 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.entropy_iterative">
-<code class="sig-name descname">entropy_iterative</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, iterative_samplesize=10, max_iterative_batchsize=20, dtype=None, device=None, return_samples=False, verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy_iterative" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">entropy_iterative</code><span class="sig-paren">(</span><em class="sig-param">sub_manifolds=[-1], conditional_input=None, force_embedding_coordinates=True, force_intrinsic_coordinates=False, samplesize=100, iterative_samplesize=10, max_iterative_batchsize=20, failsafe_crosscheck_tolerance=None, dtype=None, device=None, return_samples=False, verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.entropy_iterative" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculates entropy of the PDF in an iterative manner. By iterating potentially both over target samples of later sub-pdfs, and over batch items, memory is saved
 and larger samplesizes (&gt; a few 100 - 1000s) can be calculated. Probably only necessary for large sample sizes of later sub-pdfs, not of the first sub-pdf or the total PDF.</p>
 <dl class="field-list simple">
@@ -290,6 +291,7 @@ and larger samplesizes (&gt; a few 100 - 1000s) can be calculated. Probably only
 <li><p><strong>samplesize</strong> (<em>int</em>) – Samplesize to use for entropy approximation.</p></li>
 <li><p><strong>iterative_samplesize</strong> (<em>int</em>) – Number of target PDF samples evaluated simultaneously. Must be a divisor of samplesize.</p></li>
 <li><p><strong>max_iterative_batchsize</strong> (<em>int</em>) – The max number of batch samples evaluated simultaneously.</p></li>
+<li><p><strong>failsafe_crosscheck_tolerance</strong> (<em>float / None</em>) – If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.</p></li>
 <li><p><strong>dtype</strong> (<em>torch dtype</em>) – If given, uses this dtype. Otherwise uses dtype from parameters.</p></li>
 <li><p><strong>device</strong> (<em>torch.device</em>) – If given, uses this device. Otherwise uses device from parameters.</p></li>
 <li><p><strong>return_samples</strong> (<em>bool</em>) – Return the samples that are generated to calculate the entropy? Samples are returned as B*num_samples X sample_dim, so the effective batch dimension is B*num_samples.</p></li>
@@ -381,7 +383,7 @@ For the Gaussianization flow, data can be used to initilialize the starting dist
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.marginal_moments">
-<code class="sig-name descname">marginal_moments</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=50</em>, <em class="sig-param">iterative_samplesize=10</em>, <em class="sig-param">max_iterative_batchsize=20</em>, <em class="sig-param">mises_abs_precision=1e-07</em>, <em class="sig-param">calc_kl_diff_and_entropic_quantities=False</em>, <em class="sig-param">dtype=None</em>, <em class="sig-param">device=None</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.marginal_moments" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">marginal_moments</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=50</em>, <em class="sig-param">iterative_samplesize=10</em>, <em class="sig-param">max_iterative_batchsize=20</em>, <em class="sig-param">mises_abs_precision=1e-07</em>, <em class="sig-param">calc_kl_diff_and_entropic_quantities=False</em>, <em class="sig-param">failsafe_crosscheck_tolerance=None</em>, <em class="sig-param">dtype=None</em>, <em class="sig-param">device=None</em>, <em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.marginal_moments" title="Permalink to this definition">¶</a></dt>
 <dd><p>Calculate the first and second central moments of the marginal distributions. For Euclidean manifolds it calculates a Gaussian approximation, for spherical distributions calculates
 a von-Mises approximation. Because these are the respective maximum entropy distributions, their entropy should always be larger than the original distribution.
 We can also calculate the kl divergence and cross entropy between the exact distribution and its approximation, by switching on the <em>calc_kl_diff_and_entropic_quantities</em> flag.</p>
@@ -394,6 +396,7 @@ We can also calculate the kl divergence and cross entropy between the exact dist
 <li><p><strong>max_iterative_batchsize</strong> (<em>int</em>) – The max number of batch samples evaluated simultaneously.</p></li>
 <li><p><strong>mises_abs_precision</strong> (<em>float</em>) – The absolute precision used break out the loop for the mises distribution second moment estimation.</p></li>
 <li><p><strong>calc_kl_diff_and_entropic_quantities</strong> (<em>bool</em>) – Flag that determines if we also calculate the KL divergence between the respective marginal distribution and its respective 2nd-order approximation. Also includes the cross entropy.</p></li>
+<li><p><strong>failsafe_crosscheck_tolerance</strong> (<em>float / None</em>) – If set, is used to crosscheck forward/bakckward pass compatability and resample if necessary. Has been introduced for the v flow in particular, so it should not be necessary for other flows.</p></li>
 <li><p><strong>dtype</strong> (<em>torch dtype</em>) – If given, uses this dtype. Otherwise uses dtype from parameters.</p></li>
 <li><p><strong>device</strong> (<em>torch.device</em>) – If given, uses this device. Otherwise uses device from parameters.</p></li>
 <li><p><strong>verbose</strong> (<em>bool</em>) – Some extra print statements on runtime.</p></li>
@@ -423,7 +426,7 @@ entropy_total = total entropy (only total quantity calculated because it is esse
 
 <dl class="method">
 <dt id="jammy_flows.main.default.pdf.sample">
-<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em>, <em class="sig-param">dtype=None</em>, <em class="sig-param">device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.sample" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">sample</code><span class="sig-paren">(</span><em class="sig-param">conditional_input=None</em>, <em class="sig-param">samplesize=1</em>, <em class="sig-param">seed=None</em>, <em class="sig-param">allow_gradients=False</em>, <em class="sig-param">amortization_parameters=None</em>, <em class="sig-param">force_embedding_coordinates=False</em>, <em class="sig-param">force_intrinsic_coordinates=False</em>, <em class="sig-param">failsafe_crosscheck_tolerance=None</em>, <em class="sig-param">dtype=None</em>, <em class="sig-param">device=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.sample" title="Permalink to this definition">¶</a></dt>
 <dd><p>Samples from the (conditional) PDF.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
@@ -852,6 +855,34 @@ In order for this to work properly, the function <em>has</em> to be globally dif
 </dl>
 </dd></dl>
 
+<dl class="function">
+<dt id="jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere_fast">
+<code class="sig-prename descclassname">jammy_flows.layers.bisection_n_newton.</code><code class="sig-name descname">inverse_bisection_n_newton_sphere_fast</code><span class="sig-paren">(</span><em class="sig-param">combined_func</em>, <em class="sig-param">find_tangent_func</em>, <em class="sig-param">basic_exponential_map_func</em>, <em class="sig-param">target_arg</em>, <em class="sig-param">*args</em>, <em class="sig-param">num_newton_iter=25</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.bisection_n_newton.inverse_bisection_n_newton_sphere_fast" title="Permalink to this definition">¶</a></dt>
+<dd><p>Performs Newton iterations on the sphere over 1-dimensional potential functions via Exponential maps to find the inverse of a given exponential map on the sphere.
+In initial tests it was found that a very precise application requires at least 40-50 ierations, even though one is already pretty close after 10 iterations.
+Distributing the points randomly on the sphere doesn’t really help, so every point is initialized just at (0,0,1).
+In order for this to work properly, the function <em>has</em> to be globally diffeomorphic, so the exponential map has to follow the conditions outlined in
+<a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a> (Sei 2009).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>combined_func</strong> (<em>function</em>) – A function that returns the (x,y,z) unit vector and its jacobian.</p></li>
+<li><p><strong>find_tangent_func</strong> (<em>function</em>) – A funtion to calculate the tangent at a given point along a certain direction.</p></li>
+<li><p><strong>target_arg</strong> (<em>float Tensor</em>) – The argument at which the inverse functon should be evaluated. Tensor of size (B,D) where B is the batchsize, and D the dimension.</p></li>
+<li><p><strong>*args</strong> (<em>list</em>) – Any extra arguments passed to <em>func</em>.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of Newton iterations.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>Tensor</dt><dd><p>The inverse of the exponential map.</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
 </div>
 <div class="section" id="module-jammy_flows.helper_fns">
 <span id="helper-functions"></span><h3>Helper Functions<a class="headerlink" href="#module-jammy_flows.helper_fns" title="Permalink to this headline">¶</a></h3>
@@ -1221,10 +1252,10 @@ self.flow_dict[“z”][“kwargs”]=dict()</p>
 <span id="exponential-map-2-d-sphere-flow-v"></span><h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.exponential_map_s2" title="Permalink to this headline">¶</a></h4>
 <dl class="class">
 <dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2">
-<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.exponential_map_s2.</code><code class="sig-name descname">exponential_map_s2</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2" title="Permalink to this definition">¶</a></dt>
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.exponential_map_s2.</code><code class="sig-name descname">exponential_map_s2</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">max_num_newton_iter=1000</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2" title="Permalink to this definition">¶</a></dt>
 <dd><dl class="method">
 <dt id="jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__">
-<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__" title="Permalink to this definition">¶</a></dt>
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">exp_map_type='linear'</em>, <em class="sig-param">natural_direction=0</em>, <em class="sig-param">num_components=10</em>, <em class="sig-param">add_rotation=0</em>, <em class="sig-param">max_num_newton_iter=1000</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.exponential_map_s2.exponential_map_s2.__init__" title="Permalink to this definition">¶</a></dt>
 <dd><p>Uses the spherical exponential map. Symbol: “v”</p>
 <p>Uses linear and quadratic potential as described in <a class="reference external" href="https://arxiv.org/abs/0906.0874">https://arxiv.org/abs/0906.0874</a>, and exponential potential as described in <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a>.
 Additionally added a spline-based potential.</p>
@@ -1234,6 +1265,8 @@ Additionally added a spline-based potential.</p>
 <li><p><strong>exp_map_type</strong> (<em>str</em>) – Defines the potential of the exponential map. One of [“linear”, “quadratic”, “exponential”, “splines”].</p></li>
 <li><p><strong>natural_direction</strong> (<em>int</em>) – </p></li>
 <li><p><strong>num_components</strong> (<em>int</em>) – How many components to sum over in the exponential map.</p></li>
+<li><p><strong>add_rotation</strong> (<em>int</em>) – Add a rotation after the main flow?.</p></li>
+<li><p><strong>num_newton_iter</strong> (<em>int</em>) – Number of newton iterations.</p></li>
 </ul>
 </dd>
 </dl>
