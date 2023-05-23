@@ -895,7 +895,7 @@ Used to determine a region for density evaluation (not plotting).</p>
 
 <dl class="function">
 <dt id="jammy_flows.helper_fns.obtain_bins_and_visualization_regions">
-<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">obtain_bins_and_visualization_regions</code><span class="sig-paren">(</span><em class="sig-param">samples, model, percentiles=[5.0, 95.0], relative_buffer=0.1, num_bins=50, s2_norm='standard'</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.obtain_bins_and_visualization_regions" title="Permalink to this definition">¶</a></dt>
+<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">obtain_bins_and_visualization_regions</code><span class="sig-paren">(</span><em class="sig-param">samples, model, percentiles=[5.0, 95.0], relative_buffer=0.1, num_bins=50, s2_norm='standard', use_outlier_binning=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.obtain_bins_and_visualization_regions" title="Permalink to this definition">¶</a></dt>
 <dd><p>Uses samples and pdf defs to calculate binning and visualization regions.</p>
 <p>Euclidean:
 Obtain an uneven binning based on Bayesian Blocks and a region that makes sense for visualization based on 1-d percentiles.
