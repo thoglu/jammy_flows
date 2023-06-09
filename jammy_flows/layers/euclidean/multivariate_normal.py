@@ -235,11 +235,15 @@ class mvn_block(euclidean_base.euclidean_base):
 
         single_log_diagonal, full_log_diagonal, lower_triangular_entries=self._obtain_usable_flow_params(z, self.cov_type, extra_inputs=extra_inputs)
 
-        # use inverse of lower transformation matrix
-        trafo_matrix, extra_logdet=matrix_fns.obtain_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
+        if(self.cov_type=="diagonal_symmetric"):
+            res=(single_log_diagonal).exp()*z
+            log_det = log_det  + self.dimension*single_log_diagonal.sum(axis=-1)
+        else:
+            # use inverse of lower transformation matrix
+            trafo_matrix, extra_logdet=matrix_fns.obtain_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
 
-        res=torch.einsum("...ij, ...j", trafo_matrix, z)
-        log_det=log_det+extra_logdet
+            res=torch.einsum("...ij, ...j", trafo_matrix, z)
+            log_det=log_det+extra_logdet
 
         return res, log_det
 
@@ -253,12 +257,18 @@ class mvn_block(euclidean_base.euclidean_base):
 
         single_log_diagonal, full_log_diagonal, lower_triangular_entries=self._obtain_usable_flow_params(x, self.cov_type, extra_inputs=extra_inputs)
 
-        ## normally the inverse mapping involves the Upper trinagular matrix .. but we can just a well work with the lower triangular one, which just perumtes the dimensions
-        trafo_matrix, extra_logdet=matrix_fns.obtain_inverse_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
 
-        #res=torch.bmm(trafo_matrix, x)
-        res=torch.einsum("...ij, ...j", trafo_matrix, x)
-        log_det=log_det+extra_logdet
+        if(self.cov_type=="diagonal_symmetric"):
+         
+            res=(-single_log_diagonal).exp()*x
+            log_det = log_det  -self.dimension*single_log_diagonal.sum(axis=-1)
+        else:
+            ## normally the inverse mapping involves the Upper trinagular matrix .. but we can just a well work with the lower triangular one, which just perumtes the dimensions
+            trafo_matrix, extra_logdet=matrix_fns.obtain_inverse_lower_triangular_matrix_and_logdet(self.dimension, single_log_diagonal_entry=single_log_diagonal, log_diagonal_entries=full_log_diagonal, lower_triangular_entries=lower_triangular_entries, cov_type=self.cov_type)
+
+            #res=torch.bmm(trafo_matrix, x)
+            res=torch.einsum("...ij, ...j", trafo_matrix, x)
+            log_det=log_det+extra_logdet
 
         return res, log_det
 

@@ -13,17 +13,44 @@ import copy
 
 from scipy.spatial.transform import Rotation as R
 
-def find_bins(trace, percentiles=[5.0,95.0], num_bins=50):
 
-    perc=numpy.percentile(trace, percentiles)
+def _update_attached_visualization_bounds(subgridspec, visualization_bounds):
+    """
+    Attach visualization bounds to subgridspec or update existing bounds.
+    """
 
-    bins=list(numpy.linspace(perc[0], perc[1], num_bins-2))
+    if(hasattr(subgridspec, "visualization_bounds")):
+        new_bounds=[]
 
-    new_edges=[min(trace)-1e-5]+bins+[max(trace)+1e-5]
+        for ind_b,cur_b in enumerate(subgridspec.visualization_bounds):
+            new_b=(min([cur_b[0], visualization_bounds[ind_b][0]]), max([cur_b[1], visualization_bounds[ind_b][1]]))
 
-    return numpy.array(new_edges)
+            new_bounds.append(new_b)
 
-def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0], relative_buffer=0.1, num_bins=50, s2_norm="standard"):
+        setattr(subgridspec, "visualization_bounds", new_bounds)
+
+    else:
+        setattr(subgridspec, "visualization_bounds", visualization_bounds)
+    
+
+def find_bins(trace, percentiles=[5.0,95.0], num_bins=50, use_outlier_binning=False):
+
+    if(use_outlier_binning):
+        perc=numpy.percentile(trace, percentiles)
+
+        bins=list(numpy.linspace(perc[0], perc[1], num_bins-2))
+
+        new_edges=[min(trace)-1e-5]+bins+[max(trace)+1e-5]
+
+        new_edges=numpy.array(new_edges)
+
+    else:
+
+        new_edges=numpy.linspace(min(trace)-1e-5, max(trace)+1e-5, num_bins)
+
+    return new_edges
+
+def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0], relative_buffer=0.1, num_bins=50, s2_norm="standard", use_outlier_binning=False):
     
     """
     Uses samples and pdf defs to calculate binning and visualization regions.
@@ -678,7 +705,9 @@ def plot_joint_pdf(pdf,
                    var_names=[],
                    relative_buffer=0.1,
                    vis_percentiles=[3.0,97.0],
-                   show_relative_std=1):
+                   show_relative_std=0,
+                   use_outlier_binning=False,
+                   **kwargs):
 
     plot_density = False
     dim = len(samples[0])
@@ -702,7 +731,7 @@ def plot_joint_pdf(pdf,
     ## 
 
 
-    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf, percentiles=vis_percentiles, relative_buffer=relative_buffer, num_bins=50, s2_norm=s2_norm)
+    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf, percentiles=vis_percentiles, relative_buffer=relative_buffer, use_outlier_binning=use_outlier_binning, num_bins=50, s2_norm=s2_norm)
     
     if(bounds is not None):
         visualization_bounds=bounds
@@ -797,8 +826,10 @@ def plot_joint_pdf(pdf,
             
             subgridspec = gridspec.subgridspec(1, 1)
             ax = fig.add_subplot(subgridspec[0, 0])
-        else:
+            setattr(subgridspec, "axdict", {"ax": ax})
+            
             ## find ax in existing gridspec
+            """
             for ax in fig.get_axes():
                 ax_geometry=ax.get_subplotspec().get_geometry()
 
@@ -807,6 +838,12 @@ def plot_joint_pdf(pdf,
 
                 if(ax_geometry[0]==1 and ax_geometry[1]==1):
                     break
+            """
+        ax=subgridspec.axdict["ax"]
+
+
+        ## attach/update "visualization_bounds" to subgridspec
+        _update_attached_visualization_bounds(subgridspec, visualization_bounds)
         
         ax.hist(samples[:, 0], bins=histogram_edges[0], density=True)
 
@@ -821,22 +858,20 @@ def plot_joint_pdf(pdf,
             ax.set_yticklabels([])
             ax.set_xticklabels([])
 
-        ax.set_xlim(visualization_bounds[0][0], visualization_bounds[0][1])
+        ax.set_xlim(subgridspec.visualization_bounds[0][0], subgridspec.visualization_bounds[0][1])
 
     elif (dim == 2 and multiplot == False):
      
         if (subgridspec is None):
             subgridspec = gridspec.subgridspec(1, 1)
             ax = fig.add_subplot(subgridspec[0, 0])
-        else:
-            for ax in fig.get_axes():
-                ax_geometry=ax.get_subplotspec().get_geometry()
+            setattr(subgridspec, "axdict", {"ax": ax})
+        
+        ax=subgridspec.axdict["ax"]
+  
 
-                if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                    continue
-
-                if(ax_geometry[0]==1 and ax_geometry[1]==1):
-                    break
+        _update_attached_visualization_bounds(subgridspec, visualization_bounds)
+        
         if(plot_density):
             plot_density_with_contours(ax, log_evals, evalpositions,
                                      bin_volumes, pts_per_dim)
@@ -881,8 +916,8 @@ def plot_joint_pdf(pdf,
 
             ax.plot(np_gl.T[0], np_gl.T[1], color="gray", alpha=0.5)
        
-        ax.set_xlim(visualization_bounds[0][0], visualization_bounds[0][1])
-        ax.set_ylim(visualization_bounds[1][0], visualization_bounds[1][1]) 
+        ax.set_xlim(subgridspec.visualization_bounds[0][0], subgridspec.visualization_bounds[0][1])
+        ax.set_ylim(subgridspec.visualization_bounds[1][0], subgridspec.visualization_bounds[1][1]) 
     
         if (hide_labels):
             ax.set_yticklabels([])
@@ -894,16 +929,34 @@ def plot_joint_pdf(pdf,
         if (subgridspec is None):
             
             subgridspec = gridspec.subgridspec(dim, dim)
+        
+            setattr(subgridspec, "axdict", {})
 
+            for ind1 in range(dim):
+                for ind2 in range(dim):
+                    if(ind2>ind1):
+                        continue
+
+                    subgridspec.axdict[(ind1,ind2)]=fig.add_subplot(subgridspec[ind1, ind2])
+                    ## make sure background looks similar to histogram empty bins
+                    
+                    if(ind2<ind1):
+                        subgridspec.axdict[(ind1,ind2)].set_facecolor(colormap(0.0))
+
+        ## attach/update "visualization_bounds" to subgridspec
+        _update_attached_visualization_bounds(subgridspec, visualization_bounds)
         
         for ind1 in range(dim):
             for ind2 in range(dim):
                       
                 if (ind2 < ind1):
 
+                    """
                     found_ax=False
                     for ax in fig.get_axes():
+
                         ax_geometry=ax.get_subplotspec().get_geometry()
+                        print("checking ... ", ax_geometry)
                         num_rows=ax_geometry[0]
                         this_gridspec=ax.get_gridspec()
 
@@ -915,11 +968,14 @@ def plot_joint_pdf(pdf,
                            
                             break
 
-                    if(found_ax==False):
-                        ax = fig.add_subplot(subgridspec[ind1, ind2])
 
-                    ## make sure background looks similar to histogram empty bins
-                    ax.set_facecolor(colormap(0.0))
+                    if(found_ax==False):
+                        print("have not found in off diagonal ", ind1, ind2)
+                        ax = fig.add_subplot(subgridspec[ind1, ind2])
+                        print("added AX ", ax.get_subplotspec().get_geometry())
+                    """
+
+                    ax=subgridspec.axdict[(ind1,ind2)]
 
                     if (plot_only_contours == False):
                         ax.hist2d(samples[:, ind2],
@@ -946,8 +1002,8 @@ def plot_joint_pdf(pdf,
                             color=contour_color,
                             contour_probs=contour_probs)
                     
-                    ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
-                    ax.set_ylim(visualization_bounds[ind1][0], visualization_bounds[ind1][1])
+                    ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
+                    ax.set_ylim(subgridspec.visualization_bounds[ind1][0], subgridspec.visualization_bounds[ind1][1])
 
                     ## always hide labels if left or bottom 
                     if(ind2==0 and ind1<(dim-1)):
@@ -988,14 +1044,18 @@ def plot_joint_pdf(pdf,
                 elif (ind2 == ind1):
 
                     ## looking for ax
+                    """
                     found_ax=False
                     for ax in fig.get_axes():
-                       
+
+
+                            
                         ax_geometry=ax.get_subplotspec().get_geometry()
                         num_rows=ax_geometry[0]
                         
                         if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
                             continue
+
 
                         
                         if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
@@ -1003,13 +1063,22 @@ def plot_joint_pdf(pdf,
                            
                             break
 
+
                     if(found_ax==False):
+                        print("have not found hte ax ....", ax, ind2, ind1)
                         ax = fig.add_subplot(subgridspec[ind1, ind2])
+
+                        print("added AX ", ax.get_subplotspec().get_geometry())
+                    """
 
                     ##############
 
+                    ax=subgridspec.axdict[(ind1,ind2)]
 
-                    ax.hist(samples[:, ind1], bins=histogram_edges[ind1], density=True)
+                    color="black"
+                    if("color_1d" in kwargs.keys()):
+                        color=kwargs["color_1d"]
+                    ax.hist(samples[:, ind1], bins=histogram_edges[ind1], histtype="step", density=True, color=color)
 
                     if(show_relative_std):
                         std=numpy.std(samples[:, ind1])
@@ -1021,7 +1090,7 @@ def plot_joint_pdf(pdf,
                         ax.axvline(plotted_true_values[ind1].cpu().numpy(), color="red", lw=2.0)
                 
                    
-                    ax.set_xlim(visualization_bounds[ind2][0], visualization_bounds[ind2][1])
+                    ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
 
                     # 1-d hists do not need y labels
                     ax.set_yticklabels([])
@@ -1064,7 +1133,9 @@ def visualize_pdf(pdf,
                   num_iterative_steps=-1,
                   relative_vis_buffer=0.1,
                   vis_percentiles=[3.0, 97.0],
-                  show_relative_std=1
+                  show_relative_std=0,
+                  use_outlier_binning=False,
+                  **kwargs
                   ):
    
     with torch.no_grad():
@@ -1140,6 +1211,18 @@ def visualize_pdf(pdf,
               force_intrinsic_coordinates=True)
       else:
 
+        # check if PDF involves only a "x" flow (which does not nothing.. enforce device then)
+        used_dtype, used_device=pdf.obtain_current_dtype_n_device()
+
+        if(used_dtype is None):
+            if("dtype" in kwargs):
+                used_dtype=kwargs["dtype"]
+
+        if(used_device is None):
+            if("device" in kwargs):
+                used_device=kwargs["device"]
+
+        
         if(num_iterative_steps>0):
             assert(nsamples%num_iterative_steps==0), "Number of total sample points must be divisible by iterative steps!"
             
@@ -1150,8 +1233,8 @@ def visualize_pdf(pdf,
 
                 cur_samples, _, _, _ = pdf.sample(
                   samplesize=num_per_step,
-                  seed=seed+cur_step if seed is not None else None,
-                  force_intrinsic_coordinates=True)
+                  seed=seed+cur_step if seed is not None else None, device=used_device, dtype=used_dtype, force_intrinsic_coordinates=True)
+
 
                 samples.append(cur_samples)
 
@@ -1162,7 +1245,10 @@ def visualize_pdf(pdf,
           samples, samples_base, evals, evals_base = pdf.sample(
               samplesize=nsamples,
               seed=seed,
-              force_intrinsic_coordinates=True)
+              force_intrinsic_coordinates=True,
+              device=used_device,
+              dtype=used_dtype)
+
 
       higher_dim_spheres = False
 
@@ -1191,7 +1277,9 @@ def visualize_pdf(pdf,
           var_names=var_names,
           relative_buffer=relative_vis_buffer,
           vis_percentiles=vis_percentiles,
-          show_relative_std=show_relative_std)
+          show_relative_std=show_relative_std,
+          use_outlier_binning=use_outlier_binning,
+          **kwargs)
         
     
     return samples, new_subgridspec, total_pdf_integral
