@@ -1120,11 +1120,13 @@ def visualize_pdf(pdf,
 
                     cur_samples, _, _, _ = pdf.sample(
                       conditional_input=this_sample_input,
-                      seed=seed+cur_step if seed is not None else None)
+                      seed=seed+cur_step if seed is not None else None,
+                      force_intrinsic_coordinates=True)
                 else:
                     cur_samples, _, _, _ = pdf.sample(
                       conditional_input=sample_conditional_input[cur_step*num_per_step:cur_step*num_per_step+num_per_step],
-                      seed=seed+cur_step if seed is not None else None)
+                      seed=seed+cur_step if seed is not None else None,
+                      force_intrinsic_coordinates=True)
 
                 samples.append(cur_samples)
 
@@ -1134,7 +1136,8 @@ def visualize_pdf(pdf,
 
             samples, _, _, _ = pdf.sample(
               conditional_input=sample_conditional_input,
-              seed=seed)
+              seed=seed,
+              force_intrinsic_coordinates=True)
       else:
 
         if(num_iterative_steps>0):
@@ -1147,7 +1150,8 @@ def visualize_pdf(pdf,
 
                 cur_samples, _, _, _ = pdf.sample(
                   samplesize=num_per_step,
-                  seed=seed+cur_step if seed is not None else None)
+                  seed=seed+cur_step if seed is not None else None,
+                  force_intrinsic_coordinates=True)
 
                 samples.append(cur_samples)
 
@@ -1157,7 +1161,8 @@ def visualize_pdf(pdf,
 
           samples, samples_base, evals, evals_base = pdf.sample(
               samplesize=nsamples,
-              seed=seed)
+              seed=seed,
+              force_intrinsic_coordinates=True)
 
       higher_dim_spheres = False
 
