@@ -144,7 +144,7 @@ class sphere_base(layer_base.layer_base):
 
         Q = torch.eye(dim, device=device).type(vs.dtype).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
-        for i in range(1):
+        for i in range(dim):
         
             v = vs[:,i].reshape(-1,dim, 1).to(device)
             
