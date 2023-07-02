@@ -344,7 +344,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
             if(cinput.is_cuda):
                 eval_positions=eval_positions.to(cinput)
-
+   
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
     ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
