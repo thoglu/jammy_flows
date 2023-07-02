@@ -15,8 +15,6 @@ import scipy
 import math
 import time
 
-from geomstats.geometry.hypersphere import Hypersphere
-
 import healpy
 
 
@@ -3402,7 +3400,6 @@ class pdf(nn.Module):
                         kl_diff=cross_entropy-entropy_dict[sub_pdf_dim]
 
                         ## reverse kl divergence
-                        #sphere = Hypersphere(dim=2)
 
                         if(sub_pdf_dim==0):
                             mises_samples=[]
