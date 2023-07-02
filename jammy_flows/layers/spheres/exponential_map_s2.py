@@ -81,7 +81,8 @@ class exponential_map_s2(sphere_base.sphere_base):
                  natural_direction=0, 
                  num_components=10,
                  add_rotation=0,
-                 max_num_newton_iter=1000):
+                 max_num_newton_iter=1000,
+                 mean_parametrization="old"):
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -95,6 +96,7 @@ class exponential_map_s2(sphere_base.sphere_base):
             num_components (int): How many components to sum over in the exponential map.
             add_rotation (int): Add a rotation after the main flow?.
             num_newton_iter (int): Number of newton iterations.
+            mean_parametrization (str): "old" (x,y,z, directly), or "householder", which desribes each mean by a unit vec and rotates them to new positions.
         """
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False, add_rotation=add_rotation)
         
@@ -109,13 +111,24 @@ class exponential_map_s2(sphere_base.sphere_base):
         
         self.num_spline_basis_functions=10
 
+        ## mean parmetrization has an impact on the number of parameters
+        self.mean_parametrization=mean_parametrization
+        if(mean_parametrization=="old"):
+            self.num_mu_params=3
+            ## we go from positive to [0,1], used custom function here .. maybe not the best
+            self.mu_norm_function=generate_normalization_function(stretch_factor=10.0, max_value=1.0)
+        else:
+            self.num_mu_params=3*3+1 ## 3*3 householder params + one normalization param
+            # we go from reals to [0,1], just use sigmoid
+            self.mu_norm_function=torch.nn.Sigmoid()
+
         if(self.exp_map_type=="linear" or self.exp_map_type=="quadratic"):
-            self.num_potential_pars=3+1 # mu vector + weights
+            self.num_potential_pars=self.num_mu_params+1 # mu vector + weights
         elif(self.exp_map_type=="exponential" or self.exp_map_type=="polynomial"):
-            self.num_potential_pars=3+2 # mu vector + weights + exponential
+            self.num_potential_pars=self.num_mu_params+2 # mu vector + weights + exponential
         elif(self.exp_map_type=="splines"):
 
-            self.num_potential_pars=3+1+self.num_spline_basis_functions*3+1 # mu vector + weights + spline parameters (3*basis functions +1)
+            self.num_potential_pars=self.num_mu_params+1+self.num_spline_basis_functions*3+1 # mu vector + weights + spline parameters (3*basis functions +1)
         elif(self.exp_map_type=="nn"):
             raise Exception("Only used for testing, nn exponential flow does not work currently.")
             self.amortized_mlp=AmortizableMLP(3, "64-64", 3, low_rank_approximations=-1, use_permanent_parameters=use_permanent_parameters,svd_mode="smart")
@@ -131,8 +144,7 @@ class exponential_map_s2(sphere_base.sphere_base):
         ## potential parameters
         if(self.use_permanent_parameters):
             self.potential_pars=nn.Parameter(torch.randn(self.num_potential_pars, self.num_components).unsqueeze(0))
-       
-        self.mu_norm_function=generate_normalization_function(stretch_factor=10.0, max_value=1.0)
+        
 
         self.exponent_log_norm_function=generate_log_function_bounded_in_logspace(min_val_normal_space=1.0, max_val_normal_space=30.0, center=False)
 
@@ -597,20 +609,41 @@ class exponential_map_s2(sphere_base.sphere_base):
         """
 
         if(self.exp_map_type!="nn"):
-            norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
 
-            zero_mask=norm==0.0
-            assert(zero_mask.sum()==0)
+            if(self.mean_parametrization=="old"):
 
-            normalized_mu=potential_pars[:,:3,:]/norm
+                norm=((potential_pars[:,:3,:]**2).sum(axis=1, keepdim=True)).sqrt()
 
-            fake_norm=self.mu_norm_function(norm)
-       
+                zero_mask=norm==0.0
+                assert(zero_mask.sum()==0)
+
+                normalized_mu=potential_pars[:,:3,:]/norm
+
+                fake_norm=self.mu_norm_function(norm)
+
+            else:
+
+                reshaped_pars=potential_pars[:,:9,:].permute(0,2,1).reshape(-1, 3,3)
+               
+                hh_matrices=self.compute_householder_matrix(reshaped_pars, 3, device=x.device)
+
+                
+                hh_matrices=hh_matrices.reshape(-1,self.num_components,9).reshape(-1,self.num_components, 3,3).permute(0,2,3,1)
+                
+                pre_mu=torch.zeros_like(potential_pars[:,:3,:])
+                pre_mu[:,2,:]=1.0
+
+                normalized_mu=torch.einsum("bijm,bjm->bim", hh_matrices, pre_mu)
+
+                pre_norm=potential_pars[:,9:10,:]
+                fake_norm=self.mu_norm_function(pre_norm)
+
+        
         #print("exm map type ", self.exp_map_type)
         if(self.exp_map_type=="exponential"):
            
     
-            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            log_weights=potential_pars[:,self.num_mu_params:self.num_mu_params+1,:]-torch.logsumexp(potential_pars[:,self.num_mu_params:self.num_mu_params+1,:],dim=2,keepdims=True)+fake_norm.log()
             weights=log_weights.exp()
 
             #xl=x/(x**2).sum(axis=1,keepdims=True).sqrt()
@@ -619,7 +652,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
             x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
 
-            scaling_beta=potential_pars[:,4:5,:].exp()
+            scaling_beta=potential_pars[:,self.num_mu_params+1:self.num_mu_params+2,:].exp()
 
            
 
@@ -639,7 +672,7 @@ class exponential_map_s2(sphere_base.sphere_base):
             pure_grad_vec_jacobian=pure_grad_vec_jacobian.sum(axis=-1)
         elif(self.exp_map_type=="linear"):
 
-            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            log_weights=potential_pars[:,self.num_mu_params:self.num_mu_params+1,:]-torch.logsumexp(potential_pars[:,self.num_mu_params:self.num_mu_params+1,:],dim=2,keepdims=True)+fake_norm.log()
             weights=log_weights.exp()
 
             x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
@@ -649,7 +682,7 @@ class exponential_map_s2(sphere_base.sphere_base):
             pure_grad_vec_jacobian=None
         elif(self.exp_map_type=="quadratic"):
 
-            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            log_weights=potential_pars[:,self.num_mu_params:self.num_mu_params+1,:]-torch.logsumexp(potential_pars[:,self.num_mu_params:self.num_mu_params+1,:],dim=2,keepdims=True)+fake_norm.log()
             weights=log_weights.exp()
 
             x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
@@ -670,14 +703,14 @@ class exponential_map_s2(sphere_base.sphere_base):
        
         elif(self.exp_map_type=="splines"):
 
-            log_weights=potential_pars[:,3:4,:]-torch.logsumexp(potential_pars[:,3:4,:],dim=2,keepdims=True)+fake_norm.log()
+            log_weights=potential_pars[:,self.num_mu_params:self.num_mu_params+1,:]-torch.logsumexp(potential_pars[:,self.num_mu_params:self.num_mu_params+1,:],dim=2,keepdims=True)+fake_norm.log()
             weights=log_weights.exp()
 
             x_times_mu=(x[:,:,None]*normalized_mu).sum(axis=1, keepdims=True)
 
-            unnormalized_widths=potential_pars[:,4:self.num_spline_basis_functions+4,:].permute(0,2,1)
-            unnormalized_heights=potential_pars[:,self.num_spline_basis_functions+4:2*self.num_spline_basis_functions+4,:].permute(0,2,1)
-            unnormalized_derivatives=potential_pars[:,2*self.num_spline_basis_functions+4:3*self.num_spline_basis_functions+5,:].permute(0,2,1)
+            unnormalized_widths=potential_pars[:,self.num_mu_params+1:self.num_spline_basis_functions+self.num_mu_params+1,:].permute(0,2,1)
+            unnormalized_heights=potential_pars[:,self.num_spline_basis_functions+self.num_mu_params+1:2*self.num_spline_basis_functions+self.num_mu_params+1,:].permute(0,2,1)
+            unnormalized_derivatives=potential_pars[:,2*self.num_spline_basis_functions+self.num_mu_params+1:3*self.num_spline_basis_functions+self.num_mu_params+2,:].permute(0,2,1)
 
             res, log_deriv=spline_fns.rational_quadratic_spline(x_times_mu.permute(0,2,1),
                               unnormalized_widths,
@@ -892,9 +925,10 @@ class exponential_map_s2(sphere_base.sphere_base):
         [x,log_det]=inputs
         
         assert(x.dtype==torch.float64), "V flow requires float64, otherwise it often will not converge correctly!"
-        
+            
+      
         if(extra_inputs is not None):
-
+           
             potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)
         else:
             potential_pars=self.potential_pars.to(x)
@@ -940,8 +974,6 @@ class exponential_map_s2(sphere_base.sphere_base):
             #x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-
-        
 
         if(extra_inputs is not None):
             potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)

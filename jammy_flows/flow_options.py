@@ -151,6 +151,7 @@ opts_dict["v"]["kwargs"]["num_components"] = (10, lambda x: x>0) ## number of co
 opts_dict["v"]["kwargs"]["natural_direction"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
 opts_dict["v"]["kwargs"]["add_rotation"] = (0, [0,1]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
 opts_dict["v"]["kwargs"]["max_num_newton_iter"] = (1000, lambda x: x>0) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
+opts_dict["v"]["kwargs"]["mean_parametrization"] = ("old", ["old", "householder"]) ## natural direction corresponds to the transformation happing in the forward direction - default: 0 (0 faster pdf eval, 1 fast sampling)
 
 
 # Manifold Continuous normalizing flow
