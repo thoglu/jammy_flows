@@ -11,10 +11,10 @@ from ..spline_fns import rational_quadratic_spline
 class spline_1d(sphere_base.sphere_base):
     def __init__(self, dimension=1, 
                        euclidean_to_sphere_as_first=True, 
-                       add_rotation=0,
+                       add_rotation=1,
                        natural_direction=0, 
                        use_permanent_parameters=False,  
-                       num_basis_functions=5):
+                       num_basis_functions=10):
         """
         A circular spline variant. Symbol: "o"
 
@@ -27,18 +27,13 @@ class spline_1d(sphere_base.sphere_base):
             raise Exception("The moebius flow is defined for dimension 1, but dimension %d is handed over" % (dimension))
            
         self.num_basis_functions=num_basis_functions
-     
-        self.num_omega_pars=3
 
         ## add parameters from this layer (on top of householder params defined in the class parent)
-        self.total_param_num+=self.num_basis_functions*self.num_omega_pars
+        self.total_param_num+=self.num_basis_functions*3
 
         if(use_permanent_parameters):
-            self.moebius_pars=nn.Parameter(torch.randn(self.num_basis_functions,self.num_omega_pars).unsqueeze(0))
+            self.spline_pars=nn.Parameter(torch.randn(self.num_basis_functions,3).unsqueeze(0))
             
-        else:
-            self.moebius_pars=torch.zeros(self.num_basis_functions,self.num_omega_pars).unsqueeze(0)
-
         ## natural direction means no bisection in the forward pass, but in the backward pass
         self.natural_direction=natural_direction
 
@@ -46,44 +41,34 @@ class spline_1d(sphere_base.sphere_base):
 
         [x,log_det]=inputs
 
-        moebius_pars=self.moebius_pars.to(x)
-        #this_num_params=self.use_moebius*num_per_omega
         if(extra_inputs is not None):
-            
-            moebius_pars=moebius_pars+torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, self.num_omega_pars])
-        
+            spline_pars=torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, 3])
+        else:
+            spline_pars=self.spline_pars.to(x)
+
         if(self.always_parametrize_in_embedding_space):
             # embedding to intrinsic
             x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
-       
-        #xmask=x>numpy.pi
-        #x=(xmask)*(x-2*numpy.pi)+(~xmask)*x
-    
         # mirror derivatives at the endpoints
-        derivs=torch.cat([moebius_pars[:,:,2], moebius_pars[:,0:1,2]], dim=1)
+        derivs=torch.cat([spline_pars[:,:,2], spline_pars[:,0:1,2]], dim=1)
 
-        
+        use_inverse=True
+        if(self.natural_direction==0):
+            use_inverse=False
+
         x, log_deriv=rational_quadratic_spline(x,
-                      moebius_pars[:,:,0],
-                      moebius_pars[:,:,1],
+                      spline_pars[:,:,0],
+                      spline_pars[:,:,1],
                       derivs,
-                      inverse=False,
+                      inverse=use_inverse,
                       left=0, right=2*numpy.pi, bottom=0, top=2*numpy.pi,
                       rel_min_bin_width=1e-3,
                       rel_min_bin_height=1e-3,
                           min_derivative=1e-3)
 
+        print("NON FIN", torch.where(~torch.isfinite(x)))
         log_deriv=log_deriv.sum(axis=-1)
-
-    
-        ## switch back to 0-2pi
-        #smaller_mask=x<0
-        #x=(smaller_mask)*(2*numpy.pi+x)+(~smaller_mask)*x
-
-        
-        ### moebius is actually the inverse mapping
-        
         
         log_det=log_det+log_deriv
 
@@ -92,7 +77,7 @@ class spline_1d(sphere_base.sphere_base):
             # embedding to intrinsic
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
-       
+        print("NON FIN FINAL", torch.where(~torch.isfinite(x)))
         return x, log_det
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
@@ -100,40 +85,34 @@ class spline_1d(sphere_base.sphere_base):
        
         [x,log_det]=inputs
 
-        moebius_pars=self.moebius_pars.to(x)
-        #this_num_params=self.num_basis_functions*self.num_omega_pars
-        if(extra_inputs is not None):
-         
-            moebius_pars=moebius_pars+torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, self.num_omega_pars])
         
+        if(extra_inputs is not None):
+            spline_pars=torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, 3])
+        else:
+            spline_pars=self.spline_pars.to(x)
         
         if(self.always_parametrize_in_embedding_space):
             # embedding to intrinsic
             x, log_det=self.eucl_to_spherical_embedding(x, log_det)
         
-
-        #xmask=x>numpy.pi
-        #x=(xmask)*(x-2*numpy.pi)+(~xmask)*x
-
         # mirror derivatives at the endpoints
-        derivs=torch.cat([moebius_pars[:,:,2], moebius_pars[:,0:1,2]], dim=1)
+        derivs=torch.cat([spline_pars[:,:,2], spline_pars[:,0:1,2]], dim=1)
+
+        use_inverse=False
+        if(self.natural_direction==0):
+            use_inverse=True
 
         x, log_deriv=rational_quadratic_spline(x,
-                      moebius_pars[:,:,0],
-                      moebius_pars[:,:,1],
+                      spline_pars[:,:,0],
+                      spline_pars[:,:,1],
                       derivs,
-                      inverse=True,
+                      inverse=use_inverse,
                       left=0, right=2*numpy.pi, bottom=0, top=2*numpy.pi,
                       rel_min_bin_width=1e-3,
                       rel_min_bin_height=1e-3,
                           min_derivative=1e-3)
 
         log_deriv=log_deriv.sum(axis=-1)
-
-    
-        ## switch back to 0/2pi
-        #smaller_mask=x<0
-        #x=(smaller_mask)*(2*numpy.pi+x)+(~smaller_mask)*x
 
         log_det=log_det+log_deriv
 
@@ -142,28 +121,23 @@ class spline_1d(sphere_base.sphere_base):
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
         return x, log_det
-        
+
     def _init_params(self, params):
 
-        self.moebius_pars.data=params.reshape(1, self.num_basis_functions, self.num_omega_pars)
+        self.spline_pars.data=params.reshape(1, self.num_basis_functions, 3)
 
     def _get_desired_init_parameters(self):
 
-        ## gaussian init data
-        
-        return torch.ones((self.num_basis_functions*self.num_omega_pars))*0.54
+        ## fixed params for the spline
+        return torch.ones((self.num_basis_functions*3))*0.54
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
-        """ 
-        Implemented by Euclidean sublayers.
-        """
-
-        moebius_pars=self.moebius_pars
-        #this_num_params=self.num_basis_functions*self.num_omega_pars
+     
         if(extra_inputs is not None):
-         
-            moebius_pars=extra_inputs.reshape(-1, self.num_basis_functions, self.num_omega_pars)
+            spline_pars=extra_inputs.reshape(-1, self.num_basis_functions, 3)
+        else:
+            spline_pars=self.spline_pars
 
-        param_dict[extra_prefix+"moebius"]=moebius_pars.data
+        param_dict[extra_prefix+"moebius"]=spline_pars.data
         
 
