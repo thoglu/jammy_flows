@@ -117,9 +117,9 @@ opts_dict["o"] = dict()
 opts_dict["o"]["module"] = sphere_spline_1d
 opts_dict["o"]["type"] = "s"
 opts_dict["o"]["kwargs"] = dict()
-opts_dict["o"]["kwargs"]["add_rotation"] = (0, [0,1])
+opts_dict["o"]["kwargs"]["add_rotation"] = (1, [0,1])
 opts_dict["o"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
-opts_dict["o"]["kwargs"]["natural_direction"] = (0, [0,1])
+opts_dict["o"]["kwargs"]["natural_direction"] = (1, [0,1])
 
 
 """
@@ -174,7 +174,12 @@ opts_dict["f"] = dict()
 opts_dict["f"]["module"] = fisher_von_mises_2d
 opts_dict["f"]["type"] = "s"
 opts_dict["f"]["kwargs"] = dict()
-
+opts_dict["f"]["kwargs"]["add_vertical_rq_spline_flow"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["add_circular_rq_spline_flow"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["add_correlated_rq_spline_flow"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["circular_flow_defs"] = ("o", lambda x: type(x)==str)
+opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("r", lambda x: type(x)==str)
+opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
 
 """
 Interval flows
@@ -185,7 +190,7 @@ opts_dict["r"] = dict()
 opts_dict["r"]["module"] = rational_quadratic_spline
 opts_dict["r"]["type"] = "i"
 opts_dict["r"]["kwargs"] = dict()
-opts_dict["r"]["kwargs"]["num_basis_elements"] = (10, lambda x: x>0)
+opts_dict["r"]["kwargs"]["num_basis_elements"] = (5, lambda x: x>0)
 
 """
 Simplex flows
@@ -211,11 +216,14 @@ opts_dict["x"] = dict()
 opts_dict["x"]["module"] = euclidean_do_nothing
 opts_dict["x"]["type"] = "e"
 opts_dict["x"]["kwargs"] = dict()
+opts_dict["x"]["kwargs"]["add_offset"]=(0, [0,1])
+
 
 opts_dict["y"] = dict()
 opts_dict["y"]["module"] = spherical_do_nothing
 opts_dict["y"]["type"] = "s"
 opts_dict["y"]["kwargs"] = dict()
+opts_dict["y"]["kwargs"]["add_rotation"]=(0, [0,1])
 
 opts_dict["z"] = dict()
 opts_dict["z"]["module"] = interval_do_nothing

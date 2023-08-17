@@ -42,7 +42,7 @@ class spline_1d(sphere_base.sphere_base):
         [x,log_det]=inputs
 
         if(extra_inputs is not None):
-            spline_pars=torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, 3])
+            spline_pars=torch.reshape(extra_inputs, [-1, self.num_basis_functions, 3])
         else:
             spline_pars=self.spline_pars.to(x)
 
@@ -67,7 +67,7 @@ class spline_1d(sphere_base.sphere_base):
                       rel_min_bin_height=1e-3,
                           min_derivative=1e-3)
 
-        print("NON FIN", torch.where(~torch.isfinite(x)))
+      
         log_deriv=log_deriv.sum(axis=-1)
         
         log_det=log_det+log_deriv
@@ -77,7 +77,7 @@ class spline_1d(sphere_base.sphere_base):
             # embedding to intrinsic
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
-        print("NON FIN FINAL", torch.where(~torch.isfinite(x)))
+        
         return x, log_det
 
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
@@ -87,7 +87,7 @@ class spline_1d(sphere_base.sphere_base):
 
         
         if(extra_inputs is not None):
-            spline_pars=torch.reshape(extra_inputs, [x.shape[0], self.num_basis_functions, 3])
+            spline_pars=torch.reshape(extra_inputs, [-1, self.num_basis_functions, 3])
         else:
             spline_pars=self.spline_pars.to(x)
         
