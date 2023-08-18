@@ -940,8 +940,8 @@ def plot_joint_pdf(pdf,
                     subgridspec.axdict[(ind1,ind2)]=fig.add_subplot(subgridspec[ind1, ind2])
                     ## make sure background looks similar to histogram empty bins
                     
-                    if(ind2<ind1):
-                        subgridspec.axdict[(ind1,ind2)].set_facecolor(colormap(0.0))
+                    #if(ind2<ind1):
+                    #    subgridspec.axdict[(ind1,ind2)].set_facecolor("white")
 
         ## attach/update "visualization_bounds" to subgridspec
         _update_attached_visualization_bounds(subgridspec, visualization_bounds)
@@ -982,7 +982,8 @@ def plot_joint_pdf(pdf,
                                   samples[:, ind1],
                                   bins=[histogram_edges[ind2], histogram_edges[ind1]],
                                   density=True,
-                                  cmap=colormap)
+                                  cmap=colormap,
+                                  cmin=1e-20)
 
                     if (plotted_true_values is not None):
                         ax.plot([plotted_true_values[ind2].cpu().numpy()], [plotted_true_values[ind1].cpu().numpy()],
