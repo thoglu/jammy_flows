@@ -1003,8 +1003,8 @@ def plot_joint_pdf(pdf,
                             color=contour_color,
                             contour_probs=contour_probs)
                     
-                    #ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
-                    #ax.set_ylim(subgridspec.visualization_bounds[ind1][0], subgridspec.visualization_bounds[ind1][1])
+                    ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
+                    ax.set_ylim(subgridspec.visualization_bounds[ind1][0], subgridspec.visualization_bounds[ind1][1])
 
                     ## always hide labels if left or bottom 
                     if(ind2==0 and ind1<(dim-1)):
