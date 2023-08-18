@@ -51,7 +51,7 @@ opts_dict["g"]["kwargs"]["width_smooth_saturation"]=(1, [0,1]) #
 opts_dict["g"]["kwargs"]["regulate_normalization"]=(1, [0,1])
 opts_dict["g"]["kwargs"]["add_skewness"]=(0, [0,1])
 
-opts_dict["g"]["kwargs"]["rotation_mode"]=("householder", ["householder", "triangular_combination", "angles", "cayley"])
+opts_dict["g"]["kwargs"]["rotation_mode"]=("householder", ["householder", "triangular_combination", "angles", "cayley", "none"])
 opts_dict["g"]["kwargs"]["nonlinear_stretch_type"]=("classic", ["classic", "rq_splines"])
 
 # Old Gaussianization flow implementation (deprecated)

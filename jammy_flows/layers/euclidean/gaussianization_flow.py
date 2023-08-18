@@ -795,7 +795,9 @@ class gf_block(euclidean_base.euclidean_base):
                 rot_matrix[:,1:2,0:1]=(2*rotation_params*mult_fac).unsqueeze(-1)
 
                 rotation_params=rot_matrix
-
+        elif(self.rotation_mode=="none"):
+            rotation_params=None
+            
         if(self.nonlinear_stretch_type=="classic"):
 
             kde_log_skew_exponents=self.kde_log_skew_exponents.to(x)
