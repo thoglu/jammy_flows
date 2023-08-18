@@ -344,7 +344,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
             if(cinput.is_cuda):
                 eval_positions=eval_positions.to(cinput)
-
+   
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
     ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
@@ -544,13 +544,11 @@ def show_sample_contours(ax,
             new_samples[:, 1] = somey
 
 
-
     bin_fillings, xedges, yedges = numpy.histogram2d(new_samples[:, 0],
                                                      new_samples[:, 1],
                                                      bins=bins,
                                                      density=True)
-
-  
+   
     xvals = 0.5 * (xedges[1:] + xedges[:-1])
     yvals = 0.5 * (yedges[1:] + yedges[:-1])
     bw = (xedges[1] - xedges[0]) * (yedges[1] - yedges[0])
@@ -558,35 +556,39 @@ def show_sample_contours(ax,
     bin_volumes=bw
     
     contour_values = calculate_contours(bin_fillings, bin_volumes, probs=contour_probs)
+   
     ## reverse
     contour_values = contour_values[::-1]
 
     bounds=None
 
     try:
-      ret = ax.contour(xvals,
+        ret = ax.contour(xvals,
                        yvals,
                        bin_fillings.T,
                        levels=contour_values,
                        colors=color)
 
-      fmt_dict = dict()
+        fmt_dict = dict()
 
-      for ind, cprob in enumerate(contour_probs[::-1]):
+        for ind, cprob in enumerate(contour_probs[::-1]):
           if(ind<len(contour_values)):
               fmt_dict[contour_values[ind]] = "%d" % (int(cprob * 100)) + r" %"
 
-      ax.clabel(ret,
+        ax.clabel(ret,
                 fontsize=9,
                 inline=1,
                 fmt=fmt_dict,
                 levels=contour_values,
                 colors=color)
 
-     
-      bounds = get_bounds_from_contour(ret)
+
+        bounds = get_bounds_from_contour(ret)
+    
     except:
+      print("Contour failed")
       return [[-1.0,1.0], [-1.0,1.0]]
+    
 
 
     return [[bounds[0], bounds[1]], [bounds[2], bounds[3]]]
@@ -940,9 +942,6 @@ def plot_joint_pdf(pdf,
                     subgridspec.axdict[(ind1,ind2)]=fig.add_subplot(subgridspec[ind1, ind2])
                     ## make sure background looks similar to histogram empty bins
                     
-                    #if(ind2<ind1):
-                    #    subgridspec.axdict[(ind1,ind2)].set_facecolor("white")
-
         ## attach/update "visualization_bounds" to subgridspec
         _update_attached_visualization_bounds(subgridspec, visualization_bounds)
         
@@ -978,6 +977,7 @@ def plot_joint_pdf(pdf,
                     ax=subgridspec.axdict[(ind1,ind2)]
 
                     if (plot_only_contours == False):
+                        print("plot histo")
                         ax.hist2d(samples[:, ind2],
                                   samples[:, ind1],
                                   bins=[histogram_edges[ind2], histogram_edges[ind1]],
@@ -994,7 +994,7 @@ def plot_joint_pdf(pdf,
                     new_samples = numpy.concatenate(
                         [samples[:, ind2:ind2 + 1], samples[:, ind1:ind1 + 1]],
                         axis=1)
-
+                    print("IND 2", ind2, "ind 1 ", ind1)
                     if (contour_probs != []):
                         _ = show_sample_contours(
                             ax,
@@ -1003,41 +1003,58 @@ def plot_joint_pdf(pdf,
                             color=contour_color,
                             contour_probs=contour_probs)
                     
-                    ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
-                    ax.set_ylim(subgridspec.visualization_bounds[ind1][0], subgridspec.visualization_bounds[ind1][1])
+                    #ax.set_xlim(subgridspec.visualization_bounds[ind2][0], subgridspec.visualization_bounds[ind2][1])
+                    #ax.set_ylim(subgridspec.visualization_bounds[ind1][0], subgridspec.visualization_bounds[ind1][1])
 
                     ## always hide labels if left or bottom 
                     if(ind2==0 and ind1<(dim-1)):
                         ax.set_xticklabels([])
 
                         fontsize = ax.get_window_extent().height/5.0
-                        for lab in ax.get_yticklabels():
-                            lab.set_fontsize(fontsize)
+                        #for lab in ax.get_yticklabels():
+                        #    lab.set_fontsize(fontsize)
+
+                        if("labels" in kwargs):
+                            assert(len(kwargs["labels"])==dim)
+
+                            ax.set_ylabel(kwargs["labels"][ind1])
                        
                     elif((ind1==(dim-1)) and (ind2!=0)):
                         ax.set_yticklabels([])
 
                         fontsize = ax.get_window_extent().width/5.0
                         for lab in ax.get_xticklabels():
-                            lab.set_fontsize(fontsize)
+                            #lab.set_fontsize(fontsize)
                             lab.set_rotation(45)
+
+                        if("labels" in kwargs):
+                            assert(len(kwargs["labels"])==dim)
+
+                            ax.set_xlabel(kwargs["labels"][ind2])
+
 
                     elif(ind1<(dim-1) and ind2>0):
                         ax.set_yticklabels([])
                         ax.set_xticklabels([])
 
                     
-                    else:
-
+                    else:   
+                        ## lower left corner
                         fontsize = ax.get_window_extent().width/5.0
                         for lab in ax.get_xticklabels():
-                            lab.set_fontsize(fontsize)
+                            #lab.set_fontsize(fontsize)
                             lab.set_rotation(45)
 
                         fontsize = ax.get_window_extent().height/5.0
-                        for lab in ax.get_yticklabels():
-                            lab.set_fontsize(fontsize)
-                    
+                        #for lab in ax.get_yticklabels():
+                        #    lab.set_fontsize(fontsize)
+
+                        if("labels" in kwargs):
+                            assert(len(kwargs["labels"])==dim)
+
+                            ax.set_xlabel(kwargs["labels"][ind2])
+                            ax.set_ylabel(kwargs["labels"][ind1])
+
                     if (hide_labels):
                         ax.set_yticklabels([])
                         ax.set_xticklabels([])
@@ -1102,8 +1119,14 @@ def plot_joint_pdf(pdf,
                     else:
                         fontsize = ax.get_window_extent().width/5.0
                         for lab in ax.get_xticklabels():
-                            lab.set_fontsize(fontsize)
+                            #lab.set_fontsize(fontsize)
                             lab.set_rotation(45)
+
+                        if("labels" in kwargs):
+                            assert(len(kwargs["labels"])==dim)
+
+                            ax.set_xlabel(kwargs["labels"][ind2])
+                          
 
     
     return subgridspec, total_pdf_integral
@@ -1192,11 +1215,13 @@ def visualize_pdf(pdf,
 
                     cur_samples, _, _, _ = pdf.sample(
                       conditional_input=this_sample_input,
-                      seed=seed+cur_step if seed is not None else None)
+                      seed=seed+cur_step if seed is not None else None,
+                      force_intrinsic_coordinates=True)
                 else:
                     cur_samples, _, _, _ = pdf.sample(
                       conditional_input=sample_conditional_input[cur_step*num_per_step:cur_step*num_per_step+num_per_step],
-                      seed=seed+cur_step if seed is not None else None)
+                      seed=seed+cur_step if seed is not None else None,
+                      force_intrinsic_coordinates=True)
 
                 samples.append(cur_samples)
 
@@ -1206,7 +1231,8 @@ def visualize_pdf(pdf,
 
             samples, _, _, _ = pdf.sample(
               conditional_input=sample_conditional_input,
-              seed=seed)
+              seed=seed,
+              force_intrinsic_coordinates=True)
       else:
 
         # check if PDF involves only a "x" flow (which does not nothing.. enforce device then)
@@ -1231,7 +1257,8 @@ def visualize_pdf(pdf,
 
                 cur_samples, _, _, _ = pdf.sample(
                   samplesize=num_per_step,
-                  seed=seed+cur_step if seed is not None else None, device=used_device, dtype=used_dtype)
+                  seed=seed+cur_step if seed is not None else None, device=used_device, dtype=used_dtype, force_intrinsic_coordinates=True)
+
 
                 samples.append(cur_samples)
 
@@ -1242,8 +1269,10 @@ def visualize_pdf(pdf,
           samples, samples_base, evals, evals_base = pdf.sample(
               samplesize=nsamples,
               seed=seed,
+              force_intrinsic_coordinates=True,
               device=used_device,
               dtype=used_dtype)
+
 
       higher_dim_spheres = False
 

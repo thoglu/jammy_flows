@@ -139,8 +139,6 @@ class rational_quadratic_spline(interval_base.interval_base):
             widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
             heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
             derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
-            
-
        
         x, log_det_update=spline_fns.rational_quadratic_spline(x, 
                                                          widths, 

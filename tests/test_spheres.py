@@ -27,6 +27,9 @@ class Test(unittest.TestCase):
 
         print("Testing singular points")
 
+        
+        ###
+
         extra_flow_defs=dict()
         extra_flow_defs["m"]=dict()
         extra_flow_defs["m"]["add_rotation"]=0
@@ -63,6 +66,15 @@ class Test(unittest.TestCase):
         ev,_,_=this_flow(test_input)
 
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
+
+        ###
+
+        this_flow=f.pdf("s2", "f")
+        ev,_,_=this_flow(test_input)
+
+        self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
+
+        
     
       
 
@@ -134,7 +146,13 @@ class Test(unittest.TestCase):
 
                 check_flow(this_flow)
 
-      
+        
+        ## f flow
+
+        this_flow=f.pdf("s2", "f")
+        with torch.no_grad():
+            check_flow(this_flow)
+
         ## Exponential map flow
 
         extra_flow_defs=dict()
@@ -167,6 +185,10 @@ class Test(unittest.TestCase):
         this_flow=f.pdf("s2", "c", options_overwrite=extra_flow_defs)
         with torch.no_grad():
             check_flow(this_flow)
+
+      
+
+
 
 
 

@@ -15,7 +15,11 @@ import scipy
 import math
 import time
 
+import healpy
+
+
 from scipy.special import iv, i0, i1
+import scipy.linalg
 
 from typing import Union
 
@@ -2918,7 +2922,9 @@ class pdf(nn.Module):
                          failsafe_crosscheck_tolerance=None,
                          dtype=None,
                          device=None,
-                         verbose=False):
+                         verbose=False,
+                         s2_entropy_scanning=False,
+                         s2_entropy_scan_nside=32):
         """
         Calculate the first and second central moments of the marginal distributions. For Euclidean manifolds it calculates a Gaussian approximation, for spherical distributions calculates
         a von-Mises approximation. Because these are the respective maximum entropy distributions, their entropy should always be larger than the original distribution.
@@ -2935,6 +2941,7 @@ class pdf(nn.Module):
             dtype (torch dtype): If given, uses this dtype. Otherwise uses dtype from parameters.
             device (torch.device): If given, uses this device. Otherwise uses device from parameters.
             verbose (bool): Some extra print statements on runtime.
+            s2_entropy_scanning (bool): Use a healpix scan to determine entropy .. can be faster for certain s2 distributions.
 
         Returns:
 
@@ -2957,6 +2964,108 @@ class pdf(nn.Module):
            
         """
 
+        def random_VMF(mu , kappa , size = None):
+            """
+            Von Mises - Fisher distribution sampler with
+            mean direction mu and co nc en tr at io n kappa .
+            Source : https :// hal . science /hal - 04004568
+            """
+            # parse input parameters
+            n = 1 if size is None else numpy.product( size )
+            shape = () if size is None else tuple( numpy.ravel( size ))
+            mu = numpy.asarray( mu )
+            mu = mu / numpy.linalg.norm( mu )
+            (d ,) = mu.shape
+            # z component : radial samples pe rp en dic ul ar to mu
+            z = numpy.random.normal(0 , 1 , (n , d) )
+            z /= numpy.linalg.norm(z , axis =1 , keepdims = True )
+            z = z - (z @ mu[:, None ]) * mu[None , :]
+            z /= numpy.linalg.norm(z , axis =1 , keepdims = True )
+            # sample angles ( in cos and sin form )
+            cos = _random_VMF_cos(d , kappa , n )
+            sin = numpy.sqrt(1 - cos ** 2)
+            # combine angles with the z component
+            x = z * sin[:, None ] + cos[:, None ] * mu[None , :]
+            return x.reshape((*shape , d ))
+
+        def _random_VMF_cos(d: int , kappa : float , n: int):
+            """
+            Generate n iid samples t with density function given by
+            p(t) = someConstant * (1-t**2) **((d-2)/2) * exp ( kappa *t)
+            """
+            # b = Eq. 4 of https :// doi . org / 10. 1080 / 0 3 6 1 0 9 1 9 4 0 8 8 1 3 1 6 1
+            b = ( d - 1) / (2 * kappa + (4 * kappa ** 2 + ( d - 1) ** 2) ** 0.5)
+            x0 = (1 - b) / ( 1 + b)
+            c = kappa * x0 + ( d - 1) * numpy.log(1 - x0 ** 2)
+            found = 0
+            out = []
+            while found < n:
+                m = min(n , int((n-found)*1.5))
+                z = numpy.random.beta(( d - 1 ) / 2 , (d - 1) / 2 , size =m )
+                t = ( 1 - (1 + b) * z) / (1 - (1 - b) * z)
+                test = kappa * t + (d - 1) * numpy.log(1 - x0 * t) - c
+                accept = test >= -numpy.random.exponential( size =m)
+                out.append(t[ accept ])
+                found += len( out [-1])
+            return numpy.concatenate( out )[:n]
+
+        def get_rotation_matrix(target_vector):
+            # Normalize the target vector
+            
+            if(target_vector[0]==0 and target_vector[1]==0 and target_vector[2]==1.0):
+                return numpy.eye(3)
+            
+            target_vector = numpy.array(target_vector) / numpy.linalg.norm(target_vector)
+            
+            # Define the initial vector (0, 0, 1)
+            initial_vector = numpy.array([0, 0, 1])
+            
+            # Calculate the cross product between the initial and target vectors
+            cross_product = numpy.cross(initial_vector, target_vector)
+            
+            # Calculate the dot product between the initial and target vectors
+            dot_product = numpy.dot(initial_vector, target_vector)
+            
+            # Construct the skew-symmetric matrix
+            skew_symmetric_matrix = numpy.array([[0, -cross_product[2], cross_product[1]],
+                                              [cross_product[2], 0, -cross_product[0]],
+                                              [-cross_product[1], cross_product[0], 0]])
+            
+            # Construct the rotation matrix using Rodrigues' rotation formula
+            rotation_matrix = numpy.identity(3) + skew_symmetric_matrix + numpy.dot(skew_symmetric_matrix, skew_symmetric_matrix) * (1 - dot_product) / (numpy.linalg.norm(cross_product) ** 2)
+            
+            return rotation_matrix
+
+        def uniform_to_w(samples, kappa=1.0):
+
+            w_samples=1.0+(1.0/kappa)*numpy.log(samples+(1.0-samples)*numpy.exp(-2*kappa))
+            return w_samples
+
+        def obtain_fisher_mises_samples(mu, kappa, samplesize):
+
+            uniform_samples=numpy.random.uniform(size=(samplesize,))
+            uniform_samples_2=numpy.random.uniform(size=(samplesize,))
+
+            w_samples=uniform_to_w(uniform_samples,kappa=kappa)
+            
+            circle_samples_x=numpy.cos(uniform_samples_2*2*numpy.pi)
+            circle_samples_y=numpy.sin(uniform_samples_2*2*numpy.pi)
+            
+            pre_fac=numpy.sqrt(1.0-w_samples**2)
+                
+            assert(type(mu)==numpy.ndarray)
+            assert(len(mu)==3)
+            assert(len(mu.shape)==1)
+            
+            rot_matrix=get_rotation_matrix(mu)
+            
+            rot_matrix=numpy.repeat(rot_matrix[None,:,:], samplesize, axis=0)
+            
+            vecs=[ (pre_fac*circle_samples_x)[:,None], (pre_fac*circle_samples_y)[:,None], w_samples[:,None]]
+            vecs=numpy.concatenate(vecs, axis=1)
+                
+            return numpy.einsum("...ij,...j -> ...i", rot_matrix, vecs)
+
         def newton_iter(arg, p, normed_length_summed_pts):
             """
             p is the Euclidean embedding dimension: p=3 -> 2-d sphere, p=2 -> 1-d circle
@@ -2972,9 +3081,14 @@ class pdf(nn.Module):
 
                
             elif(p==3):
-
-                a_p_k=iv(1.5, arg)/iv(0.5, arg)
-
+               
+                #a_p_k=iv(1.5, arg)/iv(0.5, arg)
+                # calculate ratio based on exact formulas from abramovitz & stegun (p.443)
+                a_p_k=-1.0/arg+1.0/numpy.tanh(arg)
+              
+              
+                temp=(a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (2.0/arg)*a_p_k)
+               
                 return arg- ( (a_p_k-normed_length_summed_pts)/(1.0-a_p_k**2- (2.0/arg)*a_p_k) )
 
         
@@ -3013,18 +3127,115 @@ class pdf(nn.Module):
         
             entropy_dict=None
 
+            if(type(conditional_input)==list):  
+                data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+            else:
+                data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
+
             if(calc_kl_diff_and_entropic_quantities):
                 # also calculate total entropy [-1], because it is no extra cost 
-                entropy_dict, samples=self.entropy_iterative(sub_manifolds=[-1]+list(range(len(self.pdf_defs_list))), 
-                                                                 conditional_input=conditional_input,
-                                                                 samplesize=samplesize,
-                                                                 iterative_samplesize=iterative_samplesize,
-                                                                 max_iterative_batchsize=max_iterative_batchsize,
-                                                                 failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
-                                                                 device=used_device,
-                                                                 dtype=used_dtype,
-                                                                 return_samples=True,
-                                                                 verbose=verbose)
+
+                if(s2_entropy_scanning):
+                    assert(self.pdf_defs_list[0]=="s2")
+
+                    
+                    if(conditional_input is None):
+                        raise NotImplementedError()
+                    else:
+
+                        ent_vec=[]
+                        samp_vec=[]
+                        for cur_cinput in conditional_input:
+
+                            nside=s2_entropy_scan_nside
+
+                            tot_sum=0.0
+
+                            diff_tol=0.001
+
+                            is_still_bad=True
+
+                            MAX_SIZE=100000
+                            while( is_still_bad):
+
+                                nside=nside*2
+
+                                num_pix=healpy.nside2npix(nside)
+
+                                area_per_pixel=4*numpy.pi/num_pix
+
+                                theta, phi = healpy.pix2ang(nside=nside, ipix=numpy.arange(num_pix))
+
+                                target_angles=torch.from_numpy(numpy.concatenate([theta[:,None], phi[:,None]], axis=1))
+                               
+                                target_xyz,_=self.transform_target_space(target_angles, transform_from="intrinsic", transform_to="embedding")
+
+                                final_target=target_xyz.to(conditional_input)
+                                final_cinput=cur_cinput[None,:].repeat(num_pix, 1)
+
+                                all_log_pdfs=[]
+
+                                other_iter=0
+                                next_target=final_target[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+                                next_cinput=final_cinput[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+
+                                while(len(next_target)>0):
+                                    log_pdf,_,_=self.forward(next_target, conditional_input=next_cinput, force_embedding_coordinates=True)
+                                    log_pdf=log_pdf.cpu().numpy()
+                                    all_log_pdfs.append(log_pdf)
+
+                                    other_iter+=1
+
+                                    next_target=final_target[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+                                    next_cinput=final_cinput[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+
+                                    
+                                
+                                log_pdf=numpy.concatenate(all_log_pdfs)
+                                pdf_eval=numpy.exp(log_pdf)#numpy.exp(log_pdf)
+
+                                assert(len(pdf_eval)==num_pix), (len(pdf_eval), num_pix)
+                                probabilities=pdf_eval*area_per_pixel
+
+                                tot_sum=probabilities.sum()
+                               
+                                sample_indices=numpy.random.choice(numpy.arange(num_pix), samplesize, p=probabilities/tot_sum)
+
+                                num_unique_items=len(set(sample_indices))
+
+                                is_still_bad = (numpy.fabs(tot_sum-1.0)>diff_tol) | (num_unique_items < int(samplesize/10))
+                                print("nside ", nside," sidelen of pixel :", numpy.sqrt(area_per_pixel)*180.0/numpy.pi)
+                                print("num unique, ",num_unique_items)
+                                print("totsum ", tot_sum)
+                                print("BAD ? ", is_still_bad)
+                             
+
+                            theta, phi = healpy.pix2ang(nside=nside, ipix=sample_indices)
+
+                            this_samples=torch.from_numpy(numpy.concatenate([theta[:,None], phi[:,None]], axis=1))
+                            this_samples,_=self.transform_target_space(this_samples, transform_from="intrinsic", transform_to="embedding")
+                            ent_vec.append((probabilities*(-log_pdf)).sum())
+                           
+                            samp_vec.append(this_samples.to(conditional_input))
+
+                        entropy_dict=dict()
+                        entropy_dict[0]=torch.from_numpy(numpy.array(ent_vec)).to(conditional_input)
+                        entropy_dict["total"]=entropy_dict[0]
+
+                        samples=torch.cat(samp_vec, dim=0)
+
+
+                else:
+                    entropy_dict, samples=self.entropy_iterative(sub_manifolds=[-1]+list(range(len(self.pdf_defs_list))), 
+                                                                     conditional_input=conditional_input,
+                                                                     samplesize=samplesize,
+                                                                     iterative_samplesize=iterative_samplesize,
+                                                                     max_iterative_batchsize=max_iterative_batchsize,
+                                                                     failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
+                                                                     device=used_device,
+                                                                     dtype=used_dtype,
+                                                                     return_samples=True,
+                                                                     verbose=verbose)
 
            
 
@@ -3032,11 +3243,6 @@ class pdf(nn.Module):
             else:
                 
                 # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
-
-                if(type(conditional_input)==list):  
-                    data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
-                else:
-                    data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
 
                 samples,_,_,_=self.sample(conditional_input=data_summary_repeated, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
 
@@ -3070,7 +3276,9 @@ class pdf(nn.Module):
                     # collapse unneded dimension
                     this_mean=this_mean.squeeze(1)
 
-                    approx_entropy=0.5*torch.log(2*numpy.pi*torch.linalg.det(this_var))
+                    this_dim=this_mean.shape[1]
+
+                    approx_entropy=0.5*(this_dim*(numpy.log(2*numpy.pi)+1)+torch.log(torch.linalg.det(this_var)) )
 
                     ## flatten cov matrices for storage
                     #this_var=this_var.flatten(start_dim=1)
@@ -3088,6 +3296,23 @@ class pdf(nn.Module):
                         
                         kl_diff=cross_entropy-entropy_dict[sub_pdf_dim]
 
+                        ###
+                        if(sub_pdf_dim==0):
+                            mvn_samples = torch.distributions.MultivariateNormal(
+                                this_mean,
+                                covariance_matrix=this_var
+                            ).sample(sample_shape=(samplesize,))
+
+                            mvn_samples=mvn_samples.transpose(0,1).reshape(mvn_samples.shape[0]*mvn_samples.shape[1], -1).type_as(data_summary_repeated).to(data_summary_repeated)
+
+                          
+                            mvn_samp_logprob_exact,_,_=self.forward(mvn_samples, conditional_input=data_summary_repeated)
+                
+                            reverse_cross_entropy=-mvn_samp_logprob_exact.reshape(-1, samplesize).mean(dim=1)
+                            reverse_kl_diff=reverse_cross_entropy-approx_entropy
+                        
+
+                      
                        
                 elif("s" in sub_pdf_def):
 
@@ -3098,7 +3323,7 @@ class pdf(nn.Module):
                     ## mean vec on sphere
                     this_mean=sample_sum/(sample_sum_length)
 
-                    angle_mean,_=self.transform_target_space(this_mean, 0.0, transform_from="embedding", transform_to="default")
+                    angle_mean,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_mean, 0.0)
 
                     return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean
 
@@ -3140,26 +3365,68 @@ class pdf(nn.Module):
 
                     elif(p==3):
 
+                        a_p_k=(-1.0/this_var+1.0/numpy.tanh(this_var)).to(angle_mean)
                         
-                        c_p_k=(this_var**(0.5)/( (2*numpy.pi)**1.5 * iv(0.5, this_var))).to(angle_mean)
-                       
+                        #c_p_k=(this_var**(0.5)/( (2*numpy.pi)**1.5 * iv(0.5, this_var))).to(angle_mean)
+                        log_c_p_k=torch.zeros_like(a_p_k)
+
+
+
+                        log_c_p_k[this_var>50]=(torch.log(this_var)-numpy.log(2*numpy.pi)-this_var)[this_var>50].to(a_p_k)
+                        log_c_p_k[this_var<=50]=(torch.log(this_var)-numpy.log(2*numpy.pi)-torch.log(torch.exp(this_var)-torch.exp(-this_var)))[this_var<=50].to(a_p_k)
+
+                    
                         #c_p_k*=1e-5
-                        a_p_k=(iv(1.5, this_var)/iv(0.5, this_var)).to(angle_mean)
+                        #a_p_k=(iv(1.5, this_var)/iv(0.5, this_var)).to(angle_mean)
+                        
+
 
                     this_var=this_var.to(angle_mean)
                         
-                    approx_entropy=(-torch.log(c_p_k)-this_var*a_p_k).squeeze(1)
-               
+                    approx_entropy=(-log_c_p_k-this_var*a_p_k).squeeze(1)
+
+                    #print("APPROX ENTORPY", approx_entropy)
+                 
                     if(calc_kl_diff_and_entropic_quantities):
 
                         ## logprobs of fisher-mises
                         log_exp_facs=(these_subsamples*this_mean.unsqueeze(1)).sum(axis=2,keepdims=True)*this_var.unsqueeze(1)
-                        log_probs=log_exp_facs+torch.log(c_p_k.unsqueeze(1))
+                        log_probs=log_exp_facs+log_c_p_k.unsqueeze(1)
 
+                       
                         ## cross entropy (true->approx)
                         cross_entropy=-log_probs.mean(dim=1).squeeze(1)
-                       
+
                         kl_diff=cross_entropy-entropy_dict[sub_pdf_dim]
+
+                        ## reverse kl divergence
+
+                        if(sub_pdf_dim==0):
+                            mises_samples=[]
+                            for cur_ind, cur_mean in enumerate(this_mean):
+                                
+                                #print("MEAN", cur_mean.cpu().numpy())
+                                #print("KAPPA", this_var[cur_ind].cpu().numpy())
+                                ms=obtain_fisher_mises_samples(cur_mean.cpu().numpy() , this_var[cur_ind].cpu().numpy() , samplesize=samplesize)
+                                #print(ms)
+                                lens=numpy.sqrt(numpy.sum(ms**2, axis=1))
+                                #print("LENS", lens)
+                                ## much slower
+                                #ms=random_VMF(cur_mean.cpu().numpy() , this_var[cur_ind].cpu().numpy() , size = samplesize)
+                               
+                                mises_samples.append(torch.from_numpy(ms).type_as(log_probs).to(log_probs))
+
+                            mises_samples=torch.cat(mises_samples, dim=0)
+
+                            mises_samp_logprob_exact,_,_=self.forward(mises_samples, conditional_input=data_summary_repeated)
+                            
+                            
+                            reverse_cross_entropy=-mises_samp_logprob_exact.reshape(-1, samplesize).mean(dim=1)
+
+                            reverse_kl_diff=reverse_cross_entropy-approx_entropy
+                        
+
+                        
   
                 else:
                     raise Exception("Unsupported sub pdf type for marginal moment calculation!", sub_pdf_def)
@@ -3171,6 +3438,10 @@ class pdf(nn.Module):
                     return_dict["entropy_%d" % sub_pdf_dim]=entropy_dict[sub_pdf_dim]
                     return_dict["cross_entropy_%d" % sub_pdf_dim]=cross_entropy
                     return_dict["kl_diff_exact_approx_%d" % sub_pdf_dim]=kl_diff
+
+                    if(sub_pdf_dim==0):
+                        return_dict["kl_diff_approx_exact_0"]=reverse_kl_diff
+                        return_dict["reverse_cross_entropy_0"]=reverse_cross_entropy
 
                 return_dict["approx_entropy_%d" % sub_pdf_dim]=approx_entropy
                 

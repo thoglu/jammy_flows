@@ -97,12 +97,12 @@ class sphere_base(layer_base.layer_base):
 
             if(extra_inputs is not None):
                 
-                mat_pars=torch.reshape(extra_inputs[:,:self.num_householder_params], [x.shape[0], hh_dim, hh_dim])
+                mat_pars=torch.reshape(extra_inputs[:,:self.num_householder_params], [-1, hh_dim, hh_dim])
 
             else:
 
-                mat_pars=torch.reshape(self.householder_params, [1, hh_dim, hh_dim]).to(x)
-                mat_pars=mat_pars.repeat(x.shape[0],1,1)
+                mat_pars=torch.reshape(self.householder_params, [-1, hh_dim, hh_dim]).to(x)
+                #mat_pars=mat_pars.repeat(x.shape[0],1,1)
 
             return self.compute_householder_matrix(mat_pars, hh_dim, device=device)
 
@@ -144,7 +144,7 @@ class sphere_base(layer_base.layer_base):
 
         Q = torch.eye(dim, device=device).type(vs.dtype).unsqueeze(0).repeat(vs.shape[0], 1,1)
        
-        for i in range(1):
+        for i in range(dim):
         
             v = vs[:,i].reshape(-1,dim, 1).to(device)
             
@@ -355,9 +355,12 @@ class sphere_base(layer_base.layer_base):
             sign=(x>numpy.pi)*-1.0+(x<=numpy.pi)*1.0
             new_x=(sign>0)*x+(sign<0)*(2*numpy.pi-x)
 
+            used_eps=1e-8
+            if(x.dtype==torch.float32):
+                used_eps=1e-5
             ## make sure we dont get any infs
-            new_x=torch.where(new_x==0.0, 1e-8, new_x)
-            new_x=torch.where(new_x==2*numpy.pi, 2*numpy.pi-1e-8, new_x)
+            new_x=torch.where(new_x<=0.0, used_eps, new_x)
+            new_x=torch.where(new_x>=2*numpy.pi, 2*numpy.pi-used_eps, new_x)
 
             ## based on -pi-pi
             #sign=(x<0)*-1.0+(x>=0)*1.0
@@ -510,10 +513,11 @@ class sphere_base(layer_base.layer_base):
 
             mat=self.compute_rotation_matrix(x, extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
+            
             ## permute because we do inverse rotation
-            x = torch.bmm(mat.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
+            #x = torch.bmm(mat.permute(0,2,1), x.unsqueeze(-1)).squeeze(-1)
+            x = torch.einsum("...ij, ...j -> ...i", mat.permute(0,2,1), x)
 
-            #x=self.eucl_to_spherical_embedding(eucl)
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
@@ -545,12 +549,13 @@ class sphere_base(layer_base.layer_base):
         if(self.euclidean_to_sphere_as_first):
 
             ## only if sf_extra is None we want to transform
-         
+           
             if(self.always_parametrize_in_embedding_space and sf_extra is None):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
             #sys.exit(-1)
             x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
+            
             
         return x, log_det
 
@@ -595,8 +600,10 @@ class sphere_base(layer_base.layer_base):
 
             mat=self.compute_rotation_matrix(x,extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
-            x = torch.bmm(mat, x.unsqueeze(-1)).squeeze(-1)  # uncomment
-           
+            #x = torch.bmm(mat, x.unsqueeze(-1)).squeeze(-1)  # uncomment
+
+            ## use broadcasting
+            x = torch.einsum("...ij, ...j -> ...i", mat, x)
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 

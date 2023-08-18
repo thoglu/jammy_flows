@@ -121,6 +121,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["options_overwrite"]["v"]=dict()
         extra_flow_defs["options_overwrite"]["v"]["add_rotation"]=1
 
+        self.flow_inits.append([ ["s2", "f"], dict()])
         self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
         self.flow_inits.append([ ["s2", "c"], dict()])
 
