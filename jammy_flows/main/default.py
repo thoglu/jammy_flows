@@ -163,45 +163,101 @@ class pdf(nn.Module):
         ## loop through flow defs and initialize sub-manifold specific options
         for ind, cur_flow_defs in enumerate(self.flow_defs_list):
 
-            this_iter_flow_abbrvs=list(set(cur_flow_defs))
+            this_iter_flow_abbrvs=cur_flow_defs
 
-            self.flow_opts[ind]=dict()
+            self.flow_opts[ind]=[]
+
+            cur_flow_index=0
 
             for flow_abbrv in this_iter_flow_abbrvs:
 
                 ## first copy default options
+                self.flow_opts[ind].append(flow_options.obtain_default_options(flow_abbrv))
 
-                self.flow_opts[ind][flow_abbrv]=flow_options.obtain_default_options(flow_abbrv)
-
+                assert(len(self.flow_opts[ind])==(cur_flow_index+1))
                 ## make sure default options are consistent
-                for opt in self.flow_opts[ind][flow_abbrv].keys():
-                    flow_options.check_flow_option(flow_abbrv, opt, self.flow_opts[ind][flow_abbrv][opt])
+                for opt in self.flow_opts[ind][-1].keys():
+                    flow_options.check_flow_option(flow_abbrv, opt, self.flow_opts[ind][-1][opt])
 
+                ## refine a specific flow within a specific sub-manifold if necessary 
+                found_specific=False
+                overwrote_default=False     
                 for k in options_overwrite.keys():
-                    if(type(k)==int):
 
-                        assert( (k>=0) and (k<len(self.flow_defs_list))), "Index of detailed options is outside allowed range of defined autoregressive structure."
+                    if(type(k)==tuple):
+
+                        assert(type(k[0])==int and type(k[1])==int), "Require 2 ints for tuple-based flow definition! The first indexes the sub-manifold, the second the flow within the manifold."
+
+                        assert( (k[0]>=0) and (k[0]<len(self.flow_defs_list))), "Index of detailed options is outside allowed range of defined autoregressive structure."
                         
-                        if(k != ind):
+                        if(k[0] != ind):
                             continue
+
+                        if(k[1] != cur_flow_index):
+                            continue
+
+                        assert(len(options_overwrite[k])==1), "We have detailed flow definition per item, require length of 1 here."
+                        
+                        found_specific=True
 
                         for detail_abbrv in options_overwrite[k].keys():
 
-                            if(detail_abbrv == flow_abbrv):
+                            assert(detail_abbrv==flow_abbrv)
 
-                                for detail_opt in options_overwrite[k][detail_abbrv].keys():
+                            for detail_opt in options_overwrite[k][detail_abbrv].keys():
 
-                                    flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
+                                print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                overwrote_default=True
 
-                                    self.flow_opts[ind][flow_abbrv][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
+                                flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
+
+                                self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
+                
+                if(found_specific==False):
+                    ## refine specific sub manifold defs if necessary
+                    for k in options_overwrite.keys():
+
+                        if(type(k)==int):
+
+                            assert( (k>=0) and (k<len(self.flow_defs_list))), "Index of detailed options is outside allowed range of defined autoregressive structure."
                             
-                    elif(k==flow_abbrv):
+                            if(k != ind):
+                                continue
 
-                        for detail_opt in options_overwrite[k].keys():
-                            print("options overwrite ", detail_opt)
-                            flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
+                            for detail_abbrv in options_overwrite[k].keys():
 
-                            self.flow_opts[ind][flow_abbrv][detail_opt]=options_overwrite[k][detail_opt]
+                                if(detail_abbrv == flow_abbrv):
+                                    found_specific=True
+                                    
+                                    for detail_opt in options_overwrite[k][detail_abbrv].keys():
+
+                                        print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind],cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                        overwrote_default=True
+
+                                        flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
+
+                                        self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
+                    
+                if(found_specific==False):
+
+                    ## first check general flow defs
+                    for k in options_overwrite.keys():
+
+                        if(k==flow_abbrv):
+
+                            for detail_opt in options_overwrite[k].keys():
+                                print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_opt])
+                                overwrote_default=True
+
+                                flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
+
+                                self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_opt]
+
+
+                if(overwrote_default==False):
+                    print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) - using *default* options" % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ))
+
+                cur_flow_index+=1
 
         if(len(self.pdf_defs_list)!=len(self.flow_defs_list)):
             raise Exception("PDF defs list has to be same length as flow defs list, but ... ", self.pdf_defs_list, self.flow_defs_list)
@@ -300,7 +356,7 @@ class pdf(nn.Module):
                 if(flow_info[layer_type]["type"]!=subflow_description[0]):
                     raise Exception("layer type ", layer_type, " is not compatible with flow type ", subflow_description)
                   
-                this_kwargs = copy.deepcopy(self.flow_opts[subflow_index][layer_type])
+                this_kwargs = copy.deepcopy(self.flow_opts[subflow_index][layer_ind])
 
                 ## overwrite permanent parameters if desired or necessary
                 if(self.force_permanent_parameters_in_first_subpdf and (subflow_index==0)):
@@ -1292,7 +1348,7 @@ class pdf(nn.Module):
         if(amortization_parameters is not None):
 
             #assert(amortization_parameters.shape[0]==x.shape[0]), ("batch size of x must agree with batch size of amortization_parameters")
-            assert(amortization_parameters.shape[1]==self.total_number_amortizable_params)
+            assert(amortization_parameters.shape[1]==self.total_number_amortizable_params), (amortization_parameters.shape[1], self.total_number_amortizable_params)
         else:
             assert(self.amortize_everything==False)
 
