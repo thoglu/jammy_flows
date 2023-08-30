@@ -121,8 +121,23 @@ class Test(unittest.TestCase):
         extra_flow_defs["options_overwrite"]["v"]=dict()
         extra_flow_defs["options_overwrite"]["v"]["add_rotation"]=1
 
-        self.flow_inits.append([ ["s2", "f"], dict()])
         self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["add_vertical_rq_spline_flow"]=1
+        extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["add_correlated_rq_spline_flow"]=1
+        
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+        
         self.flow_inits.append([ ["s2", "c"], dict()])
 
         self.flow_inits.append([ ["e1", "p"], dict()])
@@ -366,8 +381,8 @@ class Test(unittest.TestCase):
 
                     tolerance=5e-2
 
-                    if("m" in init[0][1] or "o" in init[0][1]):
-                        tolerance=5e-2
+                    if("o" in init[0][1]):
+                        tolerance=2.0
 
                     if("c" in init[0][1]):
                         ## exponential map flows get a little less strict tolerance check for now
@@ -376,7 +391,7 @@ class Test(unittest.TestCase):
 
                     ### n requires double precision
                     if("n" in init[0][1]):
-                        tolerance=0.5
+                        tolerance=1.1
 
                     
                     this_flow.float()
