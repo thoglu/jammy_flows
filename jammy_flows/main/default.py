@@ -3102,21 +3102,20 @@ class pdf(nn.Module):
 
         initial_batch_size=1
 
-        if(type(conditional_input)==list):   
+        if(conditional_input is not None):
+            if(type(conditional_input)==list):   
 
-            initial_batch_size=conditional_input[0].shape[0]
+                initial_batch_size=conditional_input[0].shape[0]
 
-            assert(conditional_input[0].dtype == used_dtype)
-            assert(conditional_input[0].device == used_device)
-            
-        else:
+                assert(conditional_input[0].dtype == used_dtype)
+                assert(conditional_input[0].device == used_device)
+                
+            else:
 
-            initial_batch_size=conditional_input.shape[0]
+                initial_batch_size=conditional_input.shape[0]
 
-            assert(conditional_input[0].dtype == used_dtype)
-            assert(conditional_input[0].device == used_device)
-
-
+                assert(conditional_input[0].dtype == used_dtype)
+                assert(conditional_input[0].device == used_device)
 
         return_dict=dict()
 
@@ -3127,24 +3126,77 @@ class pdf(nn.Module):
         
             entropy_dict=None
 
-            if(type(conditional_input)==list):  
-                data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
-            else:
-                data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
-
+            
             if(calc_kl_diff_and_entropic_quantities):
                 # also calculate total entropy [-1], because it is no extra cost 
 
                 if(s2_entropy_scanning):
                     assert(self.pdf_defs_list[0]=="s2")
 
-                    
+                    ent_vec=[]
+                    samp_vec=[]
+
                     if(conditional_input is None):
-                        raise NotImplementedError()
+
+                        nside=s2_entropy_scan_nside
+
+                        tot_sum=0.0
+
+                        diff_tol=0.001
+
+                        is_still_bad=True
+
+                        MAX_SIZE=100000
+                        while( is_still_bad):
+
+                            nside=nside*2
+
+                            num_pix=healpy.nside2npix(nside)
+
+                            area_per_pixel=4*numpy.pi/num_pix
+
+                            theta, phi = healpy.pix2ang(nside=nside, ipix=numpy.arange(num_pix))
+
+                            target_angles=torch.from_numpy(numpy.concatenate([theta[:,None], phi[:,None]], axis=1))
+                           
+                            target_xyz,_=self.transform_target_space(target_angles, transform_from="intrinsic", transform_to="embedding")
+
+                            final_target=target_xyz.to(conditional_input)
+                            
+                            all_log_pdfs=[]
+
+                            other_iter=0
+                            next_target=final_target[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+                            
+                            while(len(next_target)>0):
+                                log_pdf,_,_=self.forward(next_target, conditional_input=None, force_embedding_coordinates=True)
+                                log_pdf=log_pdf.cpu().numpy()
+                                all_log_pdfs.append(log_pdf)
+
+                                other_iter+=1
+
+                                next_target=final_target[MAX_SIZE*other_iter:MAX_SIZE*other_iter+MAX_SIZE]
+                                
+                            log_pdf=numpy.concatenate(all_log_pdfs)
+                            pdf_eval=numpy.exp(log_pdf)#numpy.exp(log_pdf)
+
+                            assert(len(pdf_eval)==num_pix), (len(pdf_eval), num_pix)
+                            probabilities=pdf_eval*area_per_pixel
+
+                            tot_sum=probabilities.sum()
+                           
+                            sample_indices=numpy.random.choice(numpy.arange(num_pix), samplesize, p=probabilities/tot_sum)
+
+                            num_unique_items=len(set(sample_indices))
+
+                            is_still_bad = (numpy.fabs(tot_sum-1.0)>diff_tol) | (num_unique_items < int(samplesize/10))
+                            print("nside ", nside," sidelen of pixel :", numpy.sqrt(area_per_pixel)*180.0/numpy.pi)
+                            print("num unique, ",num_unique_items)
+                            print("totsum ", tot_sum)
+                            print("BAD ? ", is_still_bad)
+                    
                     else:
 
-                        ent_vec=[]
-                        samp_vec=[]
                         for cur_cinput in conditional_input:
 
                             nside=s2_entropy_scan_nside
@@ -3244,7 +3296,15 @@ class pdf(nn.Module):
                 
                 # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
 
-                samples,_,_,_=self.sample(conditional_input=data_summary_repeated, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
+                if(conditional_input is not None):
+                    if(type(conditional_input)==list):  
+                        data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+                    else:
+                        data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
+                else:
+                    data_summary_repeated=None
+
+                samples,_,_,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
 
             target_dim_embedded=self.total_target_dim_embedded
 
