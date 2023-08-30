@@ -177,8 +177,8 @@ opts_dict["f"]["kwargs"] = dict()
 opts_dict["f"]["kwargs"]["add_vertical_rq_spline_flow"] = (0, [0,1])
 opts_dict["f"]["kwargs"]["add_circular_rq_spline_flow"] = (0, [0,1])
 opts_dict["f"]["kwargs"]["add_correlated_rq_spline_flow"] = (0, [0,1])
-opts_dict["f"]["kwargs"]["circular_flow_defs"] = ("o", lambda x: type(x)==str)
-opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("r", lambda x: type(x)==str)
+opts_dict["f"]["kwargs"]["circular_flow_defs"] = ("oo", lambda x: type(x)==str)
+opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("rr", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
 
 """
@@ -191,6 +191,7 @@ opts_dict["r"]["module"] = rational_quadratic_spline
 opts_dict["r"]["type"] = "i"
 opts_dict["r"]["kwargs"] = dict()
 opts_dict["r"]["kwargs"]["num_basis_elements"] = (5, lambda x: x>0)
+opts_dict["r"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: type(x)==float)
 
 """
 Simplex flows

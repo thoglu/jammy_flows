@@ -93,6 +93,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         if(add_vertical_rq_spline_flow):
            
             flow_dict=dict()
+            flow_dict["r"]=dict()
+            flow_dict["r"]["fix_boundary_derivatives"]=1.0
 
             self.vertical_rqspline_flow=default.pdf("i1_-1.0_1.0", vertical_flow_defs, 
                                   options_overwrite=flow_dict,

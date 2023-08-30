@@ -70,7 +70,8 @@ class rational_quadratic_spline(interval_base.interval_base):
                  high_boundary=1.0, 
                  min_width=1e-4, 
                  min_height=1e-4, 
-                 min_derivative=1e-4):
+                 min_derivative=1e-4,
+                 fix_boundary_derivatives=-1.0):
         """
         Rational-quadartic spline layer: Symbol “r"
 
@@ -106,19 +107,31 @@ class rational_quadratic_spline(interval_base.interval_base):
             self.rel_log_heights=torch.zeros(self.num_basis_elements).type(torch.double).unsqueeze(0)
 
         ## derivatives
+        self.fix_boundary_derivatives=fix_boundary_derivatives
+        self.deriv_num_bd_subtraction=0
+        self.boundary_log_derivs=None
+        if(self.fix_boundary_derivatives>0.0):
+            self.deriv_num_bd_subtraction=2
+
+            assert(self.fix_boundary_derivatives>min_derivative)
+
+            self.boundary_log_derivs=np.log(np.exp(self.fix_boundary_derivatives-min_derivative)-1.0)
+
         if(use_permanent_parameters):
-            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_elements+1).type(torch.double).unsqueeze(0))
+            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_elements+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0))
             
         else:
-            self.rel_log_derivatives=torch.zeros(self.num_basis_elements+1).type(torch.double).unsqueeze(0)
+            self.rel_log_derivatives=torch.zeros(self.num_basis_elements+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0)
 
-        self.total_param_num+=3*self.num_basis_elements+1
+        self.total_param_num+=3*self.num_basis_elements+1-self.deriv_num_bd_subtraction
 
         ## minimum values to which relative logarithmic values are added with softmax
      
         self.min_width=min_width
         self.min_height=min_height
         self.min_derivative=min_derivative
+
+
 
 
 
@@ -139,7 +152,14 @@ class rational_quadratic_spline(interval_base.interval_base):
             widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
             heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
             derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
-       
+        
+        if(self.deriv_num_bd_subtraction>0):
+            ## add fixed log derivatives to first and last of derivatives tensor
+          
+            first_and_last=torch.ones((derivatives.shape[0],1)).to(x)*self.boundary_log_derivs
+
+            derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=1)
+            
         x, log_det_update=spline_fns.rational_quadratic_spline(x, 
                                                          widths, 
                                                          heights, 
@@ -176,7 +196,15 @@ class rational_quadratic_spline(interval_base.interval_base):
             widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
             heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
             derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
-            
+        
+        if(self.deriv_num_bd_subtraction>0):
+            ## add fixed log derivatives to first and last of derivatives tensor
+          
+            first_and_last=torch.ones((derivatives.shape[0],1)).to(x)*self.boundary_log_derivs
+
+            derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=1)
+
+
            
         x, log_det_update=spline_fns.rational_quadratic_spline(x, 
                                                          widths, 
@@ -204,7 +232,7 @@ class rational_quadratic_spline(interval_base.interval_base):
         desired_param_vec=[]
 
         ## 0.54 as start value in log space seems to result in a rather flat spline (defined by the log-derivatives in particular)
-        desired_param_vec.append(torch.ones(self.num_basis_elements*3+1)*0.54)
+        desired_param_vec.append(torch.ones(self.num_basis_elements*3+1-self.deriv_num_bd_subtraction)*0.54)
 
         return torch.cat(desired_param_vec)
 
@@ -214,12 +242,12 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         counter=0
         self.rel_log_widths.data[0,:]=params[counter:counter+self.num_basis_elements]    
-
         counter+=self.num_basis_elements
+        
         self.rel_log_heights.data[0,:]=params[counter:counter+self.num_basis_elements]
-
         counter+=self.num_basis_elements
-        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_elements+1]
+
+        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_elements+1-self.deriv_num_bd_subtraction]
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
 
