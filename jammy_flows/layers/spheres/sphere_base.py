@@ -388,7 +388,9 @@ class sphere_base(layer_base.layer_base):
                 #print("log_det sphere_to_plane ", (-x[:,0:1]).sum(axis=-1))
                 
             else:
-                cos_x=torch.cos(x[:,0:1])
+
+
+                cos_x=torch.cos(numpy.pi-x[:,0:1])
               
                 good_cos_x=(cos_x!=1.0) & (cos_x!=-1.0)
                 
@@ -398,7 +400,7 @@ class sphere_base(layer_base.layer_base):
                 #cos_x=(cos_x==1.0)*(cos_x-1e-5)+(cos_x==-1.0)*(cos_x+1e-5)+good_cos_x*cos_x
                 r_g=torch.sqrt(-torch.log( (1.0-cos_x)/2.0 )*2.0)
  
-                inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
+                #inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
 
                 ## the normal log_det .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
@@ -466,11 +468,11 @@ class sphere_base(layer_base.layer_base):
                
             else:
 
-                new_theta=torch.acos(1.0-2.0*torch.exp(-((x[:,0:1])**2)/2.0))
+                new_theta=numpy.pi-torch.acos(1.0-2.0*torch.exp(-((x[:,0:1])**2)/2.0))
 
                 r_g=x[:,0]
               
-                inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
+                #inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
                 
                 
                 #log_det+=-0.5*torch.log(1.0-inner**2)+torch.log(r_g*2.0)-0.5*r_g**2
