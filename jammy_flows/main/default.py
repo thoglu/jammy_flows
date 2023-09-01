@@ -1,7 +1,7 @@
 import torch
 from torch import nn
 
-from .. import flow_options
+from ..flow_options import *
 
 from .. import extra_functions
 from .. import amortizable_mlp
@@ -172,12 +172,12 @@ class pdf(nn.Module):
             for flow_abbrv in this_iter_flow_abbrvs:
 
                 ## first copy default options
-                self.flow_opts[ind].append(flow_options.obtain_default_options(flow_abbrv))
+                self.flow_opts[ind].append(obtain_default_options(flow_abbrv))
 
                 assert(len(self.flow_opts[ind])==(cur_flow_index+1))
                 ## make sure default options are consistent
                 for opt in self.flow_opts[ind][-1].keys():
-                    flow_options.check_flow_option(flow_abbrv, opt, self.flow_opts[ind][-1][opt])
+                    check_flow_option(flow_abbrv, opt, self.flow_opts[ind][-1][opt])
 
                 ## refine a specific flow within a specific sub-manifold if necessary 
                 found_specific=False
@@ -209,7 +209,7 @@ class pdf(nn.Module):
                                 print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
                                 overwrote_default=True
 
-                                flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
+                                check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
 
                                 self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
                 
@@ -234,7 +234,7 @@ class pdf(nn.Module):
                                         print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind],cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
                                         overwrote_default=True
 
-                                        flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
+                                        check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
 
                                         self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_abbrv][detail_opt]
                     
@@ -249,7 +249,7 @@ class pdf(nn.Module):
                                 print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_opt])
                                 overwrote_default=True
 
-                                flow_options.check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
+                                check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
 
                                 self.flow_opts[ind][-1][detail_opt]=options_overwrite[k][detail_opt]
 
@@ -341,7 +341,7 @@ class pdf(nn.Module):
         ## loop through flows and define layers according to flow definitions
         ## also count number of parameters of each layer
 
-        flow_info=flow_options.obtain_overall_flow_info()
+        flow_info=obtain_overall_flow_info()
 
         for subflow_index, subflow_description in enumerate(self.pdf_defs_list):
 
