@@ -1,11 +1,10 @@
 import torch
 from torch import nn
 
-from ..flow_options import *
+from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
+from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks, _calculate_coverage
+from ..amortizable_mlp import AmortizableMLP
 
-from .. import extra_functions
-from .. import amortizable_mlp
-from ..extra_functions import list_from_str, NONLINEARITIES
 
 import collections
 import numpy
@@ -603,7 +602,7 @@ class pdf(nn.Module):
 
                     these_hidden_dims=list_from_str(self.amortization_mlp_dims[pdf_index])
                     
-                    custom_mlp=amortizable_mlp.AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.amortization_mlp_ranks[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
+                    custom_mlp=AmortizableMLP(this_summary_dim, these_hidden_dims, num_predicted_pars, low_rank_approximations=self.amortization_mlp_ranks[pdf_index], use_permanent_parameters=self.amortize_everything==False, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
                     
                     if(self.amortize_everything):
                         self.total_number_amortizable_params+=custom_mlp.num_amortization_params
@@ -649,7 +648,7 @@ class pdf(nn.Module):
 
                         if(self.amortization_mlp_use_custom_mode):
                            
-                            self.log_normalization_mlp=extra_functions.AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
+                            self.log_normalization_mlp=AmortizableMLP(this_summary_dim, self.hidden_mlp_dims_poisson, num_predicted_pars, low_rank_approximations=self.rank_of_mlp_mappings_poisson, use_permanent_parameters=True, highway_mode=self.amortization_mlp_highway_mode, svd_mode="smart")
 
                         else:
 
@@ -819,7 +818,7 @@ class pdf(nn.Module):
 
                 extra_mlp_inputs=None
                 if(amortization_parameters is not None):
-                    assert(type(self.mlp_predictors[0])==extra_functions.AmortizableMLP)
+                    assert(type(self.mlp_predictors[0])==AmortizableMLP)
                     assert(self.mlp_predictors[0].use_permanent_parameters==False)
 
                     num_mlp_params=self.mlp_predictors[0].num_amortization_params
@@ -1608,7 +1607,7 @@ class pdf(nn.Module):
 
             assert(predefined_target_input is None), "Failsafe does not work with predefined input!"
             
-            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, log_gauss_evals_prop=extra_functions.recheck_sampling(self, 
+            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, log_gauss_evals_prop=recheck_sampling(self, 
                       new_targets,
                       std_normal_samples,
                       return_log_pdf,
@@ -1769,7 +1768,7 @@ class pdf(nn.Module):
 
                 if("e" in subflow_description):
                     
-                    params=extra_functions.find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
+                    params=find_init_pars_of_chained_blocks(this_layer_list, data[:, this_dim_index:this_dim_index+this_dim] if data is not None else None, mvn_min_max_sv_ratio=mvn_min_max_sv_ratio)
 
                     params_list.append(params)
 
@@ -1815,7 +1814,7 @@ class pdf(nn.Module):
                                     these_params=torch.cat([these_params, torch.Tensor([log_lambda_init]).type(mlp_predictor[-1].bias.data.dtype)])
 
                         ## custom low-rank MLPs - initialization is done inside the custom MLP class
-                        if(type(mlp_predictor)== amortizable_mlp.AmortizableMLP):
+                        if(type(mlp_predictor)== AmortizableMLP):
                            
                             if(self.amortize_everything):
                                 desired_uvb_params=mlp_predictor.obtain_default_init_tensor(fix_final_bias=these_params, prev_damping_factor=damping_factor)
@@ -1915,7 +1914,7 @@ class pdf(nn.Module):
 
             ## overall coverage
             if(-1 in sub_manifolds):
-                true_cov, logprob_diffs=extra_functions._calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
+                true_cov, logprob_diffs=_calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
                 
                 return_dict["true"]["total"]=true_cov
                 return_dict["logprob_diffs"]["total"]=logprob_diffs
@@ -1929,7 +1928,7 @@ class pdf(nn.Module):
              
                 sub_logp_base=torch.distributions.Normal(0.0,1.0).log_prob(base_points[:,self.target_dim_indices_intrinsic[sm][0]:self.target_dim_indices_intrinsic[sm][1]]).sum(axis=-1)
                
-                true_cov, logprob_diffs=extra_functions._calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
+                true_cov, logprob_diffs=_calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
             
                 return_dict["true"][int(sm)]=true_cov
                 return_dict["logprob_diffs"][int(sm)]=logprob_diffs
@@ -2633,7 +2632,7 @@ class pdf(nn.Module):
             return_log_pdf[k]=base_evals_dict[k]-logdet_per_manifold[k]
 
         if(failsafe_crosscheck_tolerance):
-            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, base_evals_dict_prop=extra_functions.recheck_sampling(self, 
+            new_targets_prop, std_normal_samples_prop, return_log_pdf_prop, base_evals_dict_prop=recheck_sampling(self, 
                       new_targets,
                       std_normal_samples,
                       return_log_pdf,
