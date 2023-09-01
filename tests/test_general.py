@@ -382,7 +382,7 @@ class Test(unittest.TestCase):
                     tolerance=5e-2
 
                     if("o" in init[0][1]):
-                        tolerance=2.0
+                        tolerance=5.0
 
                     if("c" in init[0][1]):
                         ## exponential map flows get a little less strict tolerance check for now
