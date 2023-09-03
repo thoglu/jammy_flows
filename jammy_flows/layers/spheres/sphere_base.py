@@ -389,9 +389,7 @@ class sphere_base(layer_base.layer_base):
                 
             else:
 
-                ## pi-x[0] leads to a flipped stereographic projection
-                flipped_angle=numpy.pi-x[:,0:1]
-                cos_x=torch.cos(flipped_angle)
+                cos_x=torch.cos(x[:,0:1])
               
                 good_cos_x=(cos_x!=1.0) & (cos_x!=-1.0)
                 
@@ -407,7 +405,7 @@ class sphere_base(layer_base.layer_base):
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ### FULL TERM:
                 ### log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
-                log_det=log_det-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(flipped_angle[:,0]))
+                log_det=log_det-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
         
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
 
@@ -490,7 +488,7 @@ class sphere_base(layer_base.layer_base):
                 log_det=log_det+torch.log(1.0-torch.cos(new_theta[:,0]))-torch.log(torch.sin(new_theta[:,0]))
                 
                 ## flip result pi-angle for a flipped stereographic projection
-                x=torch.cat([numpy.pi-new_theta, x[:,1:2]],dim=1)
+                x=torch.cat([new_theta, x[:,1:2]],dim=1)
 
         else:
             print("dimension > 2 not implement at the moment")

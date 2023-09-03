@@ -196,12 +196,15 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         safe_part=2*kappa
         smaller_mask=kappa[:,0]<100
         
+        ## safe_part only involves kappa
         safe_part=torch.masked_scatter(input=safe_part, mask=smaller_mask[:,None], source=torch.log(torch.exp(2*kappa[smaller_mask])-1.0))
 
-        safe_ld_update=(torch.log(2*kappa)+kappa*(prev_ret+1)-safe_part)[:,0]
+        prev_ret_inverse=-1.0*prev_ret
+        safe_ld_update=(torch.log(2*kappa)+kappa*(prev_ret_inverse+1)-safe_part)[:,0]
         
         ## 1 + 1 - 2*k -2*(1+k(x-1)) / (-2k) = 2 - 2k -2 -2k(x-1) / -2k = 1 + 1(x-1)
-        ret= (1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(prev_ret-1)))/(-1+torch.exp(-2*kappa))
+        ret= (1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(prev_ret_inverse-1)))/(-1+torch.exp(-2*kappa))
+        ret=-1.0*ret
 
         #approx_result=ret # nothing happens for k->0
         if(x.dtype==torch.float32):
@@ -314,10 +317,15 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         ## 0.5+0.5x + (0.5-0.5x)*(1-2k) = 1 -k+kx = (1+k(x-1))^(1/k)
         ## intermediate [-1,1]->[-1,1] transformation
+
+        ## perform the flow with z axis swapped
+        prev_ret_inverse=-1.0*prev_ret
         
-        log_det=log_det-torch.log(kappa*prev_ret+kappa/torch.tanh(kappa))[:,0]
-        
-        ret=1.0+(1.0/kappa)*torch.log( 0.5*(1.0+prev_ret) + (0.5-0.5*prev_ret)*torch.exp(-2.0*kappa) )
+        log_det=log_det-torch.log(kappa*prev_ret_inverse+kappa/torch.tanh(kappa))[:,0]
+        ret=1.0+(1.0/kappa)*torch.log( 0.5*(1.0+prev_ret_inverse) + (0.5-0.5*prev_ret_inverse)*torch.exp(-2.0*kappa) )
+
+        ret=-1.0*ret
+
         if(x.dtype==torch.float32):
             kappa_mask=kappa<1e-4
         elif(x.dtype==torch.float64):
