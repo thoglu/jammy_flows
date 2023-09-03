@@ -180,6 +180,8 @@ opts_dict["f"]["kwargs"]["add_correlated_rq_spline_flow"] = (0, [0,1])
 opts_dict["f"]["kwargs"]["circular_flow_defs"] = ("oo", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("rr", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
+opts_dict["f"]["kwargs"]["inverse_z_scaling"] = (1, [0,1])
+
 
 """
 Interval flows

@@ -44,7 +44,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                  vertical_flow_defs="r",
                  circular_flow_defs="o",
                  add_correlated_rq_spline_flow=0,
-                 correlated_max_rank=3): # split / joint
+                 correlated_max_rank=3,
+                 inverse_z_scaling=1): 
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -70,6 +71,11 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
             raise Exception("2-D Flow")
         
         ####
+
+        if(inverse_z_scaling):
+            self.z_scaling_factor=-1.0
+        else:
+            self.z_scaling_factor=1.0
 
         self.fisher_parametrization=fisher_parametrization
 
@@ -199,12 +205,11 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         ## safe_part only involves kappa
         safe_part=torch.masked_scatter(input=safe_part, mask=smaller_mask[:,None], source=torch.log(torch.exp(2*kappa[smaller_mask])-1.0))
 
-        prev_ret_inverse=-1.0*prev_ret
-        safe_ld_update=(torch.log(2*kappa)+kappa*(prev_ret_inverse+1)-safe_part)[:,0]
+        #prev_ret_inverse=self.z_scaling_factor*prev_ret
+        safe_ld_update=(torch.log(2*kappa)+kappa*(self.z_scaling_factor*prev_ret+1)-safe_part)[:,0]
         
         ## 1 + 1 - 2*k -2*(1+k(x-1)) / (-2k) = 2 - 2k -2 -2k(x-1) / -2k = 1 + 1(x-1)
-        ret= (1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(prev_ret_inverse-1)))/(-1+torch.exp(-2*kappa))
-        ret=-1.0*ret
+        ret= self.z_scaling_factor*((1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(self.z_scaling_factor*prev_ret-1)))/(-1+torch.exp(-2*kappa)))
 
         #approx_result=ret # nothing happens for k->0
         if(x.dtype==torch.float32):
@@ -319,12 +324,10 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         ## intermediate [-1,1]->[-1,1] transformation
 
         ## perform the flow with z axis swapped
-        prev_ret_inverse=-1.0*prev_ret
+        #prev_ret_inverse=self.z_scaling_factor*prev_ret
         
-        log_det=log_det-torch.log(kappa*prev_ret_inverse+kappa/torch.tanh(kappa))[:,0]
-        ret=1.0+(1.0/kappa)*torch.log( 0.5*(1.0+prev_ret_inverse) + (0.5-0.5*prev_ret_inverse)*torch.exp(-2.0*kappa) )
-
-        ret=-1.0*ret
+        log_det=log_det-torch.log(kappa*self.z_scaling_factor*prev_ret+kappa/torch.tanh(kappa))[:,0]
+        ret=self.z_scaling_factor*(1.0+(1.0/kappa)*torch.log( 0.5*(1.0+self.z_scaling_factor*prev_ret) + (0.5-0.5*self.z_scaling_factor*prev_ret)*torch.exp(-2.0*kappa) ))
 
         if(x.dtype==torch.float32):
             kappa_mask=kappa<1e-4
@@ -367,7 +370,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
     def _get_desired_init_parameters(self):
 
-        gaussian_init=torch.randn((1))
+        gaussian_init=torch.randn((1))-3.0
 
         overall_init=gaussian_init
 
