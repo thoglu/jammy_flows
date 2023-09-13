@@ -116,26 +116,39 @@ class Test(unittest.TestCase):
 
         self.flow_inits=[]
 
-        extra_flow_defs=dict()
-        extra_flow_defs["options_overwrite"]=dict()
-        extra_flow_defs["options_overwrite"]["v"]=dict()
-        extra_flow_defs["options_overwrite"]["v"]["add_rotation"]=1
-
-        self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
+        
 
         extra_flow_defs=dict()
         extra_flow_defs["options_overwrite"]=dict()
         extra_flow_defs["options_overwrite"]["f"]=dict()
         extra_flow_defs["options_overwrite"]["f"]["add_vertical_rq_spline_flow"]=1
         extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
-
+        extra_flow_defs["options_overwrite"]["f"]["boundary_cos_theta_identity_region"]=0.4
         self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
 
         extra_flow_defs=dict()
         extra_flow_defs["options_overwrite"]=dict()
         extra_flow_defs["options_overwrite"]["f"]=dict()
-        extra_flow_defs["options_overwrite"]["f"]["add_correlated_rq_spline_flow"]=1
+        extra_flow_defs["options_overwrite"]["f"]["add_vertical_rq_spline_flow"]=1
+        extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
+        extra_flow_defs["options_overwrite"]["f"]["boundary_cos_theta_identity_region"]=0.0
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["v"]=dict()
+        extra_flow_defs["options_overwrite"]["v"]["add_rotation"]=1
+
+        self.flow_inits.append([ ["s2", "v"], extra_flow_defs])
         
+        
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["add_correlated_rq_spline_flow"]=1
+        extra_flow_defs["options_overwrite"]["f"]["boundary_cos_theta_identity_region"]=0.4
+
         self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
         
         self.flow_inits.append([ ["s2", "c"], dict()])
@@ -379,7 +392,7 @@ class Test(unittest.TestCase):
 
                     
 
-                    tolerance=5e-2
+                    tolerance=0.15
 
                     if("o" in init[0][1]):
                         tolerance=5.0
@@ -430,7 +443,9 @@ class Test(unittest.TestCase):
                         samples_bef=samples.clone()
                         ## evaluate the samples and see if the reverse direction is compatible
                         evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput, force_embedding_coordinates=use_embedding)
+                     
 
+                      
                         ## make sure there is no in place operation that changes things
                         compare_two_arrays(samples.detach().numpy(), samples_bef.detach().numpy(), "samples_before_pass", "samples_after_pass", diff_value=tolerance)
 

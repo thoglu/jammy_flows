@@ -63,7 +63,7 @@ def unconstrained_rational_quadratic_spline(inputs,
 class rational_quadratic_spline(interval_base.interval_base):
     def __init__(self, 
                  dimension, 
-                 num_basis_elements=10, 
+                 num_basis_functions=10, 
                  euclidean_to_interval_as_first=0, 
                  use_permanent_parameters=0, 
                  low_boundary=0, 
@@ -78,7 +78,7 @@ class rational_quadratic_spline(interval_base.interval_base):
         Also known as Neural spline flows - https://arxiv.org/abs/1906.04032. Adapted code from pyro implementation.
         
         Parameters:
-            num_basis_elements (int): Number of spline elements.
+            num_basis_functions (int): Number of spline elements.
             low_boundary (float): Lower boundary of the inverval.
             high_boundary (float): Higher boundary of the interval.
             min_width (float): Minimum width of a spline element.
@@ -90,21 +90,21 @@ class rational_quadratic_spline(interval_base.interval_base):
         
         ## add parameters from this layer (on top of householder params defined in the class parent)
         
-        self.num_basis_elements=num_basis_elements
+        self.num_basis_functions=num_basis_functions
 
         ## widths of intervals in rational spline
         if(use_permanent_parameters):
-            self.rel_log_widths=nn.Parameter(torch.randn(self.num_basis_elements).type(torch.double).unsqueeze(0))
+            self.rel_log_widths=nn.Parameter(torch.randn(self.num_basis_functions).type(torch.double).unsqueeze(0))
             
         else:
-            self.rel_log_widths=torch.zeros(self.num_basis_elements).type(torch.double).unsqueeze(0)
+            self.rel_log_widths=torch.zeros(self.num_basis_functions).type(torch.double).unsqueeze(0)
       
         ## heights of intervals in rational spline
         if(use_permanent_parameters):
-            self.rel_log_heights=nn.Parameter(torch.randn(self.num_basis_elements).type(torch.double).unsqueeze(0))
+            self.rel_log_heights=nn.Parameter(torch.randn(self.num_basis_functions).type(torch.double).unsqueeze(0))
             
         else:
-            self.rel_log_heights=torch.zeros(self.num_basis_elements).type(torch.double).unsqueeze(0)
+            self.rel_log_heights=torch.zeros(self.num_basis_functions).type(torch.double).unsqueeze(0)
 
         ## derivatives
         self.fix_boundary_derivatives=fix_boundary_derivatives
@@ -118,12 +118,12 @@ class rational_quadratic_spline(interval_base.interval_base):
             self.boundary_log_derivs=np.log(np.exp(self.fix_boundary_derivatives-min_derivative)-1.0)
 
         if(use_permanent_parameters):
-            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_elements+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0))
+            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_functions+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0))
             
         else:
-            self.rel_log_derivatives=torch.zeros(self.num_basis_elements+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0)
+            self.rel_log_derivatives=torch.zeros(self.num_basis_functions+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0)
 
-        self.total_param_num+=3*self.num_basis_elements+1-self.deriv_num_bd_subtraction
+        self.total_param_num+=3*self.num_basis_functions+1-self.deriv_num_bd_subtraction
 
         ## minimum values to which relative logarithmic values are added with softmax
      
@@ -149,9 +149,9 @@ class rational_quadratic_spline(interval_base.interval_base):
             
             assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
 
-            widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
-            heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
-            derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
+            widths=extra_inputs[:,:self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
+            heights=extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
+            derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
         
         if(self.deriv_num_bd_subtraction>0):
             ## add fixed log derivatives to first and last of derivatives tensor
@@ -193,9 +193,9 @@ class rational_quadratic_spline(interval_base.interval_base):
 
             assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
 
-            widths=extra_inputs[:,:self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
-            heights=extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
-            derivatives=extra_inputs[:,2*self.num_basis_elements:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
+            widths=extra_inputs[:,:self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
+            heights=extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
+            derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
         
         if(self.deriv_num_bd_subtraction>0):
             ## add fixed log derivatives to first and last of derivatives tensor
@@ -232,7 +232,7 @@ class rational_quadratic_spline(interval_base.interval_base):
         desired_param_vec=[]
 
         ## 0.54 as start value in log space seems to result in a rather flat spline (defined by the log-derivatives in particular)
-        desired_param_vec.append(torch.ones(self.num_basis_elements*3+1-self.deriv_num_bd_subtraction)*0.54)
+        desired_param_vec.append(torch.ones(self.num_basis_functions*3+1-self.deriv_num_bd_subtraction)*0.54)
 
         return torch.cat(desired_param_vec)
 
@@ -241,13 +241,13 @@ class rational_quadratic_spline(interval_base.interval_base):
     def _init_params(self, params):
 
         counter=0
-        self.rel_log_widths.data[0,:]=params[counter:counter+self.num_basis_elements]    
-        counter+=self.num_basis_elements
+        self.rel_log_widths.data[0,:]=params[counter:counter+self.num_basis_functions]    
+        counter+=self.num_basis_functions
         
-        self.rel_log_heights.data[0,:]=params[counter:counter+self.num_basis_elements]
-        counter+=self.num_basis_elements
+        self.rel_log_heights.data[0,:]=params[counter:counter+self.num_basis_functions]
+        counter+=self.num_basis_functions
 
-        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_elements+1-self.deriv_num_bd_subtraction]
+        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_functions+1-self.deriv_num_bd_subtraction]
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
 
@@ -260,9 +260,9 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         if(extra_inputs is not None):
             
-            widths=widths+extra_inputs[:,:self.num_basis_elements]
-            heights=heights+extra_inputs[:,self.num_basis_elements:2*self.num_basis_elements]
-            derivatives=derivatives+extra_inputs[:,2*self.num_basis_elements:]
+            widths=widths+extra_inputs[:,:self.num_basis_functions]
+            heights=heights+extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]
+            derivatives=derivatives+extra_inputs[:,2*self.num_basis_functions:]
 
 
         param_dict[extra_prefix+"widths"]=widths

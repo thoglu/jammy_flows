@@ -45,7 +45,9 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                  circular_flow_defs="o",
                  add_correlated_rq_spline_flow=0,
                  correlated_max_rank=3,
-                 inverse_z_scaling=1): 
+                 inverse_z_scaling=1,
+                 spline_num_basis_functions=5,
+                 boundary_cos_theta_identity_region=0.0): 
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -94,6 +96,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         self.add_vertical_rq_spline_flow=add_vertical_rq_spline_flow
         self.add_circular_rq_spline_flow=add_circular_rq_spline_flow
         self.add_correlated_rq_spline_flow=add_correlated_rq_spline_flow
+        self.boundary_cos_theta_identity_region=boundary_cos_theta_identity_region
+        self.spline_num_basis_functions=spline_num_basis_functions
 
         self.total_num_vertical_params=0
         if(add_vertical_rq_spline_flow):
@@ -101,8 +105,9 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
             flow_dict=dict()
             flow_dict["r"]=dict()
             flow_dict["r"]["fix_boundary_derivatives"]=1.0
+            flow_dict["r"]["num_basis_functions"]=spline_num_basis_functions
 
-            self.vertical_rqspline_flow=default.pdf("i1_-1.0_1.0", vertical_flow_defs, 
+            self.vertical_rqspline_flow=default.pdf("i1_-%.2f_%.2f"%(1.0-boundary_cos_theta_identity_region,1.0-boundary_cos_theta_identity_region), vertical_flow_defs, 
                                   options_overwrite=flow_dict,
                                   amortize_everything=True,
                                   amortization_mlp_use_custom_mode=True,
@@ -118,6 +123,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         if(add_circular_rq_spline_flow):
            
             flow_dict=dict()
+            flow_dict["o"]=dict()
+            flow_dict["o"]["num_basis_functions"]=spline_num_basis_functions
 
             self.circular_rqspline_flow=default.pdf("s1", circular_flow_defs, 
                                   options_overwrite=flow_dict,
@@ -138,7 +145,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
            
             flow_dict=dict()
 
-            self.correlated_rqspline_flow=default.pdf("i1_-1.0_1.0+s1", vertical_flow_defs+"+"+circular_flow_defs, 
+            self.correlated_rqspline_flow=default.pdf("i1_-%.2f_%.2f+s1" % (1.0-boundary_cos_theta_identity_region,1.0-boundary_cos_theta_identity_region), vertical_flow_defs+"+"+circular_flow_defs, 
                                   options_overwrite=flow_dict,
                                   amortize_everything=True,
                                   amortization_mlp_use_custom_mode=True,
@@ -157,7 +164,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
         
         [x,log_det]=inputs
-        
+            
         sf_extra=None
         
         if(self.always_parametrize_in_embedding_space):
@@ -230,21 +237,58 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         angle=x[:,1:]
 
-        if(correlated_params is not None):
+        if(self.boundary_cos_theta_identity_region==0.0):
+           
+            if(correlated_params is not None):
             
-            comb=torch.cat([ret, angle],dim=1)
-            comb, log_det=self.correlated_rqspline_flow.all_layer_inverse(comb, log_det, None, amortization_parameters=correlated_params)
-            ret=comb[:,:1]
-            angle=comb[:,1:]
+                comb=torch.cat([ret, angle],dim=1)
+                comb, log_det=self.correlated_rqspline_flow.all_layer_inverse(comb, log_det, None, amortization_parameters=correlated_params)
+                ret=comb[:,:1]
+                angle=comb[:,1:]
+            else:
+                ########## do vertical transformation here if desired
+                if(vertical_params is not None):
+                    ret,log_det=self.vertical_rqspline_flow.all_layer_inverse(ret, log_det, None, amortization_parameters=vertical_params)
+                
+                
+                if(circular_params is not None):
+                    angle, log_det=self.circular_rqspline_flow.all_layer_inverse(angle, log_det, None, amortization_parameters=circular_params)
+                
+
         else:
-            ########## do vertical transformation here if desired
-            if(vertical_params is not None):
-                ret,log_det=self.vertical_rqspline_flow.all_layer_inverse(ret, log_det, None, amortization_parameters=vertical_params)
-            
-            
-            if(circular_params is not None):
-                angle, log_det=self.circular_rqspline_flow.all_layer_inverse(angle, log_det, None, amortization_parameters=circular_params)
-            
+            contained_mask=((ret>(-1.0+self.boundary_cos_theta_identity_region)) & (ret<(1.0-self.boundary_cos_theta_identity_region)))[:,0]
+            assert(contained_mask.dim()==1)
+            if(contained_mask.sum()>0):
+                if(correlated_params is not None):
+                    
+                    comb=torch.cat([ret, angle],dim=1)
+                    comb_contained, log_det_contained=self.correlated_rqspline_flow.all_layer_inverse(comb[contained_mask], log_det[contained_mask], None, amortization_parameters=correlated_params if self.use_permanent_parameters else correlated_params[contained_mask])
+                    
+                    assert(contained_mask.dim()==comb[:,0].dim())
+                    comb=torch.masked_scatter(input=comb, mask=contained_mask[:,None], source=comb_contained)
+                    log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
+                    ret=comb[:,:1]
+                    angle=comb[:,1:]
+                else:
+                    ########## do vertical transformation here if desired
+                    if(vertical_params is not None):
+                        
+                        ret_contained,log_det_contained=self.vertical_rqspline_flow.all_layer_inverse(ret[contained_mask], log_det[contained_mask], None, amortization_parameters=vertical_params if self.use_permanent_parameters else vertical_params[contained_mask])
+                        
+                        assert(contained_mask.dim()==ret_contained[:,0].dim())
+                        ret=torch.masked_scatter(input=ret, mask=contained_mask[:,None], source=ret_contained)
+                        
+                        log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
+                    if(circular_params is not None):
+                        angle_contained, log_det_contained=self.circular_rqspline_flow.all_layer_inverse(angle[contained_mask], log_det[contained_mask], None, amortization_parameters=circular_params if self.use_permanent_parameters else circular_params[contained_mask])
+                       
+                        assert(contained_mask.dim()==angle_contained[:,0].dim())
+                        angle=torch.masked_scatter(input=angle, mask=contained_mask[:,None], source=angle_contained)
+                        
+                        log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
         ## go back to angle
         ret=torch.acos(ret)
         rev_upd=torch.log(torch.sin(ret))[:,0]
@@ -262,7 +306,6 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
        
         [x,log_det]=inputs
 
-        
         if(self.always_parametrize_in_embedding_space):
             x, log_det=self.eucl_to_spherical_embedding(x, log_det)
         
@@ -300,23 +343,68 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         angle=x[:,1:]
 
-        if(correlated_params is not None):
+        if(self.boundary_cos_theta_identity_region==0.0):
 
-            comb=torch.cat([prev_ret, angle],dim=1)
-            comb, log_det=self.correlated_rqspline_flow.all_layer_forward(comb, log_det, None, amortization_parameters=correlated_params)
-            prev_ret=comb[:,:1]
-            angle=comb[:,1:]
+            if(correlated_params is not None):
+
+                comb=torch.cat([prev_ret, angle],dim=1)
+                comb, log_det=self.correlated_rqspline_flow.all_layer_forward(comb, log_det, None, amortization_parameters=correlated_params)
+                prev_ret=comb[:,:1]
+                angle=comb[:,1:]
+
+            else:
+
+                if(circular_params is not None):
+
+                    angle, log_det=self.circular_rqspline_flow.all_layer_forward(angle, log_det, None, amortization_parameters=circular_params)
+                
+                ########## do vertical transformation here if desired
+                if(vertical_params is not None):
+                    prev_ret,log_det=self.vertical_rqspline_flow.all_layer_forward(prev_ret, log_det, None, amortization_parameters=vertical_params)
+                
+
 
         else:
+            ## should be a 1-d mask in batch dim only
+            contained_mask=((prev_ret>(-1.0+self.boundary_cos_theta_identity_region)) & (prev_ret<(1.0-self.boundary_cos_theta_identity_region)))[:,0]
+            assert(contained_mask.dim()==1)
+            if(contained_mask.sum()>0):
+                if(correlated_params is not None):
 
-            if(circular_params is not None):
+                    
+                    comb=torch.cat([prev_ret, angle],dim=1)
+                    comb_contained, log_det_contained=self.correlated_rqspline_flow.all_layer_forward(comb[contained_mask], log_det[contained_mask], None, amortization_parameters=correlated_params if self.use_permanent_parameters else correlated_params[contained_mask])
 
-                angle, log_det=self.circular_rqspline_flow.all_layer_forward(angle, log_det, None, amortization_parameters=circular_params)
-            
-            ########## do vertical transformation here if desired
-            if(vertical_params is not None):
-                prev_ret,log_det=self.vertical_rqspline_flow.all_layer_forward(prev_ret, log_det, None, amortization_parameters=vertical_params)
-            
+                    assert(contained_mask.dim()==comb[:,0].dim())
+                    comb=torch.masked_scatter(input=comb, mask=contained_mask[:,None], source=comb_contained)
+                        
+                    log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
+                    prev_ret=comb[:,:1]
+                    angle=comb[:,1:]
+
+                else:
+                  
+                    if(circular_params is not None):
+                        
+                        angle_contained, log_det_contained=self.circular_rqspline_flow.all_layer_forward(angle[contained_mask], log_det[contained_mask], None, amortization_parameters=circular_params if self.use_permanent_parameters else circular_params[contained_mask])
+                        
+               
+                        assert(contained_mask.dim()==angle_contained[:,0].dim())
+                        angle=torch.masked_scatter(input=angle, mask=contained_mask[:,None], source=angle_contained)
+                        
+                        log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
+                    ########## do vertical transformation here if desired
+                    if(vertical_params is not None):
+                        
+                        ret_contained,log_det_contained=self.vertical_rqspline_flow.all_layer_forward(prev_ret[contained_mask], log_det[contained_mask], None, amortization_parameters=vertical_params if self.use_permanent_parameters else vertical_params[contained_mask])
+                        
+                        assert(contained_mask.dim()==ret_contained[:,0].dim())
+                        prev_ret=torch.masked_scatter(input=prev_ret, mask=contained_mask[:,None], source=ret_contained)
+                       
+                        log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
+                      
 
         ## kappa->0 
 
@@ -347,7 +435,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         if(self.always_parametrize_in_embedding_space):
             ret, log_det=self.spherical_to_eucl_embedding(ret, log_det)
-     
+        
         return ret, log_det
 
     def _init_params(self, params):

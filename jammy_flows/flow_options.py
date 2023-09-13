@@ -181,8 +181,8 @@ opts_dict["f"]["kwargs"]["circular_flow_defs"] = ("oo", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("rr", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
 opts_dict["f"]["kwargs"]["inverse_z_scaling"] = (1, [0,1])
-
-
+opts_dict["f"]["kwargs"]["boundary_cos_theta_identity_region"] = (0.0, lambda x: ( (x>=0) & (x<1) ))
+opts_dict["f"]["kwargs"]["spline_num_basis_functions"] = (5, lambda x: ( x>0))
 """
 Interval flows
 """
@@ -192,7 +192,7 @@ opts_dict["r"] = dict()
 opts_dict["r"]["module"] = rational_quadratic_spline
 opts_dict["r"]["type"] = "i"
 opts_dict["r"]["kwargs"] = dict()
-opts_dict["r"]["kwargs"]["num_basis_elements"] = (5, lambda x: x>0)
+opts_dict["r"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
 opts_dict["r"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: type(x)==float)
 
 """
