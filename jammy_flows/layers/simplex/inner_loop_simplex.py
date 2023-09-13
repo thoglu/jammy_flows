@@ -32,7 +32,7 @@ class inner_loop_simplex(simplex_base.simplex_base):
         flow_dict["r"] = dict()
         
         # hard coded 10 basis elements at the moment
-        flow_dict["r"]["num_basis_elements"]=10
+        flow_dict["r"]["num_basis_functions"]=10
       
         self.inner_flow=default.pdf("+".join(["i1_0.0_1.0"]*self.dimension),
                                   "+".join(["rr"]*self.dimension), 
