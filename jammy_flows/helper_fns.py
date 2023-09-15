@@ -330,20 +330,25 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             ## simplex .. mask everything outside allowed region
             mask_inner=mask_inner & (eval_positions[:, model.target_dim_indices_intrinsic[ind][0]:model.target_dim_indices_intrinsic[ind][1] ].sum(axis=1) < 1.0)
 
+    batch_size=1
     if (conditional_input is not None):
 
         if(type(conditional_input)==list):
-           
+            batch_size=conditional_input[0].shape[0]
+            mask_inner=mask_inner.repeat_interleave(batch_size, dim=0)
             cinput=[]
             for ci in conditional_input:
-                cinput.append(ci.repeat(used_npts**len(mins_maxs), 1)[mask_inner])
+                cinput.append(ci.repeat_interleave(used_npts**len(mins_maxs), dim=0)[mask_inner])
 
             if(cinput[0].is_cuda):
-                eval_positions=eval_positions.to(cinput[0])
+                eval_positions=eval_positions.to(cinput[0]).repeat_interleave(batch_size, dim=0)
         else:
-            cinput = conditional_input.repeat(used_npts**len(mins_maxs), 1)[mask_inner]
+            batch_size=conditional_input.shape[0]
+            mask_inner=mask_inner.repeat_interleave(batch_size, dim=0)
+
+            cinput = conditional_input.repeat_interleave(used_npts**len(mins_maxs), dim=0)[mask_inner]
             if(cinput.is_cuda):
-                eval_positions=eval_positions.to(cinput)
+                eval_positions=eval_positions.to(cinput).repeat_interleave(batch_size, dim=0)
    
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
@@ -373,44 +378,31 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
           problematic_pars=spherical_to_cartesian_lambert(problematic_pars, fix_point=fix_point)
       flagged_coords=problematic_pars.cpu().numpy()
 
-    res = (-600.0)*torch.ones(len(torch_positions)).type_as(torch_positions).to(log_res)
+    res = (-600.0)*torch.ones(len(log_res)).type_as(log_res).to(log_res)
     res[mask_inner] = log_res  #.exp()
    
     res = res.cpu().numpy()
-    numpy_positions=eval_positions.cpu().numpy()
+    
     if((numpy.isfinite(res)==False).sum()>0):
-      print("Non-finite evaluation during PDF eval for plotting..")
-      print((numpy.isfinite(res)==False).sum())
-      print(numpy_positions[(numpy.isfinite(res)==False)])
 
-      if(cinput is None):
-        r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:])
-      else:
-        r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:], conditional_input=cinput[torch.isfinite(log_res)==False])
-      print(r)
-      raise Exception()
+        numpy_positions=eval_positions.cpu().numpy()
+        print("Non-finite evaluation during PDF eval for plotting..")
+        print((numpy.isfinite(res)==False).sum())
+        print(numpy_positions[(numpy.isfinite(res)==False)])
 
-    #######################
+        if(cinput is None):
+            r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:])
+        else:
+            r,_,_=model(eval_positions[mask_inner][torch.isfinite(log_res)==False][:], conditional_input=cinput[torch.isfinite(log_res)==False])
+        print(r)
+        raise Exception()
 
+    has_bad_regions=len(mask_inner)!=mask_inner.sum()
 
-    res.resize([used_npts] * len(mins_maxs))
+    res=res.reshape(*([batch_size]+[used_npts] * len(mins_maxs)))
 
-    resized_torch_positions = torch_positions.cpu().numpy()
-    resized_torch_positions.resize([used_npts] * len(mins_maxs) + [len(mins_maxs)])
-
-    ## add in sin(theta) factors into density
-
-    """
-
-    for ind, sz in enumerate(sin_zen_mask):
-      if(sz==1):
-        slice_mask=(None,)*ind+(slice(None,None),)+(None,)*(len(sin_zen_mask)-1-ind)
-
-        zen_vals=numpy.sin(numpy.linspace(mins_maxs[ind][0]+1e-4, mins_maxs[ind][1]-1e-4, npts))
-
-        ## log val, adding zenith factors where needed
-        res+=numpy.log(zen_vals[slice_mask])
-    """
+    resized_torch_positions = eval_positions.cpu().numpy()
+    resized_torch_positions=resized_torch_positions.reshape(*([batch_size]+[used_npts] * len(mins_maxs) + [len(mins_maxs)]))
 
     return resized_torch_positions, res, bin_volumes, sin_zen_mask, flagged_coords
 
@@ -818,7 +810,11 @@ def plot_joint_pdf(pdf,
         s2_norm=s2_norm,
         s2_rotate_to_true_value=s2_rotate_to_true_value,
         true_values=true_values)
-   
+
+    ## returned shaped is 1(batch_size) X x X y, so reduce batch size dimension
+    evalpositions=evalpositions[0]
+    log_evals=log_evals[0]
+
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
     
 
