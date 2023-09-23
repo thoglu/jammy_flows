@@ -71,7 +71,9 @@ class rational_quadratic_spline(interval_base.interval_base):
                  min_width=1e-4, 
                  min_height=1e-4, 
                  min_derivative=1e-4,
-                 fix_boundary_derivatives=-1.0):
+                 fix_boundary_derivatives=-1.0,
+                 smooth_second_derivative=0,
+                 restrict_max_min_width_height_ratio=-1.0):
         """
         Rational-quadartic spline layer: Symbol “r"
 
@@ -83,7 +85,10 @@ class rational_quadratic_spline(interval_base.interval_base):
             high_boundary (float): Higher boundary of the interval.
             min_width (float): Minimum width of a spline element.
             min_height (float): Minimum height of a spline element.
-            min_derivative (float): Minimum derivative of a spline element.
+            min_derivative (float): Minimum derivative of a spline element. Only used if *smooth_second_derivative* is 0.
+            fix_boundary_derivatives (float): If larger than 0, determines the value of the boundary derivatives
+            smooth_second_derivative (int): Determines if second derivatives should be smooth. Only works for 2 basis function currently. Ignores *min_derivative* if positive.
+            restrict_max_min_width_height_ratio (float): Maximum relative between maximum/miniumum of widths/heights.. negative will not constrain this quantity. 
 
         """
         super().__init__(dimension=dimension, euclidean_to_interval_as_first=euclidean_to_interval_as_first, use_permanent_parameters=use_permanent_parameters, low_boundary=low_boundary, high_boundary=high_boundary)
@@ -96,33 +101,42 @@ class rational_quadratic_spline(interval_base.interval_base):
         if(use_permanent_parameters):
             self.rel_log_widths=nn.Parameter(torch.randn(self.num_basis_functions).type(torch.double).unsqueeze(0))
             
-        else:
-            self.rel_log_widths=torch.zeros(self.num_basis_functions).type(torch.double).unsqueeze(0)
-      
         ## heights of intervals in rational spline
         if(use_permanent_parameters):
             self.rel_log_heights=nn.Parameter(torch.randn(self.num_basis_functions).type(torch.double).unsqueeze(0))
-            
-        else:
-            self.rel_log_heights=torch.zeros(self.num_basis_functions).type(torch.double).unsqueeze(0)
-
+        
         ## derivatives
         self.fix_boundary_derivatives=fix_boundary_derivatives
         self.deriv_num_bd_subtraction=0
-        self.boundary_log_derivs=None
+        self.boundary_log_derivs_fixed_value=None
         if(self.fix_boundary_derivatives>0.0):
-            self.deriv_num_bd_subtraction=2
+            ## recalculate what we would need to feed the spline to correctly get 1.0 via *SoftPlus*
+            self.boundary_log_derivs_fixed_value=np.log(np.exp(self.fix_boundary_derivatives-min_derivative)-1.0)
+        
+        self.smooth_second_derivative=smooth_second_derivative
+        if(self.smooth_second_derivative==1):
+            assert(self.num_basis_functions==2), "Only support 2 basis functions for smooth derivative!"
+            #assert(self.fix_boundary_derivatives>0.0), "For smooth derivatives we need to define boundary derivatives!"
 
-            assert(self.fix_boundary_derivatives>min_derivative)
-
-            self.boundary_log_derivs=np.log(np.exp(self.fix_boundary_derivatives-min_derivative)-1.0)
-
-        if(use_permanent_parameters):
-            self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_functions+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0))
-            
+            if(self.fix_boundary_derivatives>0.0):
+                self.deriv_num_bd_subtraction=num_basis_functions+1 # subtract all derivs
+            else:
+                self.deriv_num_bd_subtraction=num_basis_functions-1 # subtract all derivs but 2
         else:
-            self.rel_log_derivatives=torch.zeros(self.num_basis_functions+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0)
+            if(self.fix_boundary_derivatives>0.0):
+                ## we only need to define this if we have no smooth derivatives
+                self.deriv_num_bd_subtraction=2
 
+                assert(self.fix_boundary_derivatives>min_derivative)
+
+        self.num_derivative_params=num_basis_functions+1-self.deriv_num_bd_subtraction
+                
+        ## only use derivatives if necessary
+        if(use_permanent_parameters):
+            if( self.num_derivative_params>0):
+                self.rel_log_derivatives=nn.Parameter(torch.randn(self.num_basis_functions+1-self.deriv_num_bd_subtraction).type(torch.double).unsqueeze(0))
+        
+        ## subtract number of derivative parameters as we need
         self.total_param_num+=3*self.num_basis_functions+1-self.deriv_num_bd_subtraction
 
         ## minimum values to which relative logarithmic values are added with softmax
@@ -130,50 +144,79 @@ class rational_quadratic_spline(interval_base.interval_base):
         self.min_width=min_width
         self.min_height=min_height
         self.min_derivative=min_derivative
-
-
-
-
-
+        self.restrict_max_min_width_height_ratio=restrict_max_min_width_height_ratio
 
     def _flow_mapping(self, inputs, extra_inputs=None): 
         
         [x, log_det]=inputs
 
-      
-        widths=self.rel_log_widths.to(x)
-        heights=self.rel_log_heights.to(x)
-        derivatives=self.rel_log_derivatives.to(x)
+        if(self.use_permanent_parameters):
+            widths=self.rel_log_widths.to(x)
+            heights=self.rel_log_heights.to(x)
+            derivatives=None
+            if(self.num_derivative_params>0):
+                derivatives=self.rel_log_derivatives.to(x)
 
-        if(extra_inputs is not None):
+        else:
             
-            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
+            assert( extra_inputs is not None), "Conditional PDF.. require *extra_inputs*"
+            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be Tensor of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
 
             widths=extra_inputs[:,:self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
             heights=extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
-            derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
-        
-        if(self.deriv_num_bd_subtraction>0):
-            ## add fixed log derivatives to first and last of derivatives tensor
-          
-            first_and_last=torch.ones((derivatives.shape[0],1)).to(x)*self.boundary_log_derivs
-
-            derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=1)
             
-        x, log_det_update=spline_fns.rational_quadratic_spline(x, 
-                                                         widths, 
-                                                         heights, 
-                                                         derivatives, 
-                                                         inverse=False, 
-                                                         left=self.low_boundary, 
-                                                         right=self.high_boundary, 
-                                                         bottom=self.low_boundary, 
-                                                         top=self.high_boundary, 
-                                                         rel_min_bin_width=self.min_width,
-                                                         rel_min_bin_height=self.min_height,
-                                                         min_derivative=self.min_derivative
-                                                         )
+            if(self.num_derivative_params>0):
+                derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
         
+        if(self.smooth_second_derivative==0):
+
+            if(self.fix_boundary_derivatives>0):
+                ## add fixed log derivatives to first and last of derivatives tensor .. derivatives must exist here
+                
+                assert(self.deriv_num_bd_subtraction==2)
+
+                first_and_last=torch.ones(derivatives.shape[:-1]+(1,)).to(x)*self.boundary_log_derivs_fixed_value
+
+                derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=-1)
+
+            x, log_det_update=spline_fns.rational_quadratic_spline(x, 
+                                                             widths, 
+                                                             heights, 
+                                                             derivatives, 
+                                                             inverse=False, 
+                                                             left=self.low_boundary, 
+                                                             right=self.high_boundary, 
+                                                             bottom=self.low_boundary, 
+                                                             top=self.high_boundary, 
+                                                             rel_min_bin_width=self.min_width,
+                                                             rel_min_bin_height=self.min_height,
+                                                             min_derivative=self.min_derivative,
+                                                             restrict_max_min_width_height_ratio=self.restrict_max_min_width_height_ratio
+                                                             )
+        else:
+
+            if(self.fix_boundary_derivatives>0):
+
+                first_and_last=torch.ones(widths.shape[:-1]+(2,)).to(x)*self.boundary_log_derivs_fixed_value
+            else:
+                assert(self.num_derivative_params==2 and derivatives is not None)
+
+                first_and_last=derivatives
+
+            x, log_det_update=spline_fns.rational_quadratic_spline_smooth(x, 
+                                                             widths, 
+                                                             heights, 
+                                                             unnormalized_boundary_derivatives=first_and_last,
+                                                             inverse=False, 
+                                                             left=self.low_boundary, 
+                                                             right=self.high_boundary, 
+                                                             bottom=self.low_boundary, 
+                                                             top=self.high_boundary, 
+                                                             rel_min_bin_width=self.min_width,
+                                                             rel_min_bin_height=self.min_height,
+                                                             min_derivative=self.min_derivative,
+                                                             restrict_max_min_width_height_ratio=self.restrict_max_min_width_height_ratio
+                                                             )
        
         log_det_new=log_det+log_det_update.sum(axis=-1)
         
@@ -183,42 +226,74 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         [x, log_det]=inputs
 
-        widths=self.rel_log_widths.to(x)
-        heights=self.rel_log_heights.to(x)
-        derivatives=self.rel_log_derivatives.to(x)
+        if(self.use_permanent_parameters):
+            widths=self.rel_log_widths.to(x)
+            heights=self.rel_log_heights.to(x)
+            derivatives=None
+            if(self.num_derivative_params>0):
+                derivatives=self.rel_log_derivatives.to(x)
 
-      
-
-        if(extra_inputs is not None):
-
-            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
+        else:
+            
+            assert( extra_inputs is not None), "Conditional PDF.. require *extra_inputs*"
+            assert( (extra_inputs.shape[0]==x.shape[0]) or (extra_inputs.shape[0]==1) ), ("Extra inputs must be Tensor of shape B X .. (B=Batch size) or 1 X .. (broadcasting).. got for first dimension instead : ", extra_inputs.shape[0])
 
             widths=extra_inputs[:,:self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_widths.shape[1])
             heights=extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]#.reshape(extra_inputs.shape[0], self.rel_log_heights.shape[1])
-            derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
+            
+            if(self.num_derivative_params>0):
+                derivatives=extra_inputs[:,2*self.num_basis_functions:]#.reshape(extra_inputs.shape[0], self.rel_log_derivatives.shape[1])
         
-        if(self.deriv_num_bd_subtraction>0):
-            ## add fixed log derivatives to first and last of derivatives tensor
-          
-            first_and_last=torch.ones((derivatives.shape[0],1)).to(x)*self.boundary_log_derivs
+        if(self.smooth_second_derivative==0):
 
-            derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=1)
+            if(self.fix_boundary_derivatives>0):
+                ## add fixed log derivatives to first and last of derivatives tensor .. derivatives must exist here
+                
+                assert(self.deriv_num_bd_subtraction==2)
 
+                first_and_last=torch.ones(derivatives.shape[:-1]+(1,)).to(x)*self.boundary_log_derivs_fixed_value
 
-           
-        x, log_det_update=spline_fns.rational_quadratic_spline(x, 
-                                                         widths, 
-                                                         heights, 
-                                                         derivatives, 
-                                                         inverse=True, 
-                                                         left=self.low_boundary, 
-                                                         right=self.high_boundary, 
-                                                         bottom=self.low_boundary, 
-                                                         top=self.high_boundary, 
-                                                         rel_min_bin_width=self.min_width,
-                                                         rel_min_bin_height=self.min_height,
-                                                         min_derivative=self.min_derivative
-                                                         )
+                derivatives=torch.cat([first_and_last, derivatives, first_and_last], dim=-1)
+
+            x, log_det_update=spline_fns.rational_quadratic_spline(x, 
+                                                             widths, 
+                                                             heights, 
+                                                             derivatives, 
+                                                             inverse=True, 
+                                                             left=self.low_boundary, 
+                                                             right=self.high_boundary, 
+                                                             bottom=self.low_boundary, 
+                                                             top=self.high_boundary, 
+                                                             rel_min_bin_width=self.min_width,
+                                                             rel_min_bin_height=self.min_height,
+                                                             min_derivative=self.min_derivative,
+                                                             restrict_max_min_width_height_ratio=self.restrict_max_min_width_height_ratio
+                                                             )
+        else:
+
+            if(self.fix_boundary_derivatives>0):
+
+                first_and_last=torch.ones(widths.shape[:-1]+(2,)).to(x)*self.boundary_log_derivs_fixed_value
+
+            else:
+                assert(self.num_derivative_params==2 and derivatives is not None)
+
+                first_and_last=derivatives
+                
+            x, log_det_update=spline_fns.rational_quadratic_spline_smooth(x, 
+                                                             widths, 
+                                                             heights, 
+                                                             unnormalized_boundary_derivatives=first_and_last,
+                                                             inverse=True, 
+                                                             left=self.low_boundary, 
+                                                             right=self.high_boundary, 
+                                                             bottom=self.low_boundary, 
+                                                             top=self.high_boundary, 
+                                                             rel_min_bin_width=self.min_width,
+                                                             rel_min_bin_height=self.min_height,
+                                                             min_derivative=self.min_derivative,
+                                                             restrict_max_min_width_height_ratio=self.restrict_max_min_width_height_ratio
+                                                             )
        
         log_det_new=log_det+log_det_update.sum(axis=-1)
       
@@ -247,27 +322,31 @@ class rational_quadratic_spline(interval_base.interval_base):
         self.rel_log_heights.data[0,:]=params[counter:counter+self.num_basis_functions]
         counter+=self.num_basis_functions
 
-        self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_basis_functions+1-self.deriv_num_bd_subtraction]
+        if(self.num_derivative_params>0):
+            self.rel_log_derivatives.data[0,:]=params[counter:counter+self.num_derivative_params]
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 
 
-
         extra_input_counter=0
 
-        widths=self.rel_log_widths
-        heights=self.rel_log_heights
-        derivatives=self.rel_log_derivatives
-
-        if(extra_inputs is not None):
+        if(self.use_permanent_parameters):
+            widths=self.rel_log_widths
+            heights=self.rel_log_heights
+            if(self.num_derivative_params>0):
+                derivatives=self.rel_log_derivatives
+        else:
+            assert(extra_inputs is not None)
             
-            widths=widths+extra_inputs[:,:self.num_basis_functions]
-            heights=heights+extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]
-            derivatives=derivatives+extra_inputs[:,2*self.num_basis_functions:]
-
+            widths=extra_inputs[:,:self.num_basis_functions]
+            heights=extra_inputs[:,self.num_basis_functions:2*self.num_basis_functions]
+            if(self.num_derivative_params>0):
+                derivatives=extra_inputs[:,2*self.num_basis_functions:]
 
         param_dict[extra_prefix+"widths"]=widths
         param_dict[extra_prefix+"heights"]=heights
-        param_dict[extra_prefix+"derivatives"]=derivatives
+
+        if(self.smooth_second_derivative==0):
+            param_dict[extra_prefix+"derivatives"]=derivatives
 
     
        

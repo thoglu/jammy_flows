@@ -14,6 +14,7 @@ from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 
 from ...extra_functions import NONLINEARITIES
 from ...main import default
+from torch.nn import functional as F
 
 from .cnf_specific import utils
 
@@ -47,7 +48,12 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                  correlated_max_rank=3,
                  inverse_z_scaling=1,
                  spline_num_basis_functions=5,
-                 boundary_cos_theta_identity_region=0.0): 
+                 boundary_cos_theta_identity_region=0.0,
+                 vertical_smooth=0,
+                 vertical_restrict_max_min_width_height_ratio=-1.0,
+                 vertical_fix_boundary_derivative=1,
+                 min_kappa=1e-10,
+                 kappa_prediction="direct_log_real_bounded"): 
         """
         Uses the spherical exponential map. Symbol: "v"
 
@@ -56,17 +62,24 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         Parameters:
         
-            exp_map_type (str): Defines the potential of the exponential map. One of ["linear", "quadratic", "exponential", "splines"].
-            natural_direction (int). If 0, log-probability evaluation is faster. If 1, sampling is faster.
-            num_components (int): How many components to sum over in the exponential map.
-            add_rotation (int): Add a rotation after the main flow?.
-            num_newton_iter (int): Number of newton iterations.
+            add_vertical_rq_spline_flow (int): Add vertical rq flow?
+            add_circular_rq_spline_flow (int): Add 1-d rq flow for phi?
+            vertical_flow_defs (str): Which vertical flow layers to use.
+            circular_flow_defs (str): Which circular flow layers to use.
+            add_correlated_rq_spline_flow (int): Add a correlation between vertical and circular flow via a NN ?
+            correlated_max_rank (int): Max rank of matrices in NN to connect vertical and circular flow.
+            inverse_z_scaling (int): Define flow -z instead of z. Should be set to 1 to work well with standard stereographic projection.
+            spline_num_basis_functions (int): Number of basis functions for the vertical/circular spline flows.
+            boundary_cos_theta_identity_region (float): Defines the distance in cos(theta) from -1/1 respectively in which only an identity mapping is used.
+            vertical_smooth (int): Smooth 2nd derivatives for vertical rq flow.
+            vertical_restrict_max_min_width_height_ratio (float): Restrict the ratio between widths/heights to a maximum value.
+            vertical_fix_boundary_derivative (int): Fix boundary derivative to 1.0 or not?
+            min_kappa (float): Minimum allowed kappa value.
+            kappa_prediction (str): Either "direct_log_real_bounded", or "log_bounded", which uses softplus in log space to lower-bound kappa.
         """
 
-        add_rotation=0
-        if(fisher_parametrization=="split"):
-            add_rotation=1
-
+        
+        add_rotation=1
         super().__init__(dimension=dimension, euclidean_to_sphere_as_first=euclidean_to_sphere_as_first, use_permanent_parameters=use_permanent_parameters, higher_order_cylinder_parametrization=False, add_rotation=add_rotation)
         
         if(dimension!=2):
@@ -80,18 +93,23 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
             self.z_scaling_factor=1.0
 
         self.fisher_parametrization=fisher_parametrization
+        assert(fisher_parametrization == "split")
 
-        if(fisher_parametrization=="split"):
-            self.min_kappa=1e-10
+        self.min_kappa=min_kappa
 
-            if(self.use_permanent_parameters):
-                self.log_kappa=nn.Parameter(torch.randn(1).unsqueeze(0))
+        if(self.use_permanent_parameters):
+            self.loglike_kappa=nn.Parameter(torch.randn(1).unsqueeze(0))
 
-            self.total_param_num+=1
+        self.total_param_num+=1
+
+        if(kappa_prediction=="direct_log_real_bounded"):
+            self.kappa_fn=lambda x: x.exp()+self.min_kappa
         else:
-            self.unnormalized_mu=nn.Parameter(torch.randn(3).unsqueeze(0))
+            log_min_kappa=numpy.log(self.min_kappa)
 
-            self.total_param_num+=3
+            self.kappa_fn=lambda x: (F.softplus(x)+log_min_kappa).exp()
+
+   
 
         self.add_vertical_rq_spline_flow=add_vertical_rq_spline_flow
         self.add_circular_rq_spline_flow=add_circular_rq_spline_flow
@@ -100,12 +118,15 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         self.spline_num_basis_functions=spline_num_basis_functions
 
         self.total_num_vertical_params=0
+
         if(add_vertical_rq_spline_flow):
            
             flow_dict=dict()
             flow_dict["r"]=dict()
-            flow_dict["r"]["fix_boundary_derivatives"]=1.0
+            flow_dict["r"]["fix_boundary_derivatives"]=-1.0 if vertical_fix_boundary_derivative==0 else 1.0
             flow_dict["r"]["num_basis_functions"]=spline_num_basis_functions
+            flow_dict["r"]["smooth_second_derivative"]=vertical_smooth
+            flow_dict["r"]["restrict_max_min_width_height_ratio"]=vertical_restrict_max_min_width_height_ratio
 
             self.vertical_rqspline_flow=default.pdf("i1_-%.2f_%.2f"%(1.0-boundary_cos_theta_identity_region,1.0-boundary_cos_theta_identity_region), vertical_flow_defs, 
                                   options_overwrite=flow_dict,
@@ -120,6 +141,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                 self.vertical_flow_params = nn.Parameter(torch.randn(1, self.total_num_vertical_params))
         
         self.total_num_circular_params=0
+
         if(add_circular_rq_spline_flow):
            
             flow_dict=dict()
@@ -177,7 +199,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         if(extra_inputs is not None):
 
-            kappa=extra_inputs[:,0:1].exp()+self.min_kappa
+            kappa=self.kappa_fn(extra_inputs[:,0:1])
 
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=extra_inputs[:,1:self.total_num_correlated_params+1]
@@ -190,7 +212,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
 
         else:
-            kappa=self.log_kappa.to(x).exp()+self.min_kappa
+            kappa=self.kappa_fn(self.loglike_kappa.to(x))
 
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=self.correlated_flow_params.to(x)
@@ -314,7 +336,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         correlated_params=None
 
         if(extra_inputs is not None):
-            kappa=extra_inputs[:,:1].exp()+self.min_kappa
+            kappa=self.kappa_fn(extra_inputs[:,:1])
 
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=extra_inputs[:,1:self.total_num_correlated_params+1]
@@ -326,7 +348,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                     circular_params=extra_inputs[:,1+self.total_num_vertical_params:self.total_num_circular_params+self.total_num_vertical_params+1]
 
         else:
-            kappa=self.log_kappa.to(x).exp()+self.min_kappa
+            kappa=self.kappa_fn(self.loglike_kappa.to(x))
             
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=self.correlated_flow_params.to(x)
@@ -440,7 +462,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
     def _init_params(self, params):
 
-        self.log_kappa.data=params[:1].reshape(1, 1)
+        self.loglike_kappa.data=params[:1].reshape(1, 1)
 
         if(self.add_correlated_rq_spline_flow):
             assert(len(params)== (1+self.total_num_correlated_params))
@@ -492,7 +514,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         correlated_params=None
 
         if(extra_inputs is not None):
-            log_kappa=extra_inputs[:,:1]
+            loglike_kappa=extra_inputs[:,:1]
 
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=extra_inputs[:,1:self.total_num_correlated_params+1]
@@ -503,7 +525,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                     circular_params=extra_inputs[:,1+self.total_num_vertical_params:self.total_num_circular_params+self.total_num_vertical_params+1]
 
         else:
-            log_kappa=self.log_kappa
+            loglike_kappa=self.loglike_kappa
             
             if(self.add_correlated_rq_spline_flow):
                 correlated_params=self.correlated_flow_params
@@ -513,7 +535,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                 if(self.add_circular_rq_spline_flow):
                     circular_params=self.circular_flow_params
 
-        param_dict[extra_prefix+"log_kappa"]=log_kappa.data
+        param_dict[extra_prefix+"loglike_kappa"]=loglike_kappa.data
 
         if(self.add_correlated_rq_spline_flow):
             param_dict[extra_prefix+"correlated_params"]=correlated_params.data

@@ -183,6 +183,13 @@ opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
 opts_dict["f"]["kwargs"]["inverse_z_scaling"] = (1, [0,1])
 opts_dict["f"]["kwargs"]["boundary_cos_theta_identity_region"] = (0.0, lambda x: ( (x>=0) & (x<1) ))
 opts_dict["f"]["kwargs"]["spline_num_basis_functions"] = (5, lambda x: ( x>0))
+opts_dict["f"]["kwargs"]["vertical_smooth"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["vertical_restrict_max_min_width_height_ratio"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
+opts_dict["f"]["kwargs"]["vertical_fix_boundary_derivative"] = (0, lambda x: [0,1])
+opts_dict["f"]["kwargs"]["min_kappa"] = (1e-10, lambda x: x>0)
+opts_dict["f"]["kwargs"]["kappa_prediction"] = ("direct_log_real_bounded", ["direct_log_real_bounded", "log_bounded"])
+
+
 """
 Interval flows
 """
@@ -193,7 +200,9 @@ opts_dict["r"]["module"] = rational_quadratic_spline
 opts_dict["r"]["type"] = "i"
 opts_dict["r"]["kwargs"] = dict()
 opts_dict["r"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
-opts_dict["r"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: type(x)==float)
+opts_dict["r"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
+opts_dict["r"]["kwargs"]["smooth_second_derivative"] = (0, lambda x: (type(x)==int) & (x >=0) )
+opts_dict["r"]["kwargs"]["restrict_max_min_width_height_ratio"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
 
 """
 Simplex flows
