@@ -671,12 +671,12 @@ class sphere_base(layer_base.layer_base):
             self._obtain_layer_param_structure(param_dict, extra_inputs=extra_inputs[:, self.num_householder_params:], previous_x=previous_x, extra_prefix=extra_prefix)
 
         if(self.add_rotation):
-            hh_pars=self.householder_params
-
+            
             if(extra_inputs is not None):
                 
                 hh_pars=extra_inputs[:,:self.num_householder_params]
-
+            else:
+                hh_pars=self.householder_params
             param_dict[extra_prefix+"householder"]=hh_pars
 
     def _obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 

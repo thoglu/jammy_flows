@@ -3181,6 +3181,13 @@ class pdf(nn.Module):
         
             entropy_dict=None
 
+            data_summary_repeated=None
+            if(conditional_input is not None):
+                if(type(conditional_input)==list):  
+                    data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
+                else:
+                    data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
+
             
             if(calc_kl_diff_and_entropic_quantities):
                 # also calculate total entropy [-1], because it is no extra cost 
@@ -3350,14 +3357,6 @@ class pdf(nn.Module):
             else:
                 
                 # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
-
-                if(conditional_input is not None):
-                    if(type(conditional_input)==list):  
-                        data_summary_repeated=[ci.repeat_interleave(samplesize, dim=0) for ci in conditional_input]
-                    else:
-                        data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0)
-                else:
-                    data_summary_repeated=None
 
                 samples,_,_,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
 
