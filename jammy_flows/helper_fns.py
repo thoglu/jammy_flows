@@ -50,7 +50,13 @@ def find_bins(trace, percentiles=[5.0,95.0], num_bins=50, use_outlier_binning=Fa
 
     return new_edges
 
-def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0], relative_buffer=0.1, num_bins=50, s2_norm="standard", use_outlier_binning=False):
+def _update_bounds(old_bounds, allowed_min=None, allowed_max=None):
+
+    new_bounds=[old_bounds[0] if allowed_min is None else max(old_bounds[0], allowed_min), old_bounds[1] if allowed_max is None else min(old_bounds[1], allowed_max)]
+
+    return new_bounds
+
+def obtain_bins_and_visualization_regions(samples, model, percentiles=[3.0,97.0], relative_buffer=0.1, num_bins=50, s2_norm="standard", use_outlier_binning=False):
     
     """
     Uses samples and pdf defs to calculate binning and visualization regions.
@@ -71,95 +77,58 @@ def obtain_bins_and_visualization_regions(samples, model, percentiles=[5.0,95.0]
 
     for pdf_index, pdf_def in enumerate(model.pdf_defs_list):
 
-        if(pdf_def[0]=="e"):
-            dim=int(pdf_def[1:])
+        dim=int(pdf_def[1:])
 
-            for sub_index in range(cur_index, cur_index+dim):
+        for sub_index in range(cur_index, cur_index+dim):
 
-                np_samples=samples[:,sub_index].cpu().numpy()
-                # vis bounds
-                boundaries=numpy.percentile(np_samples, percentiles)
+            np_samples=samples[:,sub_index].cpu().numpy()
+          
+            boundaries=numpy.percentile(np_samples, percentiles)
 
-                relative_extra=relative_buffer*(boundaries[1]-boundaries[0])
+            relative_extra=relative_buffer*(boundaries[1]-boundaries[0])
 
-                visualization_bounds.append((boundaries[0]-relative_extra, boundaries[1]+relative_extra))
+            visualization_bounds.append((boundaries[0]-relative_extra, boundaries[1]+relative_extra))
+            density_eval_bounds.append(visualization_bounds[-1])
+            edges=find_bins(np_samples, percentiles=percentiles, num_bins=num_bins)
 
-                # density bounds
-                min_val = float(min(samples[:, sub_index]).cpu())
-                max_val = float(max(samples[:, sub_index]).cpu())
+            if(pdf_def[0]=="e"):
+                cur_allowed_min=None
+                cur_allowed_max=None
 
-                relative_extra=0.2*(max_val-min_val)
+            elif(pdf_def[0]=="s"):
 
-                density_eval_bounds.append((min_val-relative_extra, max_val+relative_extra))
-
-                # histo bins
-                #edges = astropy.stats.bayesian_blocks(np_samples, p0=0.1, gamma=0.9)
-
-                ## find bins based on percentiles
-                edges=find_bins(np_samples, percentiles=percentiles, num_bins=num_bins)
-                histogram_edges.append(edges)
-
-            cur_index+=dim
-
-        elif(pdf_def[0]=="s"):
-
-            if(int(pdf_def[1])==1):
-
-                visualization_bounds.append((0,2*numpy.pi))
-                density_eval_bounds.append((0,2*numpy.pi))
-                histogram_edges.append(numpy.linspace(0, 2*numpy.pi, num_bins))
-                cur_index+=1
-
-            elif(int(pdf_def[1])==2):
-
-                if(s2_norm=="standard"):
-
-                    visualization_bounds.append((0,numpy.pi))
-                    visualization_bounds.append((0,2*numpy.pi))
-
-                    density_eval_bounds.append((0,numpy.pi))
-                    density_eval_bounds.append((0,2*numpy.pi))
-
-                    histogram_edges.append(numpy.linspace(0, numpy.pi, num_bins))
-                    histogram_edges.append(numpy.linspace(0, 2*numpy.pi, num_bins))
-
+                
+                if(dim==1):
+                    cur_allowed_min=0.0
+                    cur_allowed_max=2*numpy.pi
+                    
                 else:
+                    if(s2_norm=="standard"):
 
-                    visualization_bounds.append((-2.0,2.0))
-                    visualization_bounds.append((-2.0,2.0))
+                        cur_allowed_min=0.0
+                        if(sub_index==0):
+                            ## zenith
+                            cur_allowed_max=numpy.pi
+                        else:
+                            ## azimuth
+                            cur_allowed_max=2*numpy.pi
+                    else:
+                        cur_allowed_min=-2.0
+                        cur_allowed_max=2.0
 
-                    density_eval_bounds.append((0,numpy.pi))
-                    density_eval_bounds.append((0,2*numpy.pi))
-
-                    histogram_edges.append(numpy.linspace(-2.0,2.0, num_bins))
-                    histogram_edges.append(numpy.linspace(-2.0,2.0, num_bins))
-
-                cur_index+=2
-
-        elif(pdf_def[0]=="i"):
-
-            lower=model.layer_list[pdf_index][-1].low_boundary
-            higher=model.layer_list[pdf_index][-1].high_boundary
-
-            visualization_bounds.append((lower,higher))
-        
-            density_eval_bounds.append((lower, higher))
-         
-            histogram_edges.append(numpy.linspace(lower,higher, num_bins))
+            elif(pdf_def[0]=="i"):
+                cur_allowed_min=model.layer_list[pdf_index][-1].low_boundary
+                cur_allowed_max=model.layer_list[pdf_index][-1].high_boundary
+            elif(pdf_def[0]=="a"):
+                cur_allowed_min=0.0
+                cur_allowed_max=1.0
            
-        elif(pdf_def[0]=="a"):
-
-            lower=0.0
-            higher=1.0
-
-            dim=dim=int(pdf_def[1:])
-
-            for dindex in range(dim):
-                visualization_bounds.append((lower,higher))
+            visualization_bounds[-1]=_update_bounds(visualization_bounds[-1], allowed_min=cur_allowed_min, allowed_max=cur_allowed_max)
+            density_eval_bounds[-1]=_update_bounds(density_eval_bounds[-1], allowed_min=cur_allowed_min, allowed_max=cur_allowed_max)
             
-                density_eval_bounds.append((lower, higher))
-             
-                histogram_edges.append(numpy.linspace(lower,higher, num_bins))
+            histogram_edges.append(numpy.linspace(edges[0] if cur_allowed_min is None else max(edges[0],cur_allowed_min), edges[-1] if cur_allowed_max is None else min(edges[-1],cur_allowed_max), num_bins))
+
+        cur_index+=dim
 
     return visualization_bounds, density_eval_bounds, histogram_edges
 
@@ -1156,7 +1125,7 @@ def visualize_pdf(pdf,
                   var_names=[],
                   num_iterative_steps=-1,
                   relative_vis_buffer=0.1,
-                  vis_percentiles=[3.0, 97.0],
+                  vis_percentiles=[2.0, 98.0],
                   show_relative_std=0,
                   use_outlier_binning=False,
                   **kwargs
