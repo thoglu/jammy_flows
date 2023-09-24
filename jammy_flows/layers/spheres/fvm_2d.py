@@ -30,9 +30,6 @@ import torch.autograd
 Implementation of the Fisher-von-Mises distribution as a normalizing flow. 
 """
 
-
-
-
 class fisher_von_mises_2d(sphere_base.sphere_base):
 
     def __init__(self, 
@@ -55,10 +52,9 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                  min_kappa=1e-10,
                  kappa_prediction="direct_log_real_bounded"): 
         """
-        Uses the spherical exponential map. Symbol: "v"
+        Symbol: "f"
 
-        Uses linear and quadratic potential as described in https://arxiv.org/abs/0906.0874, and exponential potential as described in https://arxiv.org/abs/2002.02428.
-        Additionally added a spline-based potential.
+        Based off of https://arxiv.org/abs/2002.02428, with additional FvM scalings and various options to play with.
 
         Parameters:
         
