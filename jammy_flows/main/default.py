@@ -14,8 +14,10 @@ import scipy
 import math
 import time
 
-import healpy
-
+try:
+    import healpy
+except:
+    print("Cannot use healpy functionality. Install healpy, if you need to do entropy scanning!")
 
 from scipy.special import iv, i0, i1
 import scipy.linalg
@@ -2386,7 +2388,7 @@ class pdf(nn.Module):
                     entropy_dict[sub_mf]=-all_log_probs.mean(dim=1)
                    
         if(return_samples):
-            return entropy_dict, targets
+            return entropy_dict, targets, log_pdf_dict
         else:
             return entropy_dict
 
@@ -3340,7 +3342,7 @@ class pdf(nn.Module):
 
 
                 else:
-                    entropy_dict, samples=self.entropy_iterative(sub_manifolds=[-1]+list(range(len(self.pdf_defs_list))), 
+                    entropy_dict, samples, log_pdf_dict=self.entropy_iterative(sub_manifolds=[-1]+list(range(len(self.pdf_defs_list))), 
                                                                      conditional_input=conditional_input,
                                                                      samplesize=samplesize,
                                                                      iterative_samplesize=iterative_samplesize,
@@ -3358,7 +3360,7 @@ class pdf(nn.Module):
                 
                 # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
 
-                samples,_,_,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
+                samples,sample_logprobs,_,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
 
             target_dim_embedded=self.total_target_dim_embedded
 
@@ -3367,6 +3369,20 @@ class pdf(nn.Module):
             if(verbose):
                 print("1) sampling took ",time.time()-tbef)
 
+
+            index_mask=None
+            ## put the approximate max PDF value in there aswell .. only works if no s2 scan is performed
+            if(not s2_entropy_scanning):
+                if(calc_kl_diff_and_entropic_quantities):
+                    ## we have log_pdf_dict
+                    reshaped_log_pdfs=log_pdf_dict["total"].reshape(initial_batch_size, samplesize)
+
+                else:
+                    ## we have sample_logprobs
+                    reshaped_log_pdfs=sample_logprobs.reshape(initial_batch_size, samplesize)
+
+                index_mask=torch.argmax(reshaped_log_pdfs, dim=1)
+              
             for sub_pdf_dim, sub_pdf_def in enumerate(self.pdf_defs_list):
 
                 this_mean=None
@@ -3379,6 +3395,10 @@ class pdf(nn.Module):
                 these_subsamples=samples[:, :, self.target_dim_indices_embedded[sub_pdf_dim][0]:self.target_dim_indices_embedded[sub_pdf_dim][1]]
 
                 if("e" in sub_pdf_def):
+
+                    ## this_max_value
+                    if(index_mask is not None):
+                        this_arg_max=these_subsamples[torch.arange(initial_batch_size), index_mask]
 
                     this_mean=torch.mean(these_subsamples, dim=1,keepdims=True)
 
@@ -3439,7 +3459,14 @@ class pdf(nn.Module):
 
                     angle_mean,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_mean, 0.0)
 
+                    # max PDF value
+                    if(index_mask is not None):
+                        this_arg_max=these_subsamples[torch.arange(initial_batch_size), index_mask]
+                        this_arg_max_angles,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_mean, 0.0)
+                        return_dict["argmax_%d_angles"%sub_pdf_dim]=this_arg_max_angles
+
                     return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean
+                    
 
                     normalized_length_R=sample_sum_length/samplesize
 
@@ -3546,6 +3573,9 @@ class pdf(nn.Module):
                     raise Exception("Unsupported sub pdf type for marginal moment calculation!", sub_pdf_def)
 
                 return_dict["mean_%d"%sub_pdf_dim]=this_mean
+                if(index_mask is not None):
+                    return_dict["argmax_%d"%sub_pdf_dim]=this_arg_max
+
                 return_dict["varlike_%d"%sub_pdf_dim]=this_var
                
                 if(entropy_dict is not None):
