@@ -651,8 +651,9 @@ class sphere_base(layer_base.layer_base):
         mat=self.compute_rotation_matrix(x, extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
         ## permute because we do inverse rotation
-        eucl = torch.bmm(mat.permute(0,2,1), eucl.unsqueeze(-1)).squeeze(-1)
-
+        
+        eucl = torch.einsum("...ij, ...j -> ...i", mat.permute(0,2,1), eucl)
+        
         new_pts,_=self.eucl_to_spherical_embedding(eucl,0.0)
 
         mask=(new_pts[:,0]<flag_pole_distance) | (new_pts[:,0] >(numpy.pi-flag_pole_distance))
