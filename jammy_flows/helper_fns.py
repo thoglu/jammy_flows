@@ -77,7 +77,7 @@ def obtain_bins_and_visualization_regions(samples, model, percentiles=[3.0,97.0]
 
     for pdf_index, pdf_def in enumerate(model.pdf_defs_list):
 
-        dim=int(pdf_def[1:])
+        dim=int(pdf_def[1:].split("_")[0])
 
         for sub_index in range(cur_index, cur_index+dim):
 
