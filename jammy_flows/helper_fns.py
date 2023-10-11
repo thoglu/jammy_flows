@@ -914,35 +914,11 @@ def plot_joint_pdf(pdf,
             for ind2 in range(dim):
                       
                 if (ind2 < ind1):
-
-                    """
-                    found_ax=False
-                    for ax in fig.get_axes():
-
-                        ax_geometry=ax.get_subplotspec().get_geometry()
-                        print("checking ... ", ax_geometry)
-                        num_rows=ax_geometry[0]
-                        this_gridspec=ax.get_gridspec()
-
-                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                            continue
-                      
-                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
-                            found_ax=True
-                           
-                            break
-
-
-                    if(found_ax==False):
-                        print("have not found in off diagonal ", ind1, ind2)
-                        ax = fig.add_subplot(subgridspec[ind1, ind2])
-                        print("added AX ", ax.get_subplotspec().get_geometry())
-                    """
-
+                    
                     ax=subgridspec.axdict[(ind1,ind2)]
 
                     if (plot_only_contours == False):
-                        print("plot histo")
+                       
                         ax.hist2d(samples[:, ind2],
                                   samples[:, ind1],
                                   bins=[histogram_edges[ind2], histogram_edges[ind1]],
@@ -959,7 +935,7 @@ def plot_joint_pdf(pdf,
                     new_samples = numpy.concatenate(
                         [samples[:, ind2:ind2 + 1], samples[:, ind1:ind1 + 1]],
                         axis=1)
-                    print("IND 2", ind2, "ind 1 ", ind1)
+                    
                     if (contour_probs != []):
                         _ = show_sample_contours(
                             ax,
@@ -1025,36 +1001,6 @@ def plot_joint_pdf(pdf,
                         ax.set_xticklabels([])
 
                 elif (ind2 == ind1):
-
-                    ## looking for ax
-                    """
-                    found_ax=False
-                    for ax in fig.get_axes():
-
-
-                            
-                        ax_geometry=ax.get_subplotspec().get_geometry()
-                        num_rows=ax_geometry[0]
-                        
-                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                            continue
-
-
-                        
-                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
-                            found_ax=True
-                           
-                            break
-
-
-                    if(found_ax==False):
-                        print("have not found hte ax ....", ax, ind2, ind1)
-                        ax = fig.add_subplot(subgridspec[ind1, ind2])
-
-                        print("added AX ", ax.get_subplotspec().get_geometry())
-                    """
-
-                    ##############
 
                     ax=subgridspec.axdict[(ind1,ind2)]
 
