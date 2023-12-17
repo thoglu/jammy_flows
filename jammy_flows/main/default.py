@@ -1902,7 +1902,8 @@ class pdf(nn.Module):
         return_dict=dict()
         return_dict["true"]=dict()
         return_dict["logprob_diffs"]=dict()
-   
+        return_dict["chi2_cdf_evals"]=dict()
+
         expected_coverage_probs=numpy.linspace(0,1.0,num_percentile_points)
         return_dict["expected"]=expected_coverage_probs
 
@@ -1916,10 +1917,11 @@ class pdf(nn.Module):
 
             ## overall coverage
             if(-1 in sub_manifolds):
-                true_cov, logprob_diffs=_calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
+                true_cov, logprob_diffs, chi2_cdf_eval=_calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
                 
                 return_dict["true"]["total"]=true_cov
                 return_dict["logprob_diffs"]["total"]=logprob_diffs
+                return_dict["chi2_cdf_evals"]["total"]=chi2_cdf_eval
 
             for sm in sub_manifolds:
                 if(sm==-1):
@@ -1930,10 +1932,11 @@ class pdf(nn.Module):
              
                 sub_logp_base=torch.distributions.Normal(0.0,1.0).log_prob(base_points[:,self.target_dim_indices_intrinsic[sm][0]:self.target_dim_indices_intrinsic[sm][1]]).sum(axis=-1)
                
-                true_cov, logprob_diffs=_calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
+                true_cov, logprob_diffs, chi2_eval=_calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
             
                 return_dict["true"][int(sm)]=true_cov
                 return_dict["logprob_diffs"][int(sm)]=logprob_diffs
+                return_dict["chi2_cdf_evals"][int(sm)]=chi2_cdf_eval
 
         return return_dict
 
@@ -3462,7 +3465,7 @@ class pdf(nn.Module):
                     # max PDF value
                     if(index_mask is not None):
                         this_arg_max=these_subsamples[torch.arange(initial_batch_size), index_mask]
-                        this_arg_max_angles,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_mean, 0.0)
+                        this_arg_max_angles,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_arg_max, 0.0)
                         return_dict["argmax_%d_angles"%sub_pdf_dim]=this_arg_max_angles
 
                     return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean

@@ -414,6 +414,7 @@ def _calculate_coverage(base_evals, dim, expected_coverage_probs):
 
     Returns: True coverage probs
              Twice logprobs
+             chi2 CDF of true delta llh
     """
 
     gauss_log_eval_at_0=-(dim/2.0)*numpy.log(2*numpy.pi)
@@ -427,7 +428,7 @@ def _calculate_coverage(base_evals, dim, expected_coverage_probs):
 
         actual_coverage_probs.append(float(sum(actual_twice_logprob<expected_twice_logprob[ind]))/float(len(actual_twice_logprob)))
 
-    return numpy.array(actual_coverage_probs), actual_twice_logprob 
+    return numpy.array(actual_coverage_probs), actual_twice_logprob, stats.chi2.cdf(actual_twice_logprob, df=dim) 
 
 
 def recheck_sampling(pdf, 
