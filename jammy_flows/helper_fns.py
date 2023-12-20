@@ -77,7 +77,7 @@ def obtain_bins_and_visualization_regions(samples, model, percentiles=[3.0,97.0]
 
     for pdf_index, pdf_def in enumerate(model.pdf_defs_list):
 
-        dim=int(pdf_def[1:])
+        dim=int(pdf_def[1:].split("_")[0])
 
         for sub_index in range(cur_index, cur_index+dim):
 
@@ -318,7 +318,7 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
             cinput = conditional_input.repeat_interleave(used_npts**len(mins_maxs), dim=0)[mask_inner]
             if(cinput.is_cuda):
                 eval_positions=eval_positions.to(cinput).repeat_interleave(batch_size, dim=0)
-   
+    
     log_res, _, _ = model(eval_positions[mask_inner], conditional_input=cinput, force_intrinsic_coordinates=True)
 
     ## update s2+lambert visualizations by adding sin(theta) factors to get proper normalization
@@ -347,9 +347,10 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
           problematic_pars=spherical_to_cartesian_lambert(problematic_pars, fix_point=fix_point)
       flagged_coords=problematic_pars.cpu().numpy()
 
-    res = (-600.0)*torch.ones(len(log_res)).type_as(log_res).to(log_res)
-    res[mask_inner] = log_res  #.exp()
+    res = (-600.0)*torch.ones(len(eval_positions)).type_as(log_res).to(log_res)
    
+    res[mask_inner] = log_res  #.exp()
+
     res = res.cpu().numpy()
     
     if((numpy.isfinite(res)==False).sum()>0):
@@ -370,9 +371,9 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
 
     res=res.reshape(*([batch_size]+[used_npts] * len(mins_maxs)))
 
-    resized_torch_positions = eval_positions.cpu().numpy()
+    resized_torch_positions = torch_positions.cpu().numpy()
     resized_torch_positions=resized_torch_positions.reshape(*([batch_size]+[used_npts] * len(mins_maxs) + [len(mins_maxs)]))
-
+    
     return resized_torch_positions, res, bin_volumes, sin_zen_mask, flagged_coords
 
 def rotate_coords_to(theta, phi, target, reverse=False):
@@ -693,11 +694,14 @@ def plot_joint_pdf(pdf,
 
     ## 
 
-
-    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf, percentiles=vis_percentiles, relative_buffer=relative_buffer, use_outlier_binning=use_outlier_binning, num_bins=50, s2_norm=s2_norm)
-    
+    num_bins=50
+    visualization_bounds, density_eval_bounds, histogram_edges=obtain_bins_and_visualization_regions(samples, pdf, percentiles=vis_percentiles, relative_buffer=relative_buffer, use_outlier_binning=use_outlier_binning, num_bins=num_bins, s2_norm=s2_norm)
+  
     if(bounds is not None):
+        # use pre-defined bounds
         visualization_bounds=bounds
+        density_eval_bounds=bounds
+        histogram_edges=[numpy.linspace(b[0],b[1], num_bins) for b in bounds]
 
     ## true positions are typically labels
     plotted_true_values=None
@@ -716,7 +720,7 @@ def plot_joint_pdf(pdf,
         if(pdf_type=="s2"):
           gridline_dict[(pdf.target_dim_indices[ind][0], pdf.target_dim_indices[ind][1])]=get_basic_gridlines()
 
-
+   
     ## transform samples to lambert space if necessary
     for ind, pdf_type in enumerate(pdf.pdf_defs_list):
         if (pdf_type == "s2" and s2_norm=="lambert"):
@@ -759,7 +763,7 @@ def plot_joint_pdf(pdf,
               gridline_dict[tup]=new_list
 
 
-
+ 
     samples = samples.cpu().numpy()
 
     pdf_conditional_input = conditional_input
@@ -785,7 +789,6 @@ def plot_joint_pdf(pdf,
     log_evals=log_evals[0]
 
     total_pdf_integral=numpy.exp(log_evals).sum()*bin_volumes
-    
 
     if (dim == 1):
 
@@ -795,17 +798,6 @@ def plot_joint_pdf(pdf,
             ax = fig.add_subplot(subgridspec[0, 0])
             setattr(subgridspec, "axdict", {"ax": ax})
             
-            ## find ax in existing gridspec
-            """
-            for ax in fig.get_axes():
-                ax_geometry=ax.get_subplotspec().get_geometry()
-
-                if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                    continue
-
-                if(ax_geometry[0]==1 and ax_geometry[1]==1):
-                    break
-            """
         ax=subgridspec.axdict["ax"]
 
 
@@ -846,21 +838,21 @@ def plot_joint_pdf(pdf,
         ## plot a histogram density from samples
 
         if ( (plot_only_contours == False) and (plot_density == False) and (skip_plotting_samples==False)):
-           
+            
             ax.hist2d(samples[:, 0],
                       samples[:, 1],
                       bins=histogram_edges,
                       density=True)
         
         if (contour_probs != [] and skip_plotting_samples==False):
-            
+ 
             _ = show_sample_contours(ax,
                                      samples,
                                      bins=histogram_edges,
                                      color=contour_color,
                                      contour_probs=contour_probs,
                                      sin_zen_mask=sin_zen_mask)
-
+        
 
         ## mark poles
         if(len(unreliable_spherical_regions)>0):
@@ -915,34 +907,10 @@ def plot_joint_pdf(pdf,
                       
                 if (ind2 < ind1):
 
-                    """
-                    found_ax=False
-                    for ax in fig.get_axes():
-
-                        ax_geometry=ax.get_subplotspec().get_geometry()
-                        print("checking ... ", ax_geometry)
-                        num_rows=ax_geometry[0]
-                        this_gridspec=ax.get_gridspec()
-
-                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                            continue
-                      
-                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
-                            found_ax=True
-                           
-                            break
-
-
-                    if(found_ax==False):
-                        print("have not found in off diagonal ", ind1, ind2)
-                        ax = fig.add_subplot(subgridspec[ind1, ind2])
-                        print("added AX ", ax.get_subplotspec().get_geometry())
-                    """
-
                     ax=subgridspec.axdict[(ind1,ind2)]
 
                     if (plot_only_contours == False):
-                        print("plot histo")
+                       
                         ax.hist2d(samples[:, ind2],
                                   samples[:, ind1],
                                   bins=[histogram_edges[ind2], histogram_edges[ind1]],
@@ -959,7 +927,7 @@ def plot_joint_pdf(pdf,
                     new_samples = numpy.concatenate(
                         [samples[:, ind2:ind2 + 1], samples[:, ind1:ind1 + 1]],
                         axis=1)
-                    print("IND 2", ind2, "ind 1 ", ind1)
+                    
                     if (contour_probs != []):
                         _ = show_sample_contours(
                             ax,
@@ -1025,36 +993,6 @@ def plot_joint_pdf(pdf,
                         ax.set_xticklabels([])
 
                 elif (ind2 == ind1):
-
-                    ## looking for ax
-                    """
-                    found_ax=False
-                    for ax in fig.get_axes():
-
-
-                            
-                        ax_geometry=ax.get_subplotspec().get_geometry()
-                        num_rows=ax_geometry[0]
-                        
-                        if(subgridspec!=ax.get_subplotspec().get_gridspec() ):
-                            continue
-
-
-                        
-                        if(ax_geometry[2]==(ind1*num_rows+ind2+1) and (num_rows==dim)):
-                            found_ax=True
-                           
-                            break
-
-
-                    if(found_ax==False):
-                        print("have not found hte ax ....", ax, ind2, ind1)
-                        ax = fig.add_subplot(subgridspec[ind1, ind2])
-
-                        print("added AX ", ax.get_subplotspec().get_geometry())
-                    """
-
-                    ##############
 
                     ax=subgridspec.axdict[(ind1,ind2)]
 
