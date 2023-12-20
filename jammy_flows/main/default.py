@@ -4,7 +4,7 @@ from torch import nn
 from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
 from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks, _calculate_coverage
 from ..amortizable_mlp import AmortizableMLP
-
+from .. import helper_fns_coverage
 
 import collections
 import numpy
@@ -305,7 +305,26 @@ class pdf(nn.Module):
             if(self.amortize_everything==False):
                 self.force_permanent_parameters_in_first_subpdf = 1
 
-    def set_use_embedding_parameters_flag(self, usement_flag, sub_pdf_index=None):
+    def get_embedding_flags(self):
+        """
+        Returns embedding parameters flags (True/False) for different sub pdfs. An embedding flag
+        is important for manifold sub dimensions. Set to True means the given sub-pdf flows expect the input to be in 
+        embedding space, while set to False the sub-pdf flows expect their input to be in intrinsic coordinates.
+        """
+
+        flags=[]
+
+        for sub_pdf_dim, ll in enumerate(self.layer_list):
+            cur_subpdf_flag=ll[0].always_parametrize_in_embedding_space
+
+            for l in ll:
+                assert(l.always_parametrize_in_embedding_space==cur_subpdf_flag)
+
+            flags.append(cur_subpdf_flag)
+
+        return flags
+
+    def set_embedding_flags(self, usement_flag, sub_pdf_index=None):
         """
         Resets the default parameter embedding structure. This defines how tensors are to be given to the PDF without
         extra flags like *force_embedding_coordinates* or *force_intrinsic_coordinates*.
@@ -334,6 +353,8 @@ class pdf(nn.Module):
 
         ## update the embedding structure with the new information
         self.update_embedding_structure()
+
+
     
     def init_flow_structure(self):
 
@@ -1870,7 +1891,7 @@ class pdf(nn.Module):
         
         return global_amortization_init
 
-    def coverage(self, 
+    def approximate_coverage(self, 
                 target_x,
                 conditional_input=None,
                 amortization_parameters=None, 
@@ -1879,7 +1900,7 @@ class pdf(nn.Module):
                 num_percentile_points=100,
                 sub_manifolds=[-1]):
         """
-        Calculates coverage for the base distribution via the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.
+        Calculates approximate coverage via the base distribution with the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.
 
         Parameters:
 
@@ -1940,7 +1961,275 @@ class pdf(nn.Module):
 
         return return_dict
 
-       
+    def coverage_and_or_pdf_scan(self,
+                                 labels=None,
+                                 conditional_input=None,
+                                 amortization_parameters=None, 
+                                 coverage_num_percentile_points=100,
+                                 sub_manifolds=[-1],
+                                 exact_coverage_calculation=False,
+                                 save_pdf_scan=False,
+                                 calculate_MAP=False):
+
+        """
+        Calculates coverage (approximate) and possibly exact. Performs pdf scan for exact coverage and save scan if desired.
+        The pdf scan and the exact coverage must be calculated in intrinsic coordinates (e.g. theta/phi for direction instead of dx/dy/dz).
+
+        Parameters:
+
+            labels (Tensor): Target positions to calculate coverage with. Must be of shape (B,D), where B = batch dimension.
+            conditional_input (Tensor/list(Tensor)/None): Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be 
+                              a list of tensors, one for each sub-PDF, if *conditional_input_dim* in __init__ is a list of ints.
+            amortization_parameters (Tensor/None): If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.
+            force_embedding_coordinates (bool): Enforces embedding coordinates in the input *x*.
+            force_intrinsic_coordinates (bool): Enforces intrinsic coordinates in the input *x*. 
+            coverage_num_percentile_points (int): At how many points along the chi2 do we want to compare observed vs expected coverage?
+            sub_manifolds (list(int)): Contains indices of sub-manifolds if coverage should be calculated for onditional PDF of the given sub-manifold. *-1* stands for the total PDF and is the default.
+            exact_coverage_calculation (bool): Calculate exact coverage based on pdf scan?
+            save_pdf_scan (bool): Save a pdf scan?
+            calculate_MAP (bool): Calculate Maximum APosterior (MAP) coordinates based on pdf scan?
+        Returns:
+
+            return_dict (dict): Dictionary of requested coverage and/or pdf scan values.
+        """
+
+        ## calculate approximate coverage with all sub manifolds
+
+        
+        used_dtype, used_device=self.obtain_current_dtype_n_device()
+
+        return_dict=dict()
+
+        embedded_labels=None
+        if(exact_coverage_calculation):
+            assert(labels is not None)
+
+        batch_size=1
+        if(conditional_input is not None):
+            batch_size=conditional_input.shape[0]
+
+        with torch.no_grad():
+
+            if(labels is not None):  
+
+                target_dim=labels.shape[1]
+
+                embedded_labels=labels
+                if(target_dim==self.total_target_dim_intrinsic):
+                    ## labels are given in intrinsic coordinates .. must transform to embedding coordinates for pdf eval
+                    embedded_labels,_=self.transform_target_space(labels, 
+                              log_det=0, 
+                              transform_from="intrinsic", 
+                              transform_to="embedding")
+
+                cov_results_approx=self.approximate_coverage(
+                        embedded_labels,
+                        conditional_input=conditional_input,
+                        force_embedding_coordinates=True,
+                        amortization_parameters=amortization_parameters, 
+                        num_percentile_points=coverage_num_percentile_points,
+                        sub_manifolds=[-1])
+
+                return_dict["approx_cov_values"]=cov_results_approx["chi2_cdf_evals"]["total"]
+                return_dict["logprob_diffs_base"]=cov_results_approx["logprob_diffs"]["total"]
+
+                ## must evaluate in embedding space for correct PDF value on manifolds
+                log_pdf_target, log_pdf_base, _ =self.forward(embedded_labels, conditional_input=conditional_input, force_embedding_coordinates=True)
+
+                return_dict["log_pdf_labels"]=log_pdf_target
+                return_dict["log_pdf_base_labels"]=log_pdf_base
+
+            if(exact_coverage_calculation or save_pdf_scan or calculate_MAP):
+
+                max_positions=[]
+                real_cov_values=[]
+                pdf_log_evals=[]
+                pdf_eval_positions=[]
+                pdf_scan_volume_sizes=[]
+
+                samples_per_event=10000
+
+                data_summary_repeated=None
+                print("self pdf defs list", self.pdf_defs_list)
+                if(self.pdf_defs_list[0][0]=="e"):
+                    ## make sure only Euclidean sub dimensions
+
+                    strs="".join([e[0] for e in self.pdf_defs_list])
+                    assert(len(list(set(strs)))==1), ("Only pure Euclidean sub spaces supported at the moment!", self.pdf_defs_list)
+
+                    # loop through all batch items and perform scan for each
+                    for cur_batch_ind in range(batch_size):
+
+                        if(conditional_input is not None):
+                            if(type(conditional_input)==list):  
+                                data_summary_repeated=[ci[cur_batch_ind:cur_batch_ind+1].repeat_interleave(samples_per_event, dim=0) for ci in conditional_input]
+                            else:
+                                data_summary_repeated=conditional_input[cur_batch_ind:cur_batch_ind+1].repeat_interleave(samples_per_event, dim=0)
+                            ####
+
+                        samples,_,log_pdf_at_samples,_=self.sample(conditional_input=data_summary_repeated, samplesize=samples_per_event)
+                        log_pdf_at_samples=log_pdf_at_samples.cpu().numpy()
+
+                        ## calculate maximum value for completeness from samples
+                        mi=numpy.argmax(log_pdf_at_samples)
+                        max_position=samples[mi:mi+1].cpu().numpy()
+                        max_positions.append(max_position)
+                        
+                        ### loop through different events with batch size 1 each (TODO: make this batchable)
+
+                        _, density_bounds,_=jammy_flows.helper_fns.obtain_bins_and_visualization_regions(samples, self, percentiles=[0.5,99.5])
+
+                        npts_per_dim=int((samples_per_event)**(1.0/float(self.total_target_dim)))
+
+
+                        evalpositions, log_evals, bin_volumes, _, _= jammy_flows.helper_fns.get_pdf_on_grid(density_bounds,
+                                                                                                            npts_per_dim,
+                                                                                                            self,
+                                                                                                            conditional_input=None if conditional_input is None else data_summary_repeated[:1],
+                                                                                                            s2_norm="standard",
+                                                                                                            s2_rotate_to_true_value=False,
+                                                                                                            true_values=None)
+                        #  expected shape here (1,num_points,dim)
+                        assert(len(evalpositions.shape)==3)
+
+                        if(save_pdf_scan):
+                                                                                                    
+                            pdf_eval_positions.append(evalpositions)
+                            pdf_log_evals.append(log_evals)
+                            pdf_scan_volume_sizes.append(bin_volumes)                                                                  
+                                                                                                           
+                                                                                                  
+                        if(exact_coverage_calculation):
+
+                            exp_log_evals_list=numpy.exp(log_evals)[0].flatten()
+                            ## expected coverage
+                            actual_expected_coverage=numpy.linspace(0, 1.0, coverage_num_percentile_points)#=[0.39,0.5,0.68,0.95]
+
+                            if(conditional_input is not None):
+                                if(type(conditional_input)==list):  
+                                    data_summary_single=[ci[cur_batch_ind:cur_batch_ind+1] for ci in conditional_input]
+                                else:
+                                    data_summary_single=conditional_input[cur_batch_ind:cur_batch_ind+1]
+
+                            """
+                            fig_temp=pylab.figure()
+                            jammy_flows.helper_fns.visualize_pdf(self.pdf, fig_temp, conditional_input=data_summary_single)
+                            pylab.savefig("test_%d.png" % cur_batch_ind)
+                            pylab.close(fig_temp)
+                            """
+                            ## get contours
+                            if(self.total_target_dim_intrinsic==1):
+                                all_joined_contours=_find_1d_contours(actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim) ,exp_log_evals_list*bin_volumes, exp_log_evals_list)
+                                
+                            else:
+                                fig_temp=pylab.figure()
+                                ax_temp=fig_temp.add_subplot(111)
+
+                                # TODO: instead of exploiting matplotlib function for coverage use independent implementation
+                                xy_contours_for_coverage=_fake_plot_and_calc_eucl_contours(ax_temp, ["black" for i in range(len(actual_expected_coverage))], actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim), numpy.linspace(density_bounds[1][0],density_bounds[1][1], npts_per_dim), exp_log_evals_list*bin_volumes, exp_log_evals_list, linestyles=["-"]*len(actual_expected_coverage))
+                                pylab.close(fig_temp)
+
+                                ## join to vec
+                                all_joined_contours=[]
+                                for ind in range(len(xy_contours_for_coverage)):
+                                   
+                                    joint=numpy.concatenate(xy_contours_for_coverage[ind], axis=0)
+                                    all_joined_contours.append(joint)
+
+                           
+                            ## find closest contour to truth
+                            cb=helper_fns_coverage.find_closest_contour(self, embedded_labels[cur_batch_ind], all_joined_contours, actual_expected_coverage)
+                            real_cov_values.append(cb)
+
+                elif(self.pdf_defs_list[0][0]=="s"):
+
+                    assert(len(self.pdf_defs_list)==1), ("Euclidean space as first.. must be a pure Euclidean space! .. but ", self.pdf_defs_list)
+                    assert(self.pdf_defs_list[0]=="s2"), "Only s2 supported at the moment!"
+
+                    max_positions_angles=[]
+                    
+                    tbef=time.time()
+
+                    nside=32
+
+                    num_pix=healpy.nside2npix(nside)
+
+                    area_per_pixel=4*numpy.pi/num_pix
+
+                    theta, phi = healpy.pix2ang(nside=nside, ipix=numpy.arange(num_pix))
+
+                    target_angles_numpy=numpy.concatenate([theta[:,None], phi[:,None]], axis=1)
+                    target_angles=torch.from_numpy(target_angles_numpy).to(used_device).type(used_dtype)
+                   
+                    target_xyz,_=self.transform_target_space(target_angles, transform_from="intrinsic", transform_to="embedding")
+
+
+                    for cur_sample in range(batch_size):
+                        
+                        if(conditional_input is not None):
+                            if(type(conditional_input)==list):  
+                                data_summary_repeated=[ci[cur_sample:cur_sample+1].repeat_interleave(num_pix, dim=0) for ci in conditional_input]
+                            else:
+                                data_summary_repeated=conditional_input[cur_sample:cur_sample+1].repeat_interleave(num_pix, dim=0)
+
+                        log_pdf,_,_=self.forward(target_xyz, conditional_input=data_summary_repeated, force_embedding_coordinates=True)
+
+                        log_pdf_test,_,_=self.forward(target_angles, conditional_input=data_summary_repeated, force_embedding_coordinates=False)
+                        
+                        print("inter mediate ", time.time()-tbef)
+                        ## calculate exact coverage prob for truth
+                        log_pdf=log_pdf.cpu().numpy()
+
+                        if(save_pdf_scan):
+                            pdf_eval_positions.append(target_angles_numpy[None,:])
+                            pdf_log_evals.append(log_pdf[None,:])
+                            pdf_scan_volume_sizes.append(numpy.ones(len(log_pdf))[None,:]*area_per_pixel)
+                            
+                        log_pdf_exp=numpy.exp(log_pdf)
+
+                        max_index=numpy.where(log_pdf_exp==numpy.max(log_pdf_exp))[0][0]
+                        
+                        max_positions.append(target_xyz[max_index:max_index+1].cpu().detach().numpy())
+                        max_positions_angles.append(target_angles[max_index:max_index+1].cpu().detach().numpy())
+                        
+                        if(exact_coverage_calculation):
+                            ## interested proportions for target space coverage
+                            ## TODO: fix start/ending to 0/1
+                            actual_expected_coverage=numpy.linspace(0.02, 0.98, coverage_num_percentile_points)
+
+                            ## resulting contours
+                            xy_contours_for_coverage_temp=helper_fns_coverage.compute_spherical_contours(actual_expected_coverage, log_pdf_exp*area_per_pixel, log_pdf_exp)
+                            xy_contours_for_coverage=[]
+                            for tc in xy_contours_for_coverage_temp:
+                       
+                                xy_contours_for_coverage.append([self.transform_target_space(torch.from_numpy(ii), transform_from="intrinsic", transform_to="embedding")[0].detach().numpy() for ii in tc])
+                            print("after cov calculation", time.time()-tbef)
+                            ## obtain coverage value of truth
+
+                            real_cov_value=helper_fns_coverage.find_closest_contour(self, embedded_labels[cur_sample], xy_contours_for_coverage, actual_expected_coverage)
+                            #real_cov_value=sl_env_helper_fns.get_real_coverage_value(embedded_labels[cur_sample:cur_sample+1], xy_contours_for_coverage, interested_proportions)
+
+                            real_cov_values.append(real_cov_value)
+
+                    if(calculate_MAP):
+                        return_dict["map_positions_angles"]=numpy.concatenate(max_positions_angles)
+
+                else:
+                    raise NotImplementedError("Mixed sub dimensions and manifolds other than Euclidean (e) and Sphere (s) not supported for pdf scan/exact coverage at the moment!")
+
+                if(calculate_MAP):  
+                    return_dict["map_positions"]=numpy.concatenate(max_positions)
+                if(exact_coverage_calculation):
+                    return_dict["real_cov_values"]=numpy.array(real_cov_values)
+
+                if(save_pdf_scan):
+                    return_dict["pdf_scan_positions"]=numpy.concatenate(pdf_eval_positions)
+                    return_dict["pdf_scan_volume_sizes"]=numpy.concatenate(pdf_scan_volume_sizes)
+                    return_dict["pdf_scan_log_evals"]=numpy.concatenate(pdf_log_evals)
+
+
+        return return_dict
+   
 
 #### Experimental functions
 #### Some of these functions generalize existing functions and will replace them in future release.
@@ -3179,6 +3468,10 @@ class pdf(nn.Module):
 
         return_dict=dict()
 
+        ## before calculating marginal moments, check embedding status .. go to embedding space
+        previous_embedding_flags=self.get_embedding_flags()
+        self.set_embedding_flags(True)
+
         if(verbose):
             tbef=time.time()
 
@@ -3466,9 +3759,9 @@ class pdf(nn.Module):
                     if(index_mask is not None):
                         this_arg_max=these_subsamples[torch.arange(initial_batch_size), index_mask]
                         this_arg_max_angles,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_arg_max, 0.0)
-                        return_dict["argmax_%d_angles"%sub_pdf_dim]=this_arg_max_angles
+                        return_dict["argmax_%d_angles"%sub_pdf_dim]=this_arg_max_angles.cpu().numpy()
 
-                    return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean
+                    return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean.cpu().numpy()
                     
 
                     normalized_length_R=sample_sum_length/samplesize
@@ -3575,28 +3868,32 @@ class pdf(nn.Module):
                 else:
                     raise Exception("Unsupported sub pdf type for marginal moment calculation!", sub_pdf_def)
 
-                return_dict["mean_%d"%sub_pdf_dim]=this_mean
+                return_dict["mean_%d"%sub_pdf_dim]=this_mean.cpu().numpy()
                 if(index_mask is not None):
-                    return_dict["argmax_%d"%sub_pdf_dim]=this_arg_max
+                    return_dict["argmax_%d"%sub_pdf_dim]=this_arg_max.cpu().numpy()
 
-                return_dict["varlike_%d"%sub_pdf_dim]=this_var
+                return_dict["varlike_%d"%sub_pdf_dim]=this_var.cpu().numpy()
                
                 if(entropy_dict is not None):
-                    return_dict["entropy_%d" % sub_pdf_dim]=entropy_dict[sub_pdf_dim]
-                    return_dict["cross_entropy_%d" % sub_pdf_dim]=cross_entropy
-                    return_dict["kl_diff_exact_approx_%d" % sub_pdf_dim]=kl_diff
+                    return_dict["entropy_%d" % sub_pdf_dim]=entropy_dict[sub_pdf_dim].cpu().numpy()
+                    return_dict["cross_entropy_%d" % sub_pdf_dim]=cross_entropy.cpu().numpy()
+                    return_dict["kl_diff_exact_approx_%d" % sub_pdf_dim]=kl_diff.cpu().numpy()
 
                     if(sub_pdf_dim==0):
-                        return_dict["kl_diff_approx_exact_0"]=reverse_kl_diff
-                        return_dict["reverse_cross_entropy_0"]=reverse_cross_entropy
+                        return_dict["kl_diff_approx_exact_0"]=reverse_kl_diff.cpu().numpy()
+                        return_dict["reverse_cross_entropy_0"]=reverse_cross_entropy.cpu().numpy()
 
-                return_dict["approx_entropy_%d" % sub_pdf_dim]=approx_entropy
+                return_dict["approx_entropy_%d" % sub_pdf_dim]=approx_entropy.cpu().numpy()
                 
             if(entropy_dict is not None):
-                return_dict["entropy_total"]=entropy_dict["total"]
+                return_dict["entropy_total"]=entropy_dict["total"].cpu().numpy()
 
         if(verbose):
             print("total infernce took ",time.time()-tbef)
+
+        ## before returning results, go back to previous embedding status
+        for emb_index in range(len(previous_embedding_flags)):
+            self.set_embedding_flags(previous_embedding_flags[emb_index], sub_pdf_index=emb_index)
 
         return return_dict
 
