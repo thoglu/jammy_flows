@@ -1718,6 +1718,9 @@ class pdf(nn.Module):
             assert(new_target.shape[1]==self.total_target_dim_intrinsic)
         elif(transform_from=="embedding"):
             assert(new_target.shape[1]==self.total_target_dim_embedded) 
+        else:
+            raise Exception("Unknown transformation space! .. ", transform_from, "Allowed: default/intrinsic/embedding")
+            
 
         potentially_transformed_vals=[]
 
@@ -1730,6 +1733,8 @@ class pdf(nn.Module):
                 this_dim=self.target_dims_intrinsic[pdf_index]
             elif(transform_from=="embedding"):
                 this_dim=self.target_dims_embedded[pdf_index]
+            else:
+                raise Exception("Unknown transformation space! .. ", transform_from, "Allowed: default/intrinsic/embedding")
             
             this_target, log_det=self.layer_list[pdf_index][-1].transform_target_space(new_target[:,index:index+this_dim], log_det=log_det, transform_from=transform_from, transform_to=transform_to)
             
@@ -1745,7 +1750,9 @@ class pdf(nn.Module):
             assert(potentially_transformed_vals.shape[1]==self.total_target_dim_intrinsic), (potentially_transformed_vals.shape, self.total_target_dim_intrinsic)
         elif(transform_to=="embedding"):
             assert(potentially_transformed_vals.shape[1]==self.total_target_dim_embedded), (new_target.shape[1], self.total_target_dim_embedded)  
-
+        else:
+            raise Exception("Unknown transformation space! .. ", transform_to, "Allowed: default/intrinsic/embedding")
+            
 
         if(len(target.shape)==1):
             potentially_transformed_vals=potentially_transformed_vals.squeeze(0)
