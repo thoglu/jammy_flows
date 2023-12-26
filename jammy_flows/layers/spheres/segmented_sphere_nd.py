@@ -186,7 +186,7 @@ class segmented_sphere_nd(sphere_base.sphere_base):
 
 
         self.zenith_type_layer_defs=zenith_type_layers
-        print("ZENITH TYPE LAYERS ", zenith_type_layers)
+       
         if("z" in self.zenith_type_layer_defs or "r" in self.zenith_type_layer_defs):
             self.subspace_is_euclidean=False
             assert("x" not in self.zenith_type_layer_defs)
