@@ -2,10 +2,10 @@ import torch
 from torch import nn
 
 from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
-from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks, _calculate_coverage
+from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks
 from ..amortizable_mlp import AmortizableMLP
-from .. import helper_fns_coverage
-
+from ..helper_fns import contours
+from ..helper_fns.coverage import calculate_approximate_coverage
 import collections
 import numpy
 import copy
@@ -1945,7 +1945,7 @@ class pdf(nn.Module):
 
             ## overall coverage
             if(-1 in sub_manifolds):
-                true_cov, logprob_diffs, chi2_cdf_eval=_calculate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
+                true_cov, logprob_diffs, chi2_cdf_eval=calculate_approximate_coverage(logp_base.cpu().numpy(), self.total_base_dim, expected_coverage_probs)
                 
                 return_dict["true"]["total"]=true_cov
                 return_dict["logprob_diffs"]["total"]=logprob_diffs
@@ -1960,7 +1960,7 @@ class pdf(nn.Module):
              
                 sub_logp_base=torch.distributions.Normal(0.0,1.0).log_prob(base_points[:,self.target_dim_indices_intrinsic[sm][0]:self.target_dim_indices_intrinsic[sm][1]]).sum(axis=-1)
                
-                true_cov, logprob_diffs, chi2_eval=_calculate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
+                true_cov, logprob_diffs, chi2_eval=calculate_approximate_coverage(sub_logp_base.cpu().numpy(), self.target_dims_intrinsic[sm], expected_coverage_probs)
             
                 return_dict["true"][int(sm)]=true_cov
                 return_dict["logprob_diffs"][int(sm)]=logprob_diffs
@@ -2126,14 +2126,14 @@ class pdf(nn.Module):
                             """
                             ## get contours
                             if(self.total_target_dim_intrinsic==1):
-                                all_joined_contours=_find_1d_contours(actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim) ,exp_log_evals_list*bin_volumes, exp_log_evals_list)
+                                all_joined_contours=contours.compute_contours(actual_expected_coverage, exp_log_evals_list, bin_volumes, sample_points=numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim))
                                 
                             else:
                                 fig_temp=pylab.figure()
                                 ax_temp=fig_temp.add_subplot(111)
 
                                 # TODO: instead of exploiting matplotlib function for coverage use independent implementation
-                                xy_contours_for_coverage=_fake_plot_and_calc_eucl_contours(ax_temp, ["black" for i in range(len(actual_expected_coverage))], actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim), numpy.linspace(density_bounds[1][0],density_bounds[1][1], npts_per_dim), exp_log_evals_list*bin_volumes, exp_log_evals_list, linestyles=["-"]*len(actual_expected_coverage))
+                                xy_contours_for_coverage=contours.fake_plot_and_calc_eucl_contours(ax_temp, ["black" for i in range(len(actual_expected_coverage))], actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim), numpy.linspace(density_bounds[1][0],density_bounds[1][1], npts_per_dim), exp_log_evals_list*bin_volumes, exp_log_evals_list, linestyles=["-"]*len(actual_expected_coverage))
                                 pylab.close(fig_temp)
 
                                 ## join to vec
@@ -2145,7 +2145,7 @@ class pdf(nn.Module):
 
                            
                             ## find closest contour to truth
-                            cb=helper_fns_coverage.find_closest_contour(self, embedded_labels[cur_batch_ind], all_joined_contours, actual_expected_coverage)
+                            cb=contours.find_closest_contour(self, embedded_labels[cur_batch_ind], all_joined_contours, actual_expected_coverage)
                             real_cov_values.append(cb)
 
                 elif(self.pdf_defs_list[0][0]=="s"):
@@ -2205,7 +2205,7 @@ class pdf(nn.Module):
                             actual_expected_coverage=numpy.linspace(0.02, 0.98, coverage_num_percentile_points)
 
                             ## resulting contours
-                            xy_contours_for_coverage_temp=helper_fns_coverage.compute_spherical_contours(actual_expected_coverage, log_pdf_exp*area_per_pixel, log_pdf_exp)
+                            xy_contours_for_coverage_temp=contours.compute_contours(actual_expected_coverage, log_pdf_exp, area_per_pixel, manifold="sphere")
                             xy_contours_for_coverage=[]
                             for tc in xy_contours_for_coverage_temp:
                        
@@ -2213,7 +2213,7 @@ class pdf(nn.Module):
                             print("after cov calculation", time.time()-tbef)
                             ## obtain coverage value of truth
 
-                            real_cov_value=helper_fns_coverage.find_closest_contour(self, embedded_labels[cur_sample], xy_contours_for_coverage, actual_expected_coverage)
+                            real_cov_value=contours.find_closest_contour(self, embedded_labels[cur_sample], xy_contours_for_coverage, actual_expected_coverage)
                             #real_cov_value=sl_env_helper_fns.get_real_coverage_value(embedded_labels[cur_sample:cur_sample+1], xy_contours_for_coverage, interested_proportions)
 
                             real_cov_values.append(real_cov_value)

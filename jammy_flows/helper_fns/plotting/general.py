@@ -13,6 +13,8 @@ import copy
 
 from scipy.spatial.transform import Rotation as R
 
+from .. import contours
+
 
 def _update_attached_visualization_bounds(subgridspec, visualization_bounds):
     """
@@ -517,7 +519,7 @@ def show_sample_contours(ax,
 
     bin_volumes=bw
     
-    contour_values = calculate_contours(bin_fillings, bin_volumes, probs=contour_probs)
+    contour_values = contours.find_contour_levels(contour_probs, bin_fillings.flatten(), bin_volumes)
    
     ## reverse
     contour_values = contour_values[::-1]
@@ -574,10 +576,8 @@ def plot_density_with_contours(ax,
     xr = (xvals[0], xvals[-1])
     yr = (yvals[0], yvals[-1])
 
-    contour_values = calculate_contours(numpy.exp(log_evals), bin_volumes,
-                                        probs=contour_probs)
+    contour_values = contours.find_contour_levels(contour_probs,numpy.exp(log_evals).flatten(), bin_volumes)
 
-   
     ## reverse
 
     contour_values = contour_values[::-1]
