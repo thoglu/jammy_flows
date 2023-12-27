@@ -22,7 +22,8 @@ VERSION = '1.0.0'
 
 # What packages are required for this module to be executed?
 REQUIRED = [
-     "torch>=1.7" , "numpy>=1.18.5" , "scipy>=1.5.4", "matplotlib>=3.3.3", "torchdiffeq>=0.2.1"
+     "torch>=1.7" , "numpy>=1.18.5" , "scipy>=1.5.4", "matplotlib>=3.3.3", "torchdiffeq>=0.2.1", 
+     "healpy>=1.16.2", "mhealpy>=0.3.0", "astropy>=5.2.2"
 ]
 
 # What packages are optional?
