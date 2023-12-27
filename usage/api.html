@@ -204,27 +204,9 @@ Each layer holds their own parameters.</p></li>
 </dd></dl>
 
 <dl class="method">
-<dt id="jammy_flows.main.default.pdf.count_parameters">
-<code class="sig-name descname">count_parameters</code><span class="sig-paren">(</span><em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.count_parameters" title="Permalink to this definition">¶</a></dt>
-<dd><p>Counts parameters of the model. It does not matter, if all paramters are amortized or not, will always return the same.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters</dt>
-<dd class="field-odd"><p><strong>verbose</strong> (<em>bool</em>) – Prints out number of parameters. Differentiates amortization from non-amortization params.</p>
-</dd>
-<dt class="field-even">Returns</dt>
-<dd class="field-even"><p><dl class="simple">
-<dt>int</dt><dd><p>Number of parameters (incl. amortization params).</p>
-</dd>
-</dl>
-</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="method">
-<dt id="jammy_flows.main.default.pdf.coverage">
-<code class="sig-name descname">coverage</code><span class="sig-paren">(</span><em class="sig-param">target_x, conditional_input=None, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False, num_percentile_points=100, sub_manifolds=[-1]</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.coverage" title="Permalink to this definition">¶</a></dt>
-<dd><p>Calculates coverage for the base distribution via the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.</p>
+<dt id="jammy_flows.main.default.pdf.approximate_coverage">
+<code class="sig-name descname">approximate_coverage</code><span class="sig-paren">(</span><em class="sig-param">target_x, conditional_input=None, amortization_parameters=None, force_embedding_coordinates=False, force_intrinsic_coordinates=False, num_percentile_points=100, sub_manifolds=[-1]</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.approximate_coverage" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates approximate coverage via the base distribution with the quantity 2*(log(p(0))-log(p_(z_base))) which should be chi^2 distributed for good coverage.</p>
 <dl class="field-list simple">
 <dt class="field-odd">Parameters</dt>
 <dd class="field-odd"><ul class="simple">
@@ -245,6 +227,54 @@ actual_twice_logprob (Numpy array): Array of twice the log-probability differenc
 </dd>
 <dt class="field-odd">Return type</dt>
 <dd class="field-odd"><p>expected_coverage_probs (Numpy array)</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.main.default.pdf.count_parameters">
+<code class="sig-name descname">count_parameters</code><span class="sig-paren">(</span><em class="sig-param">verbose=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.count_parameters" title="Permalink to this definition">¶</a></dt>
+<dd><p>Counts parameters of the model. It does not matter, if all paramters are amortized or not, will always return the same.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><p><strong>verbose</strong> (<em>bool</em>) – Prints out number of parameters. Differentiates amortization from non-amortization params.</p>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p><dl class="simple">
+<dt>int</dt><dd><p>Number of parameters (incl. amortization params).</p>
+</dd>
+</dl>
+</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.main.default.pdf.coverage_and_or_pdf_scan">
+<code class="sig-name descname">coverage_and_or_pdf_scan</code><span class="sig-paren">(</span><em class="sig-param">labels=None, conditional_input=None, amortization_parameters=None, coverage_num_percentile_points=100, sub_manifolds=[-1], exact_coverage_calculation=False, save_pdf_scan=False, calculate_MAP=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.coverage_and_or_pdf_scan" title="Permalink to this definition">¶</a></dt>
+<dd><p>Calculates coverage (approximate) and possibly exact. Performs pdf scan for exact coverage and save scan if desired.
+The pdf scan and the exact coverage must be calculated in intrinsic coordinates (e.g. theta/phi for direction instead of dx/dy/dz).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>labels</strong> (<em>Tensor</em>) – Target positions to calculate coverage with. Must be of shape (B,D), where B = batch dimension.</p></li>
+<li><p><strong>conditional_input</strong> (<em>Tensor/list</em><em>(</em><em>Tensor</em><em>)</em><em>/None</em>) – Amortization input for conditional PDFs. If given, must be of shape (B,A), where A is the conditional input dimension defined in __init__. Can also be
+a list of tensors, one for each sub-PDF, if <em>conditional_input_dim</em> in __init__ is a list of ints.</p></li>
+<li><p><strong>amortization_parameters</strong> (<em>Tensor/None</em>) – If the PDF is fully amortized, defines all the parameters of the PDF. Must be of shape (B,T), where T is the total number of parameters of the PDF.</p></li>
+<li><p><strong>force_embedding_coordinates</strong> (<em>bool</em>) – Enforces embedding coordinates in the input <em>x</em>.</p></li>
+<li><p><strong>force_intrinsic_coordinates</strong> (<em>bool</em>) – Enforces intrinsic coordinates in the input <em>x</em>.</p></li>
+<li><p><strong>coverage_num_percentile_points</strong> (<em>int</em>) – At how many points along the chi2 do we want to compare observed vs expected coverage?</p></li>
+<li><p><strong>sub_manifolds</strong> (<em>list</em><em>(</em><em>int</em><em>)</em>) – Contains indices of sub-manifolds if coverage should be calculated for onditional PDF of the given sub-manifold. <em>-1</em> stands for the total PDF and is the default.</p></li>
+<li><p><strong>exact_coverage_calculation</strong> (<em>bool</em>) – Calculate exact coverage based on pdf scan?</p></li>
+<li><p><strong>save_pdf_scan</strong> (<em>bool</em>) – Save a pdf scan?</p></li>
+<li><p><strong>calculate_MAP</strong> (<em>bool</em>) – Calculate Maximum APosterior (MAP) coordinates based on pdf scan?</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns</dt>
+<dd class="field-even"><p>Dictionary of requested coverage and/or pdf scan values.</p>
+</dd>
+<dt class="field-odd">Return type</dt>
+<dd class="field-odd"><p>return_dict (dict)</p>
 </dd>
 </dl>
 </dd></dl>
@@ -337,6 +367,14 @@ a list of tensors, one for each sub-PDF, if <em>conditional_input_dim</em> in __
 </p>
 </dd>
 </dl>
+</dd></dl>
+
+<dl class="method">
+<dt id="jammy_flows.main.default.pdf.get_embedding_flags">
+<code class="sig-name descname">get_embedding_flags</code><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.get_embedding_flags" title="Permalink to this definition">¶</a></dt>
+<dd><p>Returns embedding parameters flags (True/False) for different sub pdfs. An embedding flag
+is important for manifold sub dimensions. Set to True means the given sub-pdf flows expect the input to be in
+embedding space, while set to False the sub-pdf flows expect their input to be in intrinsic coordinates.</p>
 </dd></dl>
 
 <dl class="method">
@@ -460,8 +498,8 @@ entropy_total = total entropy (only total quantity calculated because it is esse
 </dd></dl>
 
 <dl class="method">
-<dt id="jammy_flows.main.default.pdf.set_use_embedding_parameters_flag">
-<code class="sig-name descname">set_use_embedding_parameters_flag</code><span class="sig-paren">(</span><em class="sig-param">usement_flag</em>, <em class="sig-param">sub_pdf_index=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.set_use_embedding_parameters_flag" title="Permalink to this definition">¶</a></dt>
+<dt id="jammy_flows.main.default.pdf.set_embedding_flags">
+<code class="sig-name descname">set_embedding_flags</code><span class="sig-paren">(</span><em class="sig-param">usement_flag</em>, <em class="sig-param">sub_pdf_index=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.main.default.pdf.set_embedding_flags" title="Permalink to this definition">¶</a></dt>
 <dd><p>Resets the default parameter embedding structure. This defines how tensors are to be given to the PDF without
 extra flags like <em>force_embedding_coordinates</em> or <em>force_intrinsic_coordinates</em>.</p>
 <dl class="field-list simple">
@@ -887,24 +925,6 @@ In order for this to work properly, the function <em>has</em> to be globally dif
 </div>
 <div class="section" id="module-jammy_flows.helper_fns">
 <span id="helper-functions"></span><h3>Helper Functions<a class="headerlink" href="#module-jammy_flows.helper_fns" title="Permalink to this headline">¶</a></h3>
-<dl class="function">
-<dt id="jammy_flows.helper_fns.get_density_eval_minmax_values">
-<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">get_density_eval_minmax_values</code><span class="sig-paren">(</span><em class="sig-param">samples</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.get_density_eval_minmax_values" title="Permalink to this definition">¶</a></dt>
-<dd><p>Obtain a simple estimate of pdf extent based on min/max values of samples.
-Used to determine a region for density evaluation (not plotting).</p>
-</dd></dl>
-
-<dl class="function">
-<dt id="jammy_flows.helper_fns.obtain_bins_and_visualization_regions">
-<code class="sig-prename descclassname">jammy_flows.helper_fns.</code><code class="sig-name descname">obtain_bins_and_visualization_regions</code><span class="sig-paren">(</span><em class="sig-param">samples, model, percentiles=[3.0, 97.0], relative_buffer=0.1, num_bins=50, s2_norm='standard', use_outlier_binning=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.helper_fns.obtain_bins_and_visualization_regions" title="Permalink to this definition">¶</a></dt>
-<dd><p>Uses samples and pdf defs to calculate binning and visualization regions.</p>
-<p>Euclidean:
-Obtain an uneven binning based on Bayesian Blocks and a region that makes sense for visualization based on 1-d percentiles.
-Adds a relative buffer to both sides.</p>
-<p>Other:
-Non-Euclidean manifolds have fixed bounds for binning and visualization, so this is easy.</p>
-</dd></dl>
-
 </div>
 </div>
 <div class="section" id="module-jammy_flows.layers.layer_base">
