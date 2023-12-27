@@ -11,7 +11,6 @@ import matplotlib.cm as cm
 import copy
 #import astropy.stats
 
-from scipy.spatial.transform import Rotation as R
 
 from .. import contours
 from ..grid_functions import obtain_bins_and_visualization_regions, get_pdf_on_grid, cartesian_lambert_to_spherical, spherical_to_cartesian_lambert, get_basic_gridlines

@@ -1,6 +1,8 @@
 import numpy
 import torch
 
+from scipy.spatial.transform import Rotation as R
+
 def find_bins(trace, percentiles=[5.0,95.0], num_bins=50, use_outlier_binning=False):
 
     if(use_outlier_binning):
