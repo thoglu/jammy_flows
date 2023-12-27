@@ -2119,32 +2119,9 @@ class pdf(nn.Module):
                                 else:
                                     data_summary_single=conditional_input[cur_batch_ind:cur_batch_ind+1]
 
-                            """
-                            fig_temp=pylab.figure()
-                            jammy_flows.helper_fns.visualize_pdf(self.pdf, fig_temp, conditional_input=data_summary_single)
-                            pylab.savefig("test_%d.png" % cur_batch_ind)
-                            pylab.close(fig_temp)
-                            """
-                            ## get contours
-                            if(self.total_target_dim_intrinsic==1):
-                                all_joined_contours=contours.compute_contours(actual_expected_coverage, exp_log_evals_list, bin_volumes, sample_points=numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim))
-                                
-                            else:
-                                fig_temp=pylab.figure()
-                                ax_temp=fig_temp.add_subplot(111)
+                
+                            all_joined_contours=contours.compute_contours(actual_expected_coverage, exp_log_evals_list, bin_volumes, sample_points=evalpositions[0])
 
-                                # TODO: instead of exploiting matplotlib function for coverage use independent implementation
-                                xy_contours_for_coverage=contours.fake_plot_and_calc_eucl_contours(ax_temp, ["black" for i in range(len(actual_expected_coverage))], actual_expected_coverage, numpy.linspace(density_bounds[0][0],density_bounds[0][1], npts_per_dim), numpy.linspace(density_bounds[1][0],density_bounds[1][1], npts_per_dim), exp_log_evals_list*bin_volumes, exp_log_evals_list, linestyles=["-"]*len(actual_expected_coverage))
-                                pylab.close(fig_temp)
-
-                                ## join to vec
-                                all_joined_contours=[]
-                                for ind in range(len(xy_contours_for_coverage)):
-                                   
-                                    joint=numpy.concatenate(xy_contours_for_coverage[ind], axis=0)
-                                    all_joined_contours.append(joint)
-
-                           
                             ## find closest contour to truth
                             cb=contours.find_closest_contour(self, embedded_labels[cur_batch_ind], all_joined_contours, actual_expected_coverage)
                             real_cov_values.append(cb)

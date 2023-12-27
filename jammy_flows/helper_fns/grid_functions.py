@@ -279,6 +279,61 @@ def get_pdf_on_grid(mins_maxs, npts, model, conditional_input=None, s2_norm="sta
     
     return resized_torch_positions, res, bin_volumes, sin_zen_mask, flagged_coords
 
+def rotate_coords_to(theta, phi, target, reverse=False):
+
+  target_theta=target[0].cpu().numpy()
+  target_phi=target[1].cpu().numpy()
+
+  phi=phi.cpu().numpy()
+  theta=theta.cpu().numpy()
+
+  x=numpy.cos(target_phi)*numpy.sin(target_theta)
+  y=numpy.sin(target_phi)*numpy.sin(target_theta)
+  z=numpy.cos(target_theta)
+
+  ###########
+
+  axis=-numpy.cross(numpy.array([x,y,z]), numpy.array([0,0,1]))
+  axis_len=numpy.sqrt((axis**2).sum())
+  axis/=axis_len
+
+  rot_angle=numpy.pi-target_theta
+  if(reverse):
+    rot_angle=-rot_angle
+
+
+  axis*=rot_angle.item()
+
+  rot_matrix = R.from_rotvec(axis)
+  ###########
+  
+  x=numpy.cos(phi)*numpy.sin(theta)
+  y=numpy.sin(phi)*numpy.sin(theta)
+  z=numpy.cos(theta)
+
+  vals=numpy.concatenate([x[:,None], y[:,None],z[:,None]], axis=1)
+
+  res=torch.from_numpy(rot_matrix.apply(vals))
+  
+  ##########
+
+  theta=numpy.arccos(res[:,2])
+  non_finite_mask=numpy.isfinite(theta)==False
+  larger=non_finite_mask & (res[:,2] > 0)
+  smaller=non_finite_mask & (res[:,2] < 0)
+
+  theta[smaller]=numpy.pi
+  theta[larger]=0.0
+
+
+  phi=numpy.arctan2(res[:,1],res[:,0])
+
+  #phi_smaller_mask=phi<0
+  #phi[phi_smaller_mask]=phi[phi_smaller_mask]+2*numpy.pi
+ 
+  return theta.to(target), phi.to(target)
+
+
 def cartesian_lambert_to_spherical(xl, fix_point=None):
 
     ## first go to spherical lambert
