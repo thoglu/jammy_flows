@@ -71,20 +71,20 @@ def setup_and_test_multiple_pdfs(pdf_def, layer_def):
 
     seed_everything(0)
     embedded_pdf=f.pdf(pdf_def, layer_def)
-    embedded_pdf.set_use_embedding_parameters_flag(True)
+    embedded_pdf.set_embedding_flags(True)
     embedded_pdf.double()
 
     seed_everything(0)
     intrinsic_pdf=f.pdf(pdf_def, layer_def)
-    intrinsic_pdf.set_use_embedding_parameters_flag(False)
+    intrinsic_pdf.set_embedding_flags(False)
     intrinsic_pdf.double()
 
     for sub_pdf_index in [-1]+list(range(len(normal_pdf.layer_list))):
         print("sub pdf ", sub_pdf_index)
-        normal_pdf.set_use_embedding_parameters_flag(False)
+        normal_pdf.set_embedding_flags(False)
         if(sub_pdf_index>=0):
            
-            normal_pdf.set_use_embedding_parameters_flag(True, sub_pdf_index=sub_pdf_index)
+            normal_pdf.set_embedding_flags(True, sub_pdf_index=sub_pdf_index)
 
         normal_sample,_,_,_=normal_pdf.sample(samplesize=100)
         normal_eval,_,_=normal_pdf(normal_sample)
