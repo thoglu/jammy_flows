@@ -4,8 +4,9 @@ from torch import nn
 from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
 from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks
 from ..amortizable_mlp import AmortizableMLP
-from ..helper_fns import contours
+from ..helper_fns import contours, grid_functions
 from ..helper_fns.coverage import calculate_approximate_coverage
+
 import collections
 import numpy
 import copy
@@ -2084,12 +2085,12 @@ class pdf(nn.Module):
                         
                         ### loop through different events with batch size 1 each (TODO: make this batchable)
 
-                        _, density_bounds,_=jammy_flows.helper_fns.obtain_bins_and_visualization_regions(samples, self, percentiles=[0.5,99.5])
+                        _, density_bounds,_=grid_functions.obtain_bins_and_visualization_regions(samples, self, percentiles=[0.5,99.5])
 
                         npts_per_dim=int((samples_per_event)**(1.0/float(self.total_target_dim)))
 
 
-                        evalpositions, log_evals, bin_volumes, _, _= jammy_flows.helper_fns.get_pdf_on_grid(density_bounds,
+                        evalpositions, log_evals, bin_volumes, _, _= grid_functions.get_pdf_on_grid(density_bounds,
                                                                                                             npts_per_dim,
                                                                                                             self,
                                                                                                             conditional_input=None if conditional_input is None else data_summary_repeated[:1],

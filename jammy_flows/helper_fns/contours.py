@@ -3,6 +3,7 @@ import numpy as np
 from numpy import ma
 import matplotlib
 import matplotlib as mpl
+from matplotlib import _api
 
 try:
     import meander
@@ -99,7 +100,7 @@ def compute_contours(proportions, pdf_evals, areas, sample_points=None, manifold
             List of arrays containing phi values for desired contours
     '''
 
-    assert(healpy is not None), "Spherical contour calculation requires healpy!"
+    
     assert(meander is not None), "Spherical contour calculation requires meander!"
 
     
@@ -117,14 +118,9 @@ def compute_contours(proportions, pdf_evals, areas, sample_points=None, manifold
                 for i in range(len(pdf_evals) - 1):
                     if (pdf_evals[i] - level) * (pdf_evals[i + 1] - level) <= 0:
                         # Linear interpolation to find a more accurate point of crossing
-                        x_contour = xvals[i] + (level - pdf_evals[i]) * (xvals[i + 1] - xvals[i]) / (pdf_evals[i + 1] - pdf_evals[i])
+                        x_contour = sample_points[i] + (level - pdf_evals[i]) * (sample_points[i + 1] - sample_points[i]) / (pdf_evals[i + 1] - pdf_evals[i])
                         contour.append(x_contour)
-                """
-                if(len(contour)==1):
-                    contour.append(contour[-1])
-                assert(len(contour)==2), ("Issue with contour ", contour)
-                """
-
+               
                 ## create 1 "joint" 1-d contour here
                 combined_list.append(numpy.array(contour)[...,None])
         elif(sample_points.shape[1]==2):
@@ -132,9 +128,11 @@ def compute_contours(proportions, pdf_evals, areas, sample_points=None, manifold
 
     elif(manifold=="sphere"):
 
+        assert(healpy is not None), "Spherical contour calculation requires healpy!"
+
         if(sample_points is None):
-            nside = healpy.pixelfunc.get_nside(sorted_pdf_with_area)
-            sample_points = numpy.array(healpy.pix2ang(nside,numpy.arange(len(sorted_pdf_with_area)))).T
+            nside = healpy.pixelfunc.get_nside(pdf_evals)
+            sample_points = numpy.array(healpy.pix2ang(nside,numpy.arange(len(pdf_evals)))).T
 
         contours_by_level = meander.spherical_contours(sample_points, pdf_evals, levels)
     else:

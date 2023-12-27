@@ -1,4 +1,6 @@
 import numpy
+import torch
+from scipy import stats
 
 def find_closest(s, all_xyz_contours, contor_probs_all_cov):
     """

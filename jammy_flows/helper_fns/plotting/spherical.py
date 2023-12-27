@@ -50,14 +50,7 @@ def add(self,
         """
        
         required_args = ["axis", "world", "angle", "text", "axis_displacement", "data"]
-        if pixel is not None:
-            warnings.warn(
-                "Setting the pixel coordinates of a label does nothing and is"
-                " deprecated, as these can only be accurately calculated when"
-                " Matplotlib is drawing a figure. To prevent this warning pass the"
-                f" following arguments as keyword arguments: {required_args}",
-                AstropyDeprecationWarning,
-            )
+        
         if (
             axis is None
             or world is None
@@ -119,7 +112,7 @@ class HealpyAxesAzimuthOrdering(HealpyAxes):
                 rect=Bbox.from_bounds(*rect)
 
             else:
-                raise Exeption("Unknown ax rect ", type(rect))
+                raise Exception("Unknown ax rect ", type(rect))
 
         ## default setting for 
         fixed_rot=numpy.array([0.0,90.0,0.0]) # rotation z set to 0 ensures azimuth starts at 0 
@@ -247,7 +240,7 @@ class OrthviewAzimuth(HealpyAxes):
                 rect=Bbox.from_bounds(*rect)
 
             else:
-                raise Exeption("Unknown ax rect ", type(rect))
+                raise Exception("Unknown ax rect ", type(rect))
         
         self._cdelt = 1/numpy.pi
         
