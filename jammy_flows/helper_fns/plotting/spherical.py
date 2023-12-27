@@ -424,8 +424,67 @@ def plot_multiresolution_healpy(pdf,
                                                                     max_entries_per_pixel=max_entries_per_pixel,
                                                                     use_density_if_possible=use_density_if_possible)
     
+    
+    ax=_plot_multiresolution_healpy(eval_positions,
+                                    pdf_evals,
+                                    eval_areas,
+                                    moc_map=moc_map,
+                                    fig=fig, 
+                                    ax_to_plot=ax_to_plot,
+                                    samplesize=samplesize, 
+                                    max_entries_per_pixel=max_entries_per_pixel,
+                                    draw_pixels=draw_pixels,
+                                    use_density_if_possible=use_density_if_possible,
+                                    log_scale=log_scale,
+                                    cbar=cbar,
+                                    cbar_kwargs=cbar_kwargs,
+                                    graticule=graticule,
+                                    graticule_kwargs=graticule_kwargs,
+                                    draw_contours=draw_contours,
+                                    contour_probs=contour_probs,
+                                    contour_colors=contour_colors, # None -> pick colors from color scheme
+                                    zoom=zoom,
+                                    visualization=visualization, # zen_azi or dec_ra
+                                    declination_trafo_function=declination_trafo_function) # required to transform to dec/ra before plotting )
+
+    return ax
+
+def _plot_multiresolution_healpy(eval_positions,
+                                pdf_evals,
+                                eval_areas,
+                                moc_map=None,
+                                fig=None, 
+                                ax_to_plot=None,
+                                samplesize=10000, 
+                                max_entries_per_pixel=5,
+                                draw_pixels=True,
+                                use_density_if_possible=True,
+                                log_scale=True,
+                                cbar=True,
+                                cbar_kwargs={},
+                                graticule=True,
+                                graticule_kwargs={},
+                                draw_contours=True,
+                                contour_probs=[0.68, 0.95],
+                                contour_colors=None, # None -> pick colors from color scheme
+                                zoom=False,
+                                visualization="zen_azi", # zen_azi or dec_ra
+                                declination_trafo_function=None): # required to transform to dec/ra before plotting 
+    
+    """
+    Visualizes an S2 pdf, or a certain S2 subpart of a PDF using an adaptive healpix grid from mhealpy. Useful if the PDF
+    is very small and higher nside becomes computationally expensive. Can also overlay smooth contours on this irregular grid
+    using the *meander* package. This function differs in that it directly takes the PDF values instead of a pdf object.
+
+    """
+    
     zoom_diameter=None
     mean_coords=None
+
+    ## recreate moc map if necessary
+    if(moc_map is None):
+        sample_pix = mhealpy.ang2pix(mhealpy.MAX_NSIDE, eval_positions[:,0], eval_positions[:,1], nest = True)
+        moc_map = HealpixMap.moc_histogram(mhealpy.MAX_NSIDE, sample_pix, 1, nest=True)
 
     if(zoom):
         
@@ -573,3 +632,4 @@ def plot_multiresolution_healpy(pdf,
         ax.graticule(**graticule_default_kwargs)
 
     return ax
+
