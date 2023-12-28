@@ -6,7 +6,7 @@ from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, f
 from ..amortizable_mlp import AmortizableMLP
 from ..helper_fns import contours, grid_functions
 from ..helper_fns.coverage import calculate_approximate_coverage
-
+from ..helper_fns.plotting.spherical import get_multiresolution_evals
 import collections
 import numpy
 import copy
@@ -2128,10 +2128,11 @@ class pdf(nn.Module):
 
                 elif(self.pdf_defs_list[0][0]=="s"):
 
-                    assert(len(self.pdf_defs_list)==1), ("Euclidean space as first.. must be a pure Euclidean space! .. but ", self.pdf_defs_list)
+                    assert(len(self.pdf_defs_list)==1), ("Must be a pure Spherical space! .. but ", self.pdf_defs_list)
                     assert(self.pdf_defs_list[0]=="s2"), "Only s2 supported at the moment!"
-
                     max_positions_angles=[]
+                    """
+                    
                     
                     tbef=time.time()
 
@@ -2147,35 +2148,43 @@ class pdf(nn.Module):
                     target_angles=torch.from_numpy(target_angles_numpy).to(used_device).type(used_dtype)
                    
                     target_xyz,_=self.transform_target_space(target_angles, transform_from="intrinsic", transform_to="embedding")
-
+                    """
 
                     for cur_sample in range(batch_size):
                         
+                        single_conditional_input=None
                         if(conditional_input is not None):
+                        
                             if(type(conditional_input)==list):  
-                                data_summary_repeated=[ci[cur_sample:cur_sample+1].repeat_interleave(num_pix, dim=0) for ci in conditional_input]
+                                single_conditional_input=[ci[cur_sample:cur_sample+1] for ci in conditional_input]
                             else:
-                                data_summary_repeated=conditional_input[cur_sample:cur_sample+1].repeat_interleave(num_pix, dim=0)
-
+                                single_conditional_input=conditional_input[cur_sample:cur_sample+1]
+                        """
                         log_pdf,_,_=self.forward(target_xyz, conditional_input=data_summary_repeated, force_embedding_coordinates=True)
 
                         log_pdf_test,_,_=self.forward(target_angles, conditional_input=data_summary_repeated, force_embedding_coordinates=False)
-                        
-                        print("inter mediate ", time.time()-tbef)
+                        """  
+                        eval_positions, log_pdf_evals, pdf_evals, eval_areas, _ = get_multiresolution_evals(self, samplesize=10000, conditional_input=single_conditional_input, max_entries_per_pixel=5)
                         ## calculate exact coverage prob for truth
+                        """
                         log_pdf=log_pdf.cpu().numpy()
 
-                        if(save_pdf_scan):
-                            pdf_eval_positions.append(target_angles_numpy[None,:])
-                            pdf_log_evals.append(log_pdf[None,:])
-                            pdf_scan_volume_sizes.append(numpy.ones(len(log_pdf))[None,:]*area_per_pixel)
+                        
                             
                         log_pdf_exp=numpy.exp(log_pdf)
-
-                        max_index=numpy.where(log_pdf_exp==numpy.max(log_pdf_exp))[0][0]
                         
-                        max_positions.append(target_xyz[max_index:max_index+1].cpu().detach().numpy())
-                        max_positions_angles.append(target_angles[max_index:max_index+1].cpu().detach().numpy())
+                        """
+
+                        if(save_pdf_scan):
+                            pdf_eval_positions.append(eval_positions)
+                            pdf_log_evals.append(log_pdf_evals)
+                            pdf_scan_volume_sizes.append(eval_areas)
+
+                        max_index=numpy.argmax(pdf_evals)
+                        
+                        max_positions_angles.append(eval_positions[max_index:max_index+1])
+                        embedding_max_position,_=self.transform_target_space(torch.from_numpy(max_positions_angles[-1]), transform_from="intrinsic", transform_to="embedding")
+                        max_positions.append(embedding_max_position.numpy())
                         
                         if(exact_coverage_calculation):
                             ## interested proportions for target space coverage
@@ -2183,7 +2192,7 @@ class pdf(nn.Module):
                             actual_expected_coverage=numpy.linspace(0.02, 0.98, coverage_num_percentile_points)
 
                             ## resulting contours
-                            xy_contours_for_coverage_temp=contours.compute_contours(actual_expected_coverage, log_pdf_exp, area_per_pixel, manifold="sphere")
+                            xy_contours_for_coverage_temp=contours.compute_contours(actual_expected_coverage, pdf_evals, eval_areas, manifold="sphere")
                             xy_contours_for_coverage=[]
                             for tc in xy_contours_for_coverage_temp:
                        
@@ -2208,9 +2217,9 @@ class pdf(nn.Module):
                     return_dict["real_cov_values"]=numpy.array(real_cov_values)
 
                 if(save_pdf_scan):
-                    return_dict["pdf_scan_positions"]=numpy.concatenate(pdf_eval_positions)
-                    return_dict["pdf_scan_volume_sizes"]=numpy.concatenate(pdf_scan_volume_sizes)
-                    return_dict["pdf_scan_log_evals"]=numpy.concatenate(pdf_log_evals)
+                    return_dict["pdf_scan_positions"]=pdf_eval_positions
+                    return_dict["pdf_scan_volume_sizes"]=pdf_scan_volume_sizes
+                    return_dict["pdf_scan_log_evals"]=pdf_log_evals
 
 
         return return_dict
