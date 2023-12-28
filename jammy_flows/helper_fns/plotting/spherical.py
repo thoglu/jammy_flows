@@ -537,7 +537,8 @@ def plot_multiresolution_healpy(pdf,
                                 contour_colors=None, # None -> pick colors from color scheme
                                 zoom=False,
                                 visualization="zen_azi", # zen_azi or dec_ra
-                                declination_trafo_function=None): # required to transform to dec/ra before plotting 
+                                declination_trafo_function=None, # required to transform to dec/ra before plotting 
+                                show_grid=False): 
     
     """
     Visualizes an S2 pdf, or a certain S2 subpart of a PDF using an adaptive healpix grid from mhealpy. Useful if the PDF
@@ -572,7 +573,8 @@ def plot_multiresolution_healpy(pdf,
                                     contour_colors=contour_colors, # None -> pick colors from color scheme
                                     zoom=zoom,
                                     visualization=visualization, # zen_azi or dec_ra
-                                    declination_trafo_function=declination_trafo_function) # required to transform to dec/ra before plotting )
+                                    declination_trafo_function=declination_trafo_function,
+                                    show_grid=show_grid) 
 
     return ax
 
@@ -593,7 +595,8 @@ def _plot_multiresolution_healpy(eval_positions,
                                 contour_colors=None, # None -> pick colors from color scheme
                                 zoom=False,
                                 projection_type="zen_azi", # zen_azi or dec_ra
-                                declination_trafo_function=None): # required to transform to dec/ra before plotting 
+                                declination_trafo_function=None, # required to transform to dec/ra before plotting 
+                                show_grid=False): 
     
     """
     Visualizes an S2 pdf, or a certain S2 subpart of a PDF using an adaptive healpix grid from mhealpy. Useful if the PDF
@@ -759,6 +762,9 @@ def _plot_multiresolution_healpy(eval_positions,
             graticule_default_kwargs[extra_kwarg]=graticule_kwargs[extra_kwarg]
        
         ax.graticule(**graticule_default_kwargs)
+
+    if(show_grid):
+        moc_map.plot_grid(ax, linewidth = .1, color = 'white');
 
     return ax
 
