@@ -220,7 +220,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         ## go to cylinder from angle
         prev_ret=torch.cos(x[:,:1])
-        fw_upd=torch.log(torch.sin(x[:,0]))
+        fw_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(x[:,0])))
+
         log_det=log_det+fw_upd
 
         ## intermediate [-1,1]->[-1,1] transformation
@@ -252,7 +253,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         ### we have to make the angles safe here...TODO: change to external transformation
         ret=torch.where(ret<=-1.0, -1.0+1e-7, ret)
         ret=torch.where(ret>=1.0, 1.0-1e-7, ret)
-
+       
         angle=x[:,1:]
 
         if(self.boundary_cos_theta_identity_region==0.0):
@@ -307,8 +308,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                         
                         log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
                       
-        ## go back to angle
-        ret=torch.acos(ret)
+        ## go back to angle in a safe way
+        ret=sphere_base.return_safe_angle_within_pi(torch.acos(ret))
         rev_upd=torch.log(torch.sin(ret))[:,0]
         log_det=log_det-rev_upd
 
@@ -356,7 +357,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         ## go to cylinder from angle
         prev_ret=torch.cos(x[:,:1])
-        fw_upd=torch.log(torch.sin(x[:,0]))
+        fw_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(x[:,0])))
         log_det=log_det+fw_upd
 
         angle=x[:,1:]
@@ -446,7 +447,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         
         ## go back to angle
         ret=torch.acos(ret)
-        rev_upd=torch.log(torch.sin(ret))[:,0]
+        rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(ret)))[:,0]
         log_det=log_det-rev_upd
 
         ret=torch.cat([ret, angle], dim=1)
