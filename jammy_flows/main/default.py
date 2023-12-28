@@ -2131,24 +2131,6 @@ class pdf(nn.Module):
                     assert(len(self.pdf_defs_list)==1), ("Must be a pure Spherical space! .. but ", self.pdf_defs_list)
                     assert(self.pdf_defs_list[0]=="s2"), "Only s2 supported at the moment!"
                     max_positions_angles=[]
-                    """
-                    
-                    
-                    tbef=time.time()
-
-                    nside=32
-
-                    num_pix=healpy.nside2npix(nside)
-
-                    area_per_pixel=4*numpy.pi/num_pix
-
-                    theta, phi = healpy.pix2ang(nside=nside, ipix=numpy.arange(num_pix))
-
-                    target_angles_numpy=numpy.concatenate([theta[:,None], phi[:,None]], axis=1)
-                    target_angles=torch.from_numpy(target_angles_numpy).to(used_device).type(used_dtype)
-                   
-                    target_xyz,_=self.transform_target_space(target_angles, transform_from="intrinsic", transform_to="embedding")
-                    """
 
                     for cur_sample in range(batch_size):
                         
@@ -2159,21 +2141,12 @@ class pdf(nn.Module):
                                 single_conditional_input=[ci[cur_sample:cur_sample+1] for ci in conditional_input]
                             else:
                                 single_conditional_input=conditional_input[cur_sample:cur_sample+1]
-                        """
-                        log_pdf,_,_=self.forward(target_xyz, conditional_input=data_summary_repeated, force_embedding_coordinates=True)
-
-                        log_pdf_test,_,_=self.forward(target_angles, conditional_input=data_summary_repeated, force_embedding_coordinates=False)
-                        """  
+                        
                         eval_positions, log_pdf_evals, pdf_evals, eval_areas, _ = get_multiresolution_evals(self, samplesize=10000, conditional_input=single_conditional_input, max_entries_per_pixel=5)
-                        ## calculate exact coverage prob for truth
-                        """
-                        log_pdf=log_pdf.cpu().numpy()
-
-                        
-                            
-                        log_pdf_exp=numpy.exp(log_pdf)
-                        
-                        """
+                        if((~numpy.isfinite(log_pdf_evals)).sum()>0):
+                            print("nonfint")
+                            print(log_pdf_evals[~numpy.isfinite(log_pdf_evals)])
+                            sys.exit(-1)
 
                         if(save_pdf_scan):
                             pdf_eval_positions.append(eval_positions)
@@ -2197,7 +2170,7 @@ class pdf(nn.Module):
                             for tc in xy_contours_for_coverage_temp:
                        
                                 xy_contours_for_coverage.append([self.transform_target_space(torch.from_numpy(ii), transform_from="intrinsic", transform_to="embedding")[0].detach().numpy() for ii in tc])
-                            print("after cov calculation", time.time()-tbef)
+                            
                             ## obtain coverage value of truth
 
                             real_cov_value=contours.find_closest_contour(self, embedded_labels[cur_sample], xy_contours_for_coverage, actual_expected_coverage)
