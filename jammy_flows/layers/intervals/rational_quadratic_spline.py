@@ -150,6 +150,10 @@ class rational_quadratic_spline(interval_base.interval_base):
         
         [x, log_det]=inputs
 
+        ## make sure we stay in range
+        x=torch.where(x>1.0, 1.0, x)
+        x=torch.where(x<-1.0, -1.0, x)
+
         if(self.use_permanent_parameters):
             widths=self.rel_log_widths.to(x)
             heights=self.rel_log_heights.to(x)
@@ -219,6 +223,10 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                              )
        
         log_det_new=log_det+log_det_update.sum(axis=-1)
+
+        ## make sure we stay in range
+        x=torch.where(x>1.0, 1.0, x)
+        x=torch.where(x<-1.0, -1.0, x)
         
         return x, log_det_new
 
@@ -226,6 +234,10 @@ class rational_quadratic_spline(interval_base.interval_base):
 
         [x, log_det]=inputs
 
+        ## make sure we stay in range
+        x=torch.where(x>1.0, 1.0, x)
+        x=torch.where(x<-1.0, -1.0, x)
+
         if(self.use_permanent_parameters):
             widths=self.rel_log_widths.to(x)
             heights=self.rel_log_heights.to(x)
@@ -296,7 +308,11 @@ class rational_quadratic_spline(interval_base.interval_base):
                                                              )
        
         log_det_new=log_det+log_det_update.sum(axis=-1)
-      
+        
+        ## make sure we stay in range
+        x=torch.where(x>1.0, 1.0, x)
+        x=torch.where(x<-1.0, -1.0, x)
+
         return x, log_det_new
 
 
