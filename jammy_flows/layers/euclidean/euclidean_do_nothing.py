@@ -13,12 +13,12 @@ import torch.distributions as tdist
 normal_dist=tdist.Normal(0, 1)
 
 class euclidean_do_nothing(euclidean_base.euclidean_base):
-    def __init__(self, dimension, use_permanent_parameters=True):
+    def __init__(self, dimension, use_permanent_parameters=True, add_offset=0):
         """
         Identitiy transformation. Symbol "x"
         """
 
-        super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=0)
+        super().__init__(dimension=dimension, use_permanent_parameters=use_permanent_parameters, model_offset=add_offset)
 
     def _flow_mapping(self, inputs, extra_inputs=None): 
         
