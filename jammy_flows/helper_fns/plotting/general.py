@@ -15,6 +15,65 @@ import copy
 from .. import contours
 from ..grid_functions import obtain_bins_and_visualization_regions, get_pdf_on_grid, cartesian_lambert_to_spherical, spherical_to_cartesian_lambert, get_basic_gridlines
 
+def replace_axes_with_gridspec(sub_axes, new_layout=(1,1)):
+    """
+    Replace an axes object with a list of axes object that uses a new layout given by *new_layout*
+    """
+    ax_array=sub_axes
+    if(type(sub_axes)!=numpy.ndarray):
+        ax_array=numpy.array(sub_axes)
+
+    ax_array=ax_array.flatten()
+    fig = ax_array[0].figure
+
+    # Calculate the bounding box of the sub_axes and remove old axes
+  
+    l=9999999999.0
+    r=-999999999.0
+    t=-999999999.0
+    b=999999999.0
+    
+    for ax in ax_array:
+        bbox = ax.get_position()
+        l = min(l, bbox.x0)
+        r = max(r, bbox.x1)
+        b = min(b, bbox.y0)
+        t = max(t, bbox.y1)
+        
+        ax.remove()
+
+    subgrid = gridspec.GridSpec(*new_layout, left=l, right=r, top=t, bottom=b)
+ 
+    # Add new sub-axes
+    
+    if(new_layout==(1,1)):
+        ax=fig.add_subplot(subgrid[:,:])
+        return ax
+    elif(new_layout[0]==1):# or new_layout[1]==1):
+        #1-d array of axes, single row
+        list_of_axes=[]
+        for ax_id in range(new_layout[1]):
+            list_of_axes.append(fig.add_subplot(subgrid[0,ax_id]))
+
+        return numpy.array(list_of_axes)
+    elif(new_layout[1]==1):# or new_layout[1]==1):
+        #1-d array of axes, single row
+        list_of_axes=[]
+        for ax_id in range(new_layout[0]):
+            list_of_axes.append(fig.add_subplot(subgrid[ax_id,0]))
+
+        return numpy.array(list_of_axes)
+    else:
+        #2-d array of axes
+        list_of_axes=[]
+        for ax_row in range(new_layout[0]):#
+            ax_row_list=[]
+            for ax_col in range(new_layout[1]):
+                ax_row_list.append(fig.add_subplot(subgrid[ax_row,ax_col]))
+
+            list_of_axes.append(ax_row_list)
+
+        return numpy.array(list_of_axes)
 
 def _update_attached_visualization_bounds(subgridspec, visualization_bounds):
     """
