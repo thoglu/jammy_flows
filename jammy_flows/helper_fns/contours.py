@@ -124,7 +124,7 @@ def compute_contours(proportions, pdf_evals, areas, sample_points=None, manifold
                 ## create 1 "joint" 1-d contour here
                 combined_list.append(numpy.array(contour)[...,None])
         elif(sample_points.shape[1]==2):
-            contours_by_level = meander.euclidean_contours(sample_points, pdf_evals, levels)
+            contours_by_level = meander.planar_contours(sample_points, pdf_evals, levels)
 
     elif(manifold=="sphere"):
 
@@ -331,11 +331,26 @@ Custom contour generator for CustomSphereContourSet.
 """
 class custom_contour_generator(object):
     
-    def __init__(self, x,y, pdf_evals, areas, ax_obj):
-        self.joint_xy=np.concatenate([x[:,None],y[:,None]],axis=1)
-        self.pdf_evals=pdf_evals
-        self.areas=areas
-        self.ax_obj=ax_obj
+    def __init__(self, *args):
+
+        self.contour_type=args[0]
+        assert(self.contour_type=="euclidean" or self.contour_type=="zen_azi"), self.contour_type
+
+        if(len(args)==4):
+            self.has_precalculated_contours=True
+            self.contour_probs=args[1]
+            self.precalculated_contours=args[2]
+            self.ax_obj=args[3]
+            assert(len(self.contour_probs)==len(self.precalculated_contours))
+
+        elif(len(args)==6):
+            self.has_precalculated_contours=False
+            self.joint_xy=np.concatenate([args[1][:,None],args[2][:,None]],axis=1)
+            self.pdf_evals=args[3]
+            self.areas=args[4]
+            self.ax_obj=args[5]
+        else:
+            raise Exception("Require either 3 or 6 positional arguments for custom contour generator!")
     
     
     def _get_azimuth_split_contours(self, c, is_azimuthal=True):
@@ -391,7 +406,7 @@ class custom_contour_generator(object):
         if(num_splits==0):
            
             return [c]
-        
+        print("num splits .. ", num_splits)
         return new_groups
         
         
@@ -407,57 +422,65 @@ class custom_contour_generator(object):
         
         
     def create_contour(self, contour_prob):
-        
-        contours=compute_contours([contour_prob], self.pdf_evals, self.areas, sample_points=self.joint_xy, manifold="sphere")
-       
-        contours=contours[0]
-        
-        all_contours=[]
-        
-        min_contour_len=2
+        print("cprob ..", contour_prob)
+        if(self.has_precalculated_contours):
+            assert(contour_prob in self.contour_probs)
 
-        for c in contours:
-            
-            sub_contours=self._get_azimuth_split_contours(c)
-            
-            for s in sub_contours:
-                if(len(s)>min_contour_len):
-                    all_contours.append(s)
-                ## rad to deg, zen->dec etc
+            cindex=self.contour_probs.index(contour_prob)
+
+            contours=self.precalculated_contours[cindex]
+        else:
+            contours=compute_contours([contour_prob], self.pdf_evals, self.areas, sample_points=self.joint_xy, manifold="sphere")
+           
+            contours=contours[0]
         
-        transformed_contours=[]
-        for c in all_contours:
-            new_dec=90.0-c[:,0]*180.0/numpy.pi
-            new_ra=c[:,1]*180.0/numpy.pi
-            transformed_contours.append(numpy.concatenate([new_ra[:,None],new_dec[:,None]],axis=1))
-       
-        ## nans can appear for hidden points in current projection.. get rid of those...
 
-        contours=[]
-
-        for c in transformed_contours:
-            safe_c=self.ax_obj.wcs.all_world2pix(c,1)[~numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1)[:,0])]
+        if(self.contour_type!="euclidean"):
+            all_contours=[]
             
-            if(len(safe_c)>0):
-                #contours.append(safe_c)
+            min_contour_len=2
+
+            for c in contours:
                 
-                sub_contours=self._get_azimuth_split_contours(safe_c, is_azimuthal=False)
+                sub_contours=self._get_azimuth_split_contours(c)
                 
-                for sub_c in sub_contours:
-                    if(len(sub_c)>min_contour_len): # only take contours longer than 2
-                       
-                        contours.append(sub_c)
+                for s in sub_contours:
+                    if(len(s)>min_contour_len):
+                        all_contours.append(s)
+                    ## rad to deg, zen->dec etc
+            
+            transformed_contours=[]
+            for c in all_contours:
+                new_dec=90.0-c[:,0]*180.0/numpy.pi
+                new_ra=c[:,1]*180.0/numpy.pi
+                transformed_contours.append(numpy.concatenate([new_ra[:,None],new_dec[:,None]],axis=1))
+           
+            ## nans can appear for hidden points in current projection.. get rid of those...
+
+            contours=[]
+
+            for c in transformed_contours:
+
+                safe_c=self.ax_obj.wcs.all_world2pix(c,1)[~numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1)[:,0])]
+                
+                if(len(safe_c)>0):
+                    #contours.append(safe_c)
                     
+                    sub_contours=self._get_azimuth_split_contours(safe_c, is_azimuthal=False)
+                    
+                    for sub_c in sub_contours:
+                        if(len(sub_c)>min_contour_len): # only take contours longer than 2
+                           
+                            contours.append(sub_c)
+                        
 
-        #contours=[self.ax_obj.wcs.all_world2pix(c,1)[~numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1))] for c in transformed_contours]
-        #print("transformed conts ", contours)
+         
         assert(type(contours)==list)
-        
         
         all_kinds=[]
      
         for c in contours:
-            
+            print(len(c))
             ## default is a repeating kind
             new_kind=[1]+(len(c)-2)*[2]+[79]
             
@@ -471,7 +494,7 @@ class custom_contour_generator(object):
     
     
 
-class CustomSphereContourSet(matplotlib.contour.ContourSet):
+class ContourGenerator(matplotlib.contour.ContourSet):
     """
     A custom contour set that has similar structure to QuadContourSet in matplotlib,
     but is customized to work with variable resolution spherical data.
@@ -492,7 +515,6 @@ class CustomSphereContourSet(matplotlib.contour.ContourSet):
             self._maxs = args[0]._maxs
             self._algorithm = args[0]._algorithm
         else:
-            import contourpy
 
             if algorithm is None:
                 algorithm = mpl.rcParams['contour.algorithm']
@@ -507,18 +529,40 @@ class CustomSphereContourSet(matplotlib.contour.ContourSet):
                 else:
                     corner_mask = mpl.rcParams['contour.corner_mask']
             self._corner_mask = corner_mask
-    
-            assert(len(args)==4), args
-            
-            x = args[0]
-            y = args[1]
-            log_evals = args[2]
-            areas = args[3]
-            
-            self.zmin=min(log_evals)
-            self.zmax=max(log_evals)
+        
 
-            contour_generator = custom_contour_generator(x,y,log_evals, areas, self.axes)
+            self.plotted_clabels=False
+            print("INIT contour generator .. ", args[0])
+            if(len(args)==5):
+
+                contour_type=args[0]
+                x = args[1]
+                y = args[2]
+                log_evals = args[3]
+                areas = args[4]
+                
+                self.zmin=min(log_evals)
+                self.zmax=max(log_evals)
+
+                ## contours have to be generated first
+                contour_generator = custom_contour_generator(contour_type, x,y,log_evals, areas, self.axes)
+            
+            elif(len(args)==3):
+
+                contour_type=args[0]
+                contour_probs=args[1]
+                given_contours = args[2]
+                
+                self.zmin=0.001
+                self.zmax=1.0
+
+                ## fake points
+                x=numpy.linspace(0,1,10)
+                y=numpy.linspace(0,1,10)
+
+                ## contours are pre-calculated and only handed over for plotting
+                contour_generator = custom_contour_generator(contour_type, contour_probs, given_contours, self.axes)
+
 
             t = self.get_transform()
 

@@ -711,7 +711,9 @@ def _plot_multiresolution_healpy(eval_positions,
 
             used_contour_colors=used_contour_colors[:len(contour_probs)]
 
-            ret=CustomSphereContourSet(ax, 
+            ret=ContourGenerator(
+                                 ax, 
+                                 "zen_azi",
                                        eval_positions[:,0], 
                                        eval_positions[:,1], 
                                        pdf_evals, 
