@@ -15,6 +15,7 @@ from matplotlib.projections import register_projection
 from matplotlib.transforms import Bbox
 
 from ..contours import compute_contours, CustomSphereContourSet
+from .general import replace_axes_with_gridspec
 
 ###### plotting functions for sphere (s2), employing a flexible grid to save computing while still having smooth contours
 
@@ -536,7 +537,7 @@ def plot_multiresolution_healpy(pdf,
                                 contour_probs=[0.68, 0.95],
                                 contour_colors=None, # None -> pick colors from color scheme
                                 zoom=False,
-                                visualization="zen_azi", # zen_azi or dec_ra
+                                projection_type="zen_azi", # zen_azi or dec_ra
                                 declination_trafo_function=None, # required to transform to dec/ra before plotting 
                                 show_grid=False): 
     
@@ -572,7 +573,7 @@ def plot_multiresolution_healpy(pdf,
                                     contour_probs=contour_probs,
                                     contour_colors=contour_colors, # None -> pick colors from color scheme
                                     zoom=zoom,
-                                    visualization=visualization, # zen_azi or dec_ra
+                                    projection_type=projection_type, # zen_azi or dec_ra
                                     declination_trafo_function=declination_trafo_function,
                                     show_grid=show_grid) 
 
@@ -660,13 +661,16 @@ def _plot_multiresolution_healpy(eval_positions,
         assert(ax_to_plot is not None)
 
         if(not isinstance(ax_to_plot, WCSAxes)):
+            single_ax=replace_axes_with_gridspec(ax_to_plot, new_layout=(1,1))
+
             if(zoom):
-                ax=OrthviewAzimuth(fig, ax_to_plot.get_position(), zoom_center=mean_coords, zoom_diameter=zoom_diameter)
+                ax=OrthviewAzimuth(fig, single_ax.get_position(), zoom_center=mean_coords, zoom_diameter=zoom_diameter)
             else:
-                ax=MollviewAzimuth(fig, ax_to_plot.get_position())
+                ax=MollviewAzimuth(fig, single_ax.get_position())
 
             fig.add_axes(ax)
-            ax_to_plot.remove() # remove original ax_to_plot
+            single_ax.remove() # remove original ax_to_plot
+           
         else:
             ax=ax_to_plot
         
