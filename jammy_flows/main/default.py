@@ -3641,7 +3641,7 @@ class pdf(nn.Module):
                 
                 # a simple sampling is typically faster than whole entropy calculation, so this might be a viable alternative
 
-                samples,sample_logprobs,_,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
+                samples,_,sample_logprobs,_=self.sample(conditional_input=data_summary_repeated, samplesize=samplesize, device=used_device, dtype=used_dtype, force_embedding_coordinates=True)
 
             target_dim_embedded=self.total_target_dim_embedded
 
@@ -3660,6 +3660,7 @@ class pdf(nn.Module):
 
                 else:
                     ## we have sample_logprobs
+                    print("sample logprobs shape", sample_logprobs.shape)
                     reshaped_log_pdfs=sample_logprobs.reshape(initial_batch_size, samplesize)
 
                 index_mask=torch.argmax(reshaped_log_pdfs, dim=1)
