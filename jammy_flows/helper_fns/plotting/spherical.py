@@ -14,7 +14,7 @@ from mhealpy.plot.axes import HealpyAxes
 from matplotlib.projections import register_projection
 from matplotlib.transforms import Bbox
 
-from ..contours import compute_contours, CustomSphereContourSet
+from ..contours import compute_contours, ContourGenerator
 
 ###### plotting functions for sphere (s2), employing a flexible grid to save computing while still having smooth contours
 
@@ -579,7 +579,9 @@ def _plot_multiresolution_healpy(eval_positions,
 
             used_contour_colors=used_contour_colors[:len(contour_probs)]
 
-            ret=CustomSphereContourSet(ax, 
+            ret=ContourGenerator(
+                                 ax, 
+                                 "zen_azi",
                                        eval_positions[:,0], 
                                        eval_positions[:,1], 
                                        pdf_evals, 
