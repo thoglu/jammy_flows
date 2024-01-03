@@ -693,7 +693,7 @@ def _plot_multiresolution_healpy(eval_positions,
             default_cbar_kwargs["fraction"]=0.1
             default_cbar_kwargs["shrink"]=0.5
             default_cbar_kwargs["aspect"]=25
-            default_cbar_kwargs["label"]=r"pdf value"
+            default_cbar_kwargs["label"]=r"PDF value"
 
             for extra_kwarg in cbar_kwargs:
                 default_cbar_kwargs[extra_kwarg]=cbar_kwargs[extra_kwarg]
