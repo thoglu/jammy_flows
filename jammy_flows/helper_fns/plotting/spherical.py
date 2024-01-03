@@ -14,7 +14,7 @@ from mhealpy.plot.axes import HealpyAxes
 from matplotlib.projections import register_projection
 from matplotlib.transforms import Bbox
 
-from ..contours import compute_contours, CustomSphereContourSet
+from ..contours import compute_contours, ContourGenerator
 from .general import replace_axes_with_gridspec
 
 ###### plotting functions for sphere (s2), employing a flexible grid to save computing while still having smooth contours
@@ -254,7 +254,8 @@ class MollviewAzimuth(HealpyAxesAzimuthOrdering):
         further_args=args[2:]
         
         new_kwargs=kwargs.copy()
-        del new_kwargs["projection_type"]
+        if("projection_type" in new_kwargs):
+            del new_kwargs["projection_type"]
 
         self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
 
@@ -416,7 +417,8 @@ class OrthviewAzimuth(HealpyAxes):
         further_args=args[2:]
         
         new_kwargs=kwargs.copy()
-        del new_kwargs["projection_type"]
+        if("projection_type" in new_kwargs):
+            del new_kwargs["projection_type"]
 
         self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
 
