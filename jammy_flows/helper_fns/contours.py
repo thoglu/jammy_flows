@@ -250,82 +250,6 @@ def find_1d_contours(proportions, xvals, pdf_evals_with_area, pdf_evals):
 
     return contour_list
 
-def fake_plot_and_calc_eucl_contours(ax, colors, proportions, xvals, yvals, pdf_evals_with_area, pdf_evals, linewidths=1.0, linestyles=["-"]):
-    """
-    Calculate contours using matplotlib ax object.
-    """
-    levels = []
-
-    inv_sorted=numpy.argsort(pdf_evals_with_area)[::-1]
-    
-
-    sorted_pdf_with_area = pdf_evals_with_area[inv_sorted] #list(reversed(list(sorted(samples))))
-    sorted_pdf=pdf_evals[inv_sorted]
-
-    for proportion in proportions:
-     
-        larger_mask=numpy.cumsum(sorted_pdf_with_area) > proportion
-      
-        if(larger_mask.sum()>0):
-            level_index = (numpy.cumsum(sorted_pdf_with_area) > proportion).tolist().index(True)
-
-            level = (sorted_pdf[level_index] + (sorted_pdf[level_index+1] if level_index+1 < len(sorted_pdf_with_area) else 0)) / 2.0
-            levels.append(level)
-        else:
-            ## did we alrady attach it? must have decreasing sequence
-            
-            levels.append(min(sorted_pdf))
-
-    levels=numpy.array(levels)
-    equal_last_levels=levels==min(sorted_pdf)
-
-    if(equal_last_levels.sum()>1):
-        # we have to make the last entries decreasing while being larger or equal than min
-        last_ones=[]
-        for ind in range(equal_last_levels.sum()):
-            last_ones.append(min(sorted_pdf)*(1+ind*0.01))
-        last_ones=last_ones[::-1]
-
- 
-        levels[equal_last_levels]=numpy.array(last_ones)
-
-    tweak_offset=1e-10
-    # Initialize the transformed array with the first element
-    transformed_levels = [levels[0]]
-    
-    # Transform to a new array that has strictly decreasing elemeents
-    for i in range(1, len(levels)):
-        # If the current element is the same as the previous one
-        if levels[i] == levels[i - 1]:
-            # Calculate the number of times this element has appeared consecutively
-            count = 1
-            while i - count >= 0 and levels[i] == levels[i - count]:
-                count += 1
-            # Add the element with the offset
-            transformed_levels.append(levels[i] - (count - 1) * tweak_offset)
-        else:
-            # If it's not a repeating element, just add it to the transformed array
-            transformed_levels.append(levels[i])
-
-    transformed_levels=numpy.array(transformed_levels)
-    
-    per_dim=int(numpy.sqrt(pdf_evals.shape[0]))
-    pdf_evals_resized=numpy.resize(pdf_evals, (per_dim,per_dim))
-
-   
-    res = ax.contour(xvals, 
-                       yvals,
-                       pdf_evals_resized.T,
-                       linestyles=linestyles[::-1],
-                       linewidths=linewidths,
-                       levels=transformed_levels[::-1],
-                       colors=colors[::-1])
-
-    return res.allsegs[::-1]
-
-
-
-
 """
 Custom contour generator for CustomSphereContourSet.
 """
@@ -377,9 +301,9 @@ class custom_contour_generator(object):
                 
                 ## TODO: absolute pixel difference?
                 split_condition=this_diff>20
-
-            if(split_condition):
                
+            if(split_condition):
+                
                 if( (cur_ind+1-last_start)>2):
                     new_groups.append(reduced_contour[last_start:cur_ind+1])
                 
@@ -400,19 +324,8 @@ class custom_contour_generator(object):
         return new_groups
         
         
-    def _make_isolated_kind(self,c):
-        new_kind=[1]+(len(c)-2)*[2]
-            
-        if numpy.fabs(c[0]-c[-1]).sum()==0:
-            new_kind.append(79)
-        else:
-            new_kind.append(2)
-            
-        return new_kind
-        
-        
     def create_contour(self, contour_prob):
-       
+        
         if(self.has_precalculated_contours):
             assert(contour_prob in self.contour_probs)
 
