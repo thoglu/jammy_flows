@@ -365,48 +365,38 @@ class custom_contour_generator(object):
         if(is_azimuthal==False):
             diffs=numpy.sqrt(numpy.sum((reduced_contour[1:]-reduced_contour[:-1])**2, axis=1))
             median_diff=numpy.median(diffs)
-            
-            
+        
         for cur_ind in range(len(reduced_contour)-1):
-            ## for azimuthal coordinates .. a jump in delta azimuth > 3 indicates a split
 
+            ## for azimuthal coordinates .. a jump in delta azimuth > 3 indicates a split
             if(is_azimuthal):
                 split_condition=numpy.fabs(reduced_contour[cur_ind+1][1]-reduced_contour[cur_ind][1])>3
             else:
                 # world pixel coordinates
                 this_diff=diffs[cur_ind]
-                split_condition=this_diff>8*median_diff
+                
+                ## TODO: absolute pixel difference?
+                split_condition=this_diff>20
 
             if(split_condition):
-
-                #if(is_azimuthal):
-                #    print("cur ind ", cur_ind)
-                #    print("SPLIT:", numpy.fabs(reduced_contour[cur_ind+1][1]-reduced_contour[cur_ind][1]), reduced_contour[cur_ind+1], reduced_contour[cur_ind])
-                #    print(reduced_contour[:10], reduced_contour[-10:])
-                #    print("----------")
+               
                 if( (cur_ind+1-last_start)>2):
                     new_groups.append(reduced_contour[last_start:cur_ind+1])
-                #else:
-                #    print("dropping len ..", (cur_ind+1-last_start))
+                
                 num_splits+=1
                  
                     
                 last_start=cur_ind+1
             
-            if(cur_ind==(len(reduced_contour)-2)):
-                ## we already have split at least one off, and now reached the end.. create another item
-                if(num_splits>=1):
-                    #print("final one")
-                    #print(reduced_contour[last_start:cur_ind+2])
-                    #print("OTHER LAST ONE", c[-3:])
-                    ## check if the last one of real contour is also
-                    new_groups.append(reduced_contour[last_start:cur_ind+2])
-                    num_splits+=1
+        if(num_splits>=1):
+           
+            new_groups.append(reduced_contour[last_start:])
+            num_splits+=1
             
         if(num_splits==0):
            
             return [c]
-        print("num splits .. ", num_splits)
+        
         return new_groups
         
         
@@ -422,7 +412,7 @@ class custom_contour_generator(object):
         
         
     def create_contour(self, contour_prob):
-        print("cprob ..", contour_prob)
+       
         if(self.has_precalculated_contours):
             assert(contour_prob in self.contour_probs)
 
@@ -447,6 +437,7 @@ class custom_contour_generator(object):
                 for s in sub_contours:
                     if(len(s)>min_contour_len):
                         all_contours.append(s)
+                     
                     ## rad to deg, zen->dec etc
             
             transformed_contours=[]
@@ -460,9 +451,13 @@ class custom_contour_generator(object):
             contours=[]
 
             for c in transformed_contours:
-
+               
+                if( numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1))[:,0].sum()>0):
+                  
+                    self.ax_obj.wcs.all_world2pix(c,1)[numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1)[:,0])]
+                   
                 safe_c=self.ax_obj.wcs.all_world2pix(c,1)[~numpy.isnan(self.ax_obj.wcs.all_world2pix(c,1)[:,0])]
-                
+               
                 if(len(safe_c)>0):
                     #contours.append(safe_c)
                     
@@ -480,12 +475,14 @@ class custom_contour_generator(object):
         all_kinds=[]
      
         for c in contours:
-            print(len(c))
-            ## default is a repeating kind
-            new_kind=[1]+(len(c)-2)*[2]+[79]
+           
+            ## default is a non-repeating kind (2)
+            new_kind=[1]+(len(c)-2)*[2]+[2]
             
+            # if ends are the same, make repeating (79)
             if( (c[0]-c[-1]).sum()==0):
-                new_kind[-1]=2
+                new_kind[-1]=79
+            
            
             all_kinds.append(numpy.array(new_kind, dtype=numpy.uint8))
             
@@ -532,7 +529,7 @@ class ContourGenerator(matplotlib.contour.ContourSet):
         
 
             self.plotted_clabels=False
-            print("INIT contour generator .. ", args[0])
+            
             if(len(args)==5):
 
                 contour_type=args[0]
