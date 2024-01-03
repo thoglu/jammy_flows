@@ -5,7 +5,7 @@ import collections
 from .. import layer_base
 import itertools
 
-def return_safe_angle_within_pi(x, safety_margin=1e-10):
+def return_safe_angle_within_pi(x, safety_margin=1e-7):
     """
     Restricts the angle to not hit 0 or pi exactly.
     """
@@ -189,8 +189,13 @@ class sphere_base(layer_base.layer_base):
             log_det=log_det-torch.log(torch.sin(angles[-1])).sum(axis=-1)
 
             # phi
-            new_angle=torch.acos(x[:,0:1]/torch.sum(x[:,:2]**2, dim=1, keepdims=True).sqrt())
+            acos_arg=x[:,0:1]/torch.sum(x[:,:2]**2, dim=1, keepdims=True).sqrt()
+            acos_arg=torch.where(acos_arg>1.0, 1.0, acos_arg)
+            acos_arg=torch.where(acos_arg<-1.0, -1.0, acos_arg)
+
+            new_angle=torch.acos(acos_arg)
             new_angle=torch.where(x[:,1:2]<0, 2*numpy.pi-new_angle, new_angle)
+
             angles.append(new_angle)
 
         return torch.cat(angles, dim=1), log_det
@@ -385,7 +390,6 @@ class sphere_base(layer_base.layer_base):
 
                 x[:,0:1]=torch.exp(lnr)#
 
-                #print("log_det sphere_to_plane ", (-x[:,0:1]).sum(axis=-1))
                 
             else:
 
@@ -421,7 +425,7 @@ class sphere_base(layer_base.layer_base):
 
         x, log_det, keep_sign=self.inplane_euclidean_to_spherical(x, log_det)
         sf_extra=None
-        #print("log det initial", log_det)
+        
         ## first coordinate is now radial coordinate, other coordinates are angles
         if(self.dimension==1):
             
@@ -463,8 +467,6 @@ class sphere_base(layer_base.layer_base):
                 sf_extra=sfcyl
                 x[:,0:1]=lncyl
 
-                #print("log_det planetosphere ", (lncyl).sum(axis=-1))
-               
             else:
 
                 ## pi-angle leads to a flipped stereographic projection
@@ -502,7 +504,7 @@ class sphere_base(layer_base.layer_base):
         [x, log_det] = inputs
        
         ## (1) apply inverse householder rotation if desired
-
+    
         if(self.add_rotation):
             
 
@@ -522,19 +524,6 @@ class sphere_base(layer_base.layer_base):
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
-            
-        ## correction required on 2-sphere
-        """
-        if(self.dimension==2):
-            #print("inv 1) x ", x[:,0:1])
-            safe_angles=self.return_safe_angle_within_pi(x[:,0:1])
-            x=torch.cat( [safe_angles, x[:,1:]], dim=1)
-            #log_det+=-torch.log(torch.sin(x[:,0]))
-        """
-            #print("inv 1) ld ", -torch.log(torch.sin(x[:,0])))
-        ## (2) apply sphere intrinsic inverse flow function
-        ## in 1 d case, _inv_flow_mapping should take as input values between 0 and 2pi, and outputs values between -pi and pi for easier further processing
-        
         sf_extra=None
         if(extra_inputs is None):
             inv_flow_results = self._inv_flow_mapping([x, log_det])
@@ -556,8 +545,7 @@ class sphere_base(layer_base.layer_base):
 
             #sys.exit(-1)
             x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
-            
-            
+        
         return x, log_det
 
     ## flow mapping (sampling pass)
@@ -579,16 +567,6 @@ class sphere_base(layer_base.layer_base):
         else:   
             x,log_det = self._flow_mapping([x, log_det], extra_inputs=extra_inputs[:, self.num_householder_params:], sf_extra=sf_extra)
 
-        ## safety check on 2-sphere  
-        """         
-        if(self.dimension==2):
-
-            safe_angles=self.return_safe_angle_within_pi(x[:,0:1])
-
-            x=torch.cat( [safe_angles, x[:,1:]], dim=1)
-
-            #log_det+=torch.log(torch.sin(x[:,0]))
-        """
     
         ## (3) apply householder rotation in embedding space if wanted
         #extra_input_counter=0
@@ -606,6 +584,7 @@ class sphere_base(layer_base.layer_base):
             ## use broadcasting
             x = torch.einsum("...ij, ...j -> ...i", mat, x)
             if(self.always_parametrize_in_embedding_space==False):
+              
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
 
         return x,log_det
@@ -661,7 +640,6 @@ class sphere_base(layer_base.layer_base):
         
         problematic_points=x[mask]
 
-        #print("problematic points", problematic_points)
         return problematic_points
 
     def obtain_layer_param_structure(self, param_dict, extra_inputs=None, previous_x=None, extra_prefix=""): 

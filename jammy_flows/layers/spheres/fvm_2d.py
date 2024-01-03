@@ -251,8 +251,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         log_det=log_det+safe_ld_update
 
         ### we have to make the angles safe here...TODO: change to external transformation
-        ret=torch.where(ret<=-1.0, -1.0+1e-7, ret)
-        ret=torch.where(ret>=1.0, 1.0-1e-7, ret)
+        ret=torch.where(ret<-1.0, -1.0, ret)
+        ret=torch.where(ret>1.0, 1.0, ret)
        
         angle=x[:,1:]
 
@@ -307,14 +307,19 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                         angle=torch.masked_scatter(input=angle, mask=contained_mask[:,None], source=angle_contained)
                         
                         log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
-                      
+        
+        ret=torch.where(ret<-1.0, -1.0, ret)
+        ret=torch.where(ret>1.0, 1.0, ret)
+
         ## go back to angle in a safe way
-        ret=sphere_base.return_safe_angle_within_pi(torch.acos(ret))
-        rev_upd=torch.log(torch.sin(ret))[:,0]
+        ret=torch.acos(ret)
+        rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(ret[:,0])))
+
         log_det=log_det-rev_upd
 
         ret=torch.cat([ret, angle], dim=1)
         
+
         if(self.always_parametrize_in_embedding_space):
 
             ret, log_det=self.spherical_to_eucl_embedding(ret, log_det)
@@ -324,7 +329,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
     def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
        
         [x,log_det]=inputs
-
+        
         if(self.always_parametrize_in_embedding_space):
             x, log_det=self.eucl_to_spherical_embedding(x, log_det)
         
@@ -444,12 +449,16 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
             raise Exception("Require 32 or 64 bit float")
 
         ret=torch.where(kappa_mask, prev_ret, ret)  
-        
+        ret=torch.where(ret>1.0, 1.0, ret)
+        ret=torch.where(ret<-1.0, -1.0, ret)
+
         ## go back to angle
         ret=torch.acos(ret)
-        rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(ret)))[:,0]
+        
+        rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(ret[:,0])))
         log_det=log_det-rev_upd
 
+        # join angles again
         ret=torch.cat([ret, angle], dim=1)
 
         if(self.always_parametrize_in_embedding_space):
