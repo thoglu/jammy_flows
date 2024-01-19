@@ -16,6 +16,7 @@ from matplotlib.transforms import Bbox
 
 from ..contours import compute_contours, ContourGenerator
 from .general import replace_axes_with_gridspec
+from ...layers.spheres import sphere_base
 
 ###### plotting functions for sphere (s2), employing a flexible grid to save computing while still having smooth contours
 
@@ -148,10 +149,16 @@ class HealpyAxesAzimuthOrdering(HealpyAxes):
                   dmer = 60, 
                   grid = True,
                   ticks = True, 
+                  show_zenith_label=True,
                   show_zenith_axis=True,
                   zenith_axislabel_minpad=2.0,
+                  show_azimuth_label=True,
                   show_azimuth_axis=True,
-                  tick_format = 'd', frame = True, zen_azi_mode="zen_azi",**kwargs):
+                  tick_format = 'd', 
+                  frame = True, 
+                  zen_azi_mode="zen_azi",
+                  text_size=12,
+                  **kwargs):
         """
         Graticule overwrite.
 
@@ -176,12 +183,12 @@ class HealpyAxesAzimuthOrdering(HealpyAxes):
         if(show_azimuth_axis):
             self.coords[0].set_major_formatter(tick_format)
             self.coords[0].set_ticklabel_visible(ticks)
-            self.coords[0].set_ticklabel(color='white', size=12)
+            self.coords[0].set_ticklabel(color='white', size=text_size)
 
         if(show_zenith_axis):
             self.coords[1].set_major_formatter(tick_format)
             self.coords[1].set_ticklabel_visible(ticks)
-            self.coords[1].set_ticklabel(color='black', size=12)
+            self.coords[1].set_ticklabel(color='black', size=text_size)
 
         if frame:
             self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
@@ -189,19 +196,19 @@ class HealpyAxesAzimuthOrdering(HealpyAxes):
         else:
             self.coords.frame.set_linewidth(0)            
             
-  
-        # shift axis label to left
-        #self.coords[1].set_label_coords(-0.1, 0.5)
-
         if(zen_azi_mode=="zen_azi"):
             if(show_azimuth_axis):
-                self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
+                if(show_azimuth_label):
+                    self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
 
             if(show_zenith_axis):
-                self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
 
                 ## monkeypatching ticklabels for zenith
                 self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
+
+                if(show_zenith_label):
+                    self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
+                
                 
         
 class MollviewAzimuth(HealpyAxesAzimuthOrdering):
@@ -332,10 +339,16 @@ class OrthviewAzimuth(HealpyAxes):
                   dmer = 60, 
                   grid = True,
                   ticks = True, 
+                  show_zenith_label=True,
                   show_zenith_axis=True,
                   zenith_axislabel_minpad=4.0,
+                  show_azimuth_label=True,
                   show_azimuth_axis=False,
-                  tick_format = 'd', frame = True, zen_azi_mode="zen_azi",**kwargs):
+                  tick_format = 'd', 
+                  frame = True, 
+                  zen_azi_mode="zen_azi",
+                  text_size=12,
+                  **kwargs):
         """
         Graticule overwrite.
 
@@ -360,7 +373,7 @@ class OrthviewAzimuth(HealpyAxes):
     
         self.coords[0].set_major_formatter(tick_format)
         self.coords[0].set_ticklabel_visible(ticks)
-        self.coords[0].set_ticklabel(color='white', size=12)
+        self.coords[0].set_ticklabel(color='white', size=text_size)
 
         if frame:
             self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
@@ -371,16 +384,18 @@ class OrthviewAzimuth(HealpyAxes):
        
         self.coords[1].set_major_formatter(tick_format)
         self.coords[1].set_ticklabel_visible(ticks)
-        self.coords[1].set_ticklabel(color='black', size=12)
+        self.coords[1].set_ticklabel(color='black', size=text_size)
 
         ## monkeypatching ticklabels for zenith
         self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
 
         if(show_azimuth_axis):
-            self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
+            if(show_azimuth_label):
+                self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
 
         if(show_zenith_axis):
-            self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
+            if(show_azimuth_label):
+                self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
 
 
     def proj_plot(self, *args, **kwargs):
@@ -437,6 +452,8 @@ def get_meshed_positions_and_areas(samples,
         used_samples=samples.cpu().detach().numpy()
     assert(type(used_samples)==numpy.ndarray), type(samples)
     
+    print(used_samples[:,0].min(),used_samples[:,0].max(), numpy.pi-used_samples[:,0].max())
+
     sample_pix = mhealpy.ang2pix(mhealpy.MAX_NSIDE, used_samples[:,0], used_samples[:,1], nest = True)
     
     moc_map=HealpixMap.moc_histogram(mhealpy.MAX_NSIDE, sample_pix, max_entries_per_pixel, nest=True)
@@ -480,6 +497,7 @@ def get_multiresolution_evals(pdf,
             data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0) if conditional_input.ndim==2 else conditional_input[None,:].repeat_interleave(samplesize, dim=0)
         
     samples,_,_,_=pdf.sample(samplesize=samplesize, conditional_input=data_summary_repeated)
+
     eval_positions, eval_areas, moc_map=get_meshed_positions_and_areas(samples,max_entries_per_pixel=max_entries_per_pixel)
 
     assert(pdf.pdf_defs_list[sub_pdf_index]=="s2"), ("Trying to get multiresolution for s2 subdimension, but subdimension %d is of type %s" % (sub_pdf_index, pdf.pdf_defs_list[sub_pdf_index]))
@@ -539,6 +557,7 @@ def plot_multiresolution_healpy(pdf,
                                 contour_probs=[0.68, 0.95],
                                 contour_colors=None, # None -> pick colors from color scheme
                                 zoom=False,
+                                zoom_contained_prob_mass=0.97,
                                 projection_type="zen_azi", # zen_azi or dec_ra
                                 declination_trafo_function=None, # required to transform to dec/ra before plotting 
                                 show_grid=False): 
@@ -575,6 +594,7 @@ def plot_multiresolution_healpy(pdf,
                                     contour_probs=contour_probs,
                                     contour_colors=contour_colors, # None -> pick colors from color scheme
                                     zoom=zoom,
+                                    zoom_contained_prob_mass=zoom_contained_prob_mass,
                                     projection_type=projection_type, # zen_azi or dec_ra
                                     declination_trafo_function=declination_trafo_function,
                                     show_grid=show_grid) 
@@ -597,6 +617,7 @@ def _plot_multiresolution_healpy(eval_positions,
                                 contour_probs=[0.68, 0.95],
                                 contour_colors=None, # None -> pick colors from color scheme
                                 zoom=False,
+                                zoom_contained_prob_mass=0.97,
                                 projection_type="zen_azi", # zen_azi or dec_ra
                                 declination_trafo_function=None, # required to transform to dec/ra before plotting 
                                 show_grid=False): 
@@ -622,16 +643,25 @@ def _plot_multiresolution_healpy(eval_positions,
         tot_sums=pdf_evals*eval_areas
         sorta=numpy.argsort(tot_sums)[::-1] # large to small
         ## add largest areas
-        contained_mask=numpy.cumsum(tot_sums[sorta])<0.97
+        
+        contained_mask=numpy.cumsum(tot_sums[sorta])<zoom_contained_prob_mass
         contained_positions=eval_positions[sorta][contained_mask]
-
+       
         # calculate zoom center
-        argmax_index=numpy.argmax(pdf_evals)
-        mean_coords=eval_positions[argmax_index]
+
+
+        xyz_positions,_=sphere_base.sphere_base(dimension=2).spherical_to_eucl_embedding(torch.from_numpy(eval_positions), 0.0)
+        xyz_positions=xyz_positions.cpu().numpy()
+
+        
+        weighted_sum=numpy.mean(pdf_evals[:,None]*eval_areas[:,None]*xyz_positions,axis=0)
+        mean_coords=weighted_sum/numpy.sqrt(numpy.sum(weighted_sum**2))
+        mean_coords,_=sphere_base.sphere_base(dimension=2).eucl_to_spherical_embedding(torch.from_numpy(mean_coords[None,:]), 0.0)
+        mean_coords=mean_coords[0].cpu().numpy()
 
         # calculate zoom diameter
-        zen_range=(min(contained_positions[:,0]),max(contained_positions[:,0]) )
-        azi_range=(min(contained_positions[:,1]),max(contained_positions[:,1]) )
+        zen_range=numpy.quantile(contained_positions[:,0], [0.05,0.95])
+        azi_range=numpy.quantile(contained_positions[:,1], [0.05,0.95])
 
         # zoom can be on 2pi boundary.. make sure this is taken into account in diameter
         if( (mean_coords[1]>=azi_range[0]) and (mean_coords[1]<=azi_range[1])):
@@ -642,9 +672,8 @@ def _plot_multiresolution_healpy(eval_positions,
         zen_diff=zen_range[1]-zen_range[0]
 
         # take larger value as approximate diameter
-        zoom_diameter=max(zen_diff, azi_diff)
-
-
+        zoom_diameter=max(zen_diff, azi_diff)*2.0
+        
     if(fig is None):
         assert(ax_to_plot is None)
 

@@ -300,7 +300,7 @@ class custom_contour_generator(object):
                 this_diff=diffs[cur_ind]
                 
                 ## TODO: absolute pixel difference?
-                split_condition=this_diff>20
+                split_condition=this_diff>40
                
             if(split_condition):
                 
