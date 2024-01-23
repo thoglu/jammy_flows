@@ -188,7 +188,7 @@ opts_dict["f"]["kwargs"]["vertical_restrict_max_min_width_height_ratio"] = (-1.0
 opts_dict["f"]["kwargs"]["vertical_fix_boundary_derivative"] = (1, lambda x: [0,1])
 opts_dict["f"]["kwargs"]["min_kappa"] = (1e-10, lambda x: x>0)
 opts_dict["f"]["kwargs"]["kappa_prediction"] = ("direct_log_real_bounded", ["direct_log_real_bounded", "log_bounded"])
-
+opts_dict["f"]["kwargs"]["add_extra_rotation_inbetween"] = (0, [0,1])
 
 """
 Interval flows

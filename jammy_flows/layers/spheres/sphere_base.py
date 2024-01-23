@@ -18,6 +18,25 @@ def return_safe_angle_within_pi(x, safety_margin=1e-7):
 
     return ret
 
+def return_safe_costheta(x, safety_margin=None):
+    """
+    Restricts the angle to not hit 0 or pi exactly.
+    """
+    used_safety_margin=safety_margin
+    if(safety_margin is None):
+        if(x.dtype==torch.float32):
+            used_safety_margin=1e-7
+        elif(x.dtype==torch.float64):
+            used_safety_margin=1e-10
+
+    small_mask=x<(-1.0+used_safety_margin)
+    large_mask=x>(1.0-used_safety_margin)
+   
+    ret=torch.where(small_mask, -1.0+used_safety_margin, x)
+    ret=torch.where(large_mask, 1.0-used_safety_margin, ret)
+
+    return ret
+
 class sphere_base(layer_base.layer_base):
 
     def __init__(self, 
@@ -266,10 +285,11 @@ class sphere_base(layer_base.layer_base):
         transformed_coords=[]
         keep_sign=None
 
+        radius=(x**2).sum(dim=1, keepdims=True).sqrt()
+
         for ind in range(self.dimension):
             if(ind==0):
-                radius=(x**2).sum(dim=1, keepdims=True).sqrt()
-
+                
                 ## we dont want radii of exactly 0 normally
                 ## but we can allow it because we drop the usual log_det(radius) below aswell
                 #radius[radius==0]=1e-10
@@ -284,23 +304,22 @@ class sphere_base(layer_base.layer_base):
                     ## standard jacobian 
                 #    log_det+=-torch.log(radius[:,0])*(self.dimension-1)
                                     
-            else:
-                
+            elif(ind==1):
+                nominator=x[:,:1]
 
-                mod_ind=ind-1
-
-                new_angle=torch.acos(x[:,mod_ind:mod_ind+1]/torch.sum(x[:,mod_ind:]**2, dim=1, keepdims=True).sqrt())
+                new_argument=torch.where(radius==0, 1.0, nominator/radius)
+                new_angle=torch.acos(new_argument)
                
-                if(ind==self.dimension-1):
-                    ## last one, check sign flip
-                    mask_smaller=(x[:,ind:ind+1]<0)#.double()
-                    new_angle=torch.where(mask_smaller, 2*numpy.pi-new_angle, new_angle)
-                    #new_angle=mask_smaller*(2*numpy.pi-new_angle)+(1.0-mask_smaller)*new_angle
-                else:
-                    raise NotImplementedError("D>2 not implemented for D-spheres currently")
-                    log_det=log_det+torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
+                mask_smaller=(x[:,1:2]<0)
+                new_angle=torch.where(mask_smaller, 2*numpy.pi-new_angle, new_angle)
 
                 transformed_coords.append(new_angle)
+            else:
+                # D>2 spheres not implemented currently
+                #mod_ind=ind-1
+                #new_angle=torch.acos(x[:,mod_ind:mod_ind+1]/torch.sum(x[:,mod_ind:]**2, dim=1, keepdims=True).sqrt())
+                #log_det=log_det+torch.log(torch.sin(new_angle[:,0]))*(self.dimension-1-ind)
+                raise Exception("Higher order spheres not supported right now!")
 
         
         return torch.cat(transformed_coords, dim=1), log_det, keep_sign
@@ -393,24 +412,21 @@ class sphere_base(layer_base.layer_base):
                 
             else:
 
-                cos_x=torch.cos(x[:,0:1])
-              
-                good_cos_x=(cos_x!=1.0) & (cos_x!=-1.0)
-                
-                cos_x=torch.where(cos_x==1.0, cos_x-1e-6, cos_x)
-                cos_x=torch.where(cos_x==-1.0, cos_x+1e-6, cos_x)
+                safe_theta=return_safe_angle_within_pi(x[:,0:1])
 
-                #cos_x=(cos_x==1.0)*(cos_x-1e-5)+(cos_x==-1.0)*(cos_x+1e-5)+good_cos_x*cos_x
+                cos_x=torch.cos(safe_theta)
+                ## TODO: check if we really need 1e-6 here, but it seems to be so
+                cos_x=return_safe_costheta(cos_x, safety_margin=1e-6)
+
                 r_g=torch.sqrt(-torch.log( (1.0-cos_x)/2.0 )*2.0)
  
-                #inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
-
                 ## the normal log_det .. we use another factor that drops the r term and is in concordance with *inplane_spherical_to_euclidean* definition
                 ## we also drop the sin(theta) factor, to be in accord with the spherical measure
                 ### FULL TERM:
                 ### log_det+=-torch.log(r_g[:,0])-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
-                log_det=log_det-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(x[:,0]))
-        
+                
+                log_det=log_det-torch.log(1.0-cos_x[:,0])+torch.log(torch.sin(safe_theta[:,0]))
+            
                 x=torch.cat([r_g, x[:,1:2]],dim=1)
 
         else:
@@ -471,7 +487,7 @@ class sphere_base(layer_base.layer_base):
 
                 ## pi-angle leads to a flipped stereographic projection
                 new_theta=torch.acos(1.0-2.0*torch.exp(-((x[:,0:1])**2)/2.0))
-
+                new_theta=return_safe_angle_within_pi(new_theta)
                 #r_g=x[:,0]
                 #inner=1.0-2.0*torch.exp(-((r_g)**2)/2.0)
                 
@@ -502,15 +518,16 @@ class sphere_base(layer_base.layer_base):
     def inv_flow_mapping(self, inputs, extra_inputs=None, include_area_element=True):
         
         [x, log_det] = inputs
-       
+        
         ## (1) apply inverse householder rotation if desired
-    
+        
+
         if(self.add_rotation):
             
 
             if(self.always_parametrize_in_embedding_space==False):
                 x, log_det=self.spherical_to_eucl_embedding(x, log_det)
-
+            
             ## householder dimension is one higher than sphere dimension (we rotate in embedding space)
             
 
@@ -531,7 +548,7 @@ class sphere_base(layer_base.layer_base):
             inv_flow_results = self._inv_flow_mapping([x, log_det], extra_inputs=extra_inputs[:, self.num_householder_params:])
         
         x, log_det = inv_flow_results[:2]
-     
+
         if(self.higher_order_cylinder_parametrization):
             sf_extra=inv_flow_results[2]
         
@@ -542,10 +559,9 @@ class sphere_base(layer_base.layer_base):
            
             if(self.always_parametrize_in_embedding_space and sf_extra is None):
                 x, log_det=self.eucl_to_spherical_embedding(x, log_det)
-
-            #sys.exit(-1)
+           
             x, log_det=self.sphere_to_plane(x, log_det, sf_extra=sf_extra)
-        
+
         return x, log_det
 
     ## flow mapping (sampling pass)
@@ -576,7 +592,7 @@ class sphere_base(layer_base.layer_base):
                 x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
             #xy=torch.cat((x, y), dim=1)
-
+            
             mat=self.compute_rotation_matrix(x,extra_inputs=extra_inputs, mode=self.rotation_mode, device=x.device)
 
             #x = torch.bmm(mat, x.unsqueeze(-1)).squeeze(-1)  # uncomment
@@ -636,8 +652,7 @@ class sphere_base(layer_base.layer_base):
         new_pts,_=self.eucl_to_spherical_embedding(eucl,0.0)
 
         mask=(new_pts[:,0]<flag_pole_distance) | (new_pts[:,0] >(numpy.pi-flag_pole_distance))
-        #mask=(new_pts[:,1]<flag_pole_distance) | (new_pts[:,1] >(2*numpy.pi-flag_pole_distance))
-        
+       
         problematic_points=x[mask]
 
         return problematic_points

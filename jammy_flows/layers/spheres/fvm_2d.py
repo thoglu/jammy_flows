@@ -26,10 +26,6 @@ import copy
 import torch.autograd
 
 
-"""
-Implementation of the Fisher-von-Mises distribution as a normalizing flow. 
-"""
-
 class fisher_von_mises_2d(sphere_base.sphere_base):
 
     def __init__(self, 
@@ -50,11 +46,12 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                  vertical_restrict_max_min_width_height_ratio=-1.0,
                  vertical_fix_boundary_derivative=1,
                  min_kappa=1e-10,
-                 kappa_prediction="direct_log_real_bounded"): 
+                 kappa_prediction="direct_log_real_bounded",
+                 add_extra_rotation_inbetween=0): 
         """
         Symbol: "f"
 
-        Based off of https://arxiv.org/abs/2002.02428, with additional FvM scalings and various options to play with.
+        Based off of https://arxiv.org/abs/2002.02428.
 
         Parameters:
         
@@ -178,6 +175,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                 self.correlated_flow_params = nn.Parameter(torch.randn(1, self.total_num_correlated_params))
 
         
+        self.add_extra_rotation_inbetween=add_extra_rotation_inbetween
            
     def _inv_flow_mapping(self, inputs, extra_inputs=None):
         
@@ -220,6 +218,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         ## go to cylinder from angle
         prev_ret=torch.cos(x[:,:1])
+
         fw_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(x[:,0])))
 
         log_det=log_det+fw_upd
@@ -227,16 +226,15 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         ## intermediate [-1,1]->[-1,1] transformation
         safe_part=2*kappa
         smaller_mask=kappa[:,0]<100
-        
+
         ## safe_part only involves kappa
         safe_part=torch.masked_scatter(input=safe_part, mask=smaller_mask[:,None], source=torch.log(torch.exp(2*kappa[smaller_mask])-1.0))
-
-        #prev_ret_inverse=self.z_scaling_factor*prev_ret
         safe_ld_update=(torch.log(2*kappa)+kappa*(self.z_scaling_factor*prev_ret+1)-safe_part)[:,0]
-        
-        ## 1 + 1 - 2*k -2*(1+k(x-1)) / (-2k) = 2 - 2k -2 -2k(x-1) / -2k = 1 + 1(x-1)
-        ret= self.z_scaling_factor*((1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(self.z_scaling_factor*prev_ret-1)))/(-1+torch.exp(-2*kappa)))
 
+        switched=self.z_scaling_factor*prev_ret
+       
+        ret= self.z_scaling_factor*((1.0+torch.exp(-2*kappa)-2*torch.exp(kappa*(self.z_scaling_factor*prev_ret-1)))/(-1+torch.exp(-2*kappa)))
+       
         #approx_result=ret # nothing happens for k->0
         if(x.dtype==torch.float32):
             kappa_mask=kappa<1e-4
@@ -251,10 +249,32 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         log_det=log_det+safe_ld_update
 
         ### we have to make the angles safe here...TODO: change to external transformation
-        ret=torch.where(ret<-1.0, -1.0, ret)
-        ret=torch.where(ret>1.0, 1.0, ret)
-       
+        ret=sphere_base.return_safe_costheta(ret)
         angle=x[:,1:]
+        
+
+        if(self.add_extra_rotation_inbetween):
+
+            ret=torch.acos(ret)
+            
+            rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(ret[:,0])))
+            log_det=log_det-rev_upd
+            
+            comb=torch.cat([ret, angle],dim=1)
+
+            comb, log_det=self.spherical_to_eucl_embedding(comb, log_det)
+            
+            inbetween_matrix=torch.Tensor([[0.0,0.0,1.0],[0.0,1.0,0.0],[-1.0,0.0,0.0]]).to(ret).type_as(ret).unsqueeze(0)
+
+            comb=torch.einsum("...ij,...j->...i", inbetween_matrix.permute(0,2,1), comb)
+
+            comb, log_det=self.eucl_to_spherical_embedding(comb, log_det)
+
+            ret=torch.cos(comb[:,:1])
+            fw_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(comb[:,0])))
+            log_det=log_det+fw_upd
+
+            angle=comb[:,1:]
 
         if(self.boundary_cos_theta_identity_region==0.0):
            
@@ -308,8 +328,7 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                         
                         log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
         
-        ret=torch.where(ret<-1.0, -1.0, ret)
-        ret=torch.where(ret>1.0, 1.0, ret)
+        ret=sphere_base.return_safe_costheta(ret)
 
         ## go back to angle in a safe way
         ret=torch.acos(ret)
@@ -319,10 +338,10 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         ret=torch.cat([ret, angle], dim=1)
         
-
         if(self.always_parametrize_in_embedding_space):
 
             ret, log_det=self.spherical_to_eucl_embedding(ret, log_det)
+
 
         return ret, log_det, sf_extra
 
@@ -430,6 +449,32 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
                         log_det=torch.masked_scatter(input=log_det, mask=contained_mask, source=log_det_contained)
                       
 
+        if(self.add_extra_rotation_inbetween):
+
+            ## go back to angle
+
+            prev_ret=torch.acos(prev_ret)
+            
+            rev_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(prev_ret[:,0])))
+            log_det=log_det-rev_upd
+            
+            comb=torch.cat([prev_ret, angle],dim=1)
+
+            comb, log_det=self.spherical_to_eucl_embedding(comb, log_det)
+            
+            inbetween_matrix=torch.Tensor([[0.0,0.0,1.0],[0.0,1.0,0.0],[-1.0,0.0,0.0]]).to(prev_ret).type_as(prev_ret).unsqueeze(0)
+                        
+            comb=torch.einsum("...ij,...j->...i", inbetween_matrix, comb)
+
+            comb, log_det=self.eucl_to_spherical_embedding(comb, log_det)
+
+            prev_ret=torch.cos(comb[:,:1])
+            fw_upd=torch.log(torch.sin(sphere_base.return_safe_angle_within_pi(comb[:,0])))
+            log_det=log_det+fw_upd
+
+            angle=comb[:,1:]
+
+
         ## kappa->0 
 
         ## 0.5+0.5x + (0.5-0.5x)*(1-2k) = 1 -k+kx = (1+k(x-1))^(1/k)
@@ -439,8 +484,10 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         #prev_ret_inverse=self.z_scaling_factor*prev_ret
         
         log_det=log_det-torch.log(kappa*self.z_scaling_factor*prev_ret+kappa/torch.tanh(kappa))[:,0]
+        
+        
         ret=self.z_scaling_factor*(1.0+(1.0/kappa)*torch.log( 0.5*(1.0+self.z_scaling_factor*prev_ret) + (0.5-0.5*self.z_scaling_factor*prev_ret)*torch.exp(-2.0*kappa) ))
-
+        
         if(x.dtype==torch.float32):
             kappa_mask=kappa<1e-4
         elif(x.dtype==torch.float64):
@@ -449,9 +496,9 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
             raise Exception("Require 32 or 64 bit float")
 
         ret=torch.where(kappa_mask, prev_ret, ret)  
-        ret=torch.where(ret>1.0, 1.0, ret)
-        ret=torch.where(ret<-1.0, -1.0, ret)
 
+        ret=sphere_base.return_safe_costheta(ret)
+       
         ## go back to angle
         ret=torch.acos(ret)
         
