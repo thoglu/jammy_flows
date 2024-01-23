@@ -580,6 +580,12 @@ for amortization (the original implementation is meant only for non-conditional 
 </div>
 <div class="section" id="module-jammy_flows.layers.spheres.sphere_base">
 <span id="spherical-flow-layers"></span><h3>Spherical flow layers<a class="headerlink" href="#module-jammy_flows.layers.spheres.sphere_base" title="Permalink to this headline">¶</a></h3>
+<dl class="function">
+<dt id="jammy_flows.layers.spheres.sphere_base.return_safe_costheta">
+<code class="sig-prename descclassname">jammy_flows.layers.spheres.sphere_base.</code><code class="sig-name descname">return_safe_costheta</code><span class="sig-paren">(</span><em class="sig-param">x</em>, <em class="sig-param">safety_margin=None</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.sphere_base.return_safe_costheta" title="Permalink to this definition">¶</a></dt>
+<dd><p>Restricts the angle to not hit 0 or pi exactly.</p>
+</dd></dl>
+
 <dl class="class">
 <dt id="jammy_flows.layers.spheres.sphere_base.sphere_base">
 <em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.sphere_base.</code><code class="sig-name descname">sphere_base</code><span class="sig-paren">(</span><em class="sig-param">dimension=1</em>, <em class="sig-param">euclidean_to_sphere_as_first=True</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">add_rotation=False</em>, <em class="sig-param">higher_order_cylinder_parametrization=False</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.sphere_base.sphere_base" title="Permalink to this definition">¶</a></dt>
