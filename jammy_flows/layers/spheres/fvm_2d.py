@@ -97,6 +97,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
 
         if(kappa_prediction=="direct_log_real_bounded"):
             self.kappa_fn=lambda x: x.exp()+self.min_kappa
+        elif(kappa_prediction=="softplus_real_bounded"):
+            self.kappa_fn=lambda x: F.softplus(x)+self.min_kappa
         else:
             log_min_kappa=numpy.log(self.min_kappa)
 
