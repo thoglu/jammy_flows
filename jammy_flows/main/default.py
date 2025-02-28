@@ -1546,12 +1546,19 @@ class pdf(nn.Module):
         if(self.amortize_everything):
             assert(amortization_parameters is not None)
             used_device=amortization_parameters.device
+            data_type=amortization_parameters.dtype
             used_sample_size=amortization_parameters.shape[0]
 
             if(conditional_input is not None):
                 ## TODO - maybe allow for more flexible shape combinations
-                assert(conditional_input.shape[0]==amortization_parameters.shape[0])
-                assert(conditional_input.device==amortization_parameters.device)
+                if(type(conditional_input)==list):
+                    assert(conditional_input[0].shape[0]==amortization_parameters.shape[0])
+                    assert(conditional_input[0].device==amortization_parameters.device)
+                    assert(conditional_input[0].dtype==amortization_parameters.dtype), "Dtypes between conditional_input and amortization_paramters have to agree!"
+                else:
+                    assert(conditional_input.shape[0]==amortization_parameters.shape[0])
+                    assert(conditional_input.device==amortization_parameters.device)
+                    assert(conditional_input.dtype==amortization_parameters.dtype), "Dtypes between conditional_input and amortization_paramters have to agree!"
 
         elif(conditional_input is not None):
 
