@@ -2,7 +2,10 @@ import torch
 from torch import nn
 import numpy
 
-from torchdiffeq import odeint_adjoint as odeint
+try:
+    from torchdiffeq import odeint_adjoint as odeint
+except:
+    print("torchdiffeq not found - no support for continuous flows. Install *torchdiffeq* if support is desired!")
 
 from . import sphere_base
 from . import moebius_1d
