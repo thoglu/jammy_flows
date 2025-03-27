@@ -3,13 +3,20 @@ from matplotlib.colors import LogNorm
 import pylab
 import torch
 import numpy
-from astropy.visualization.wcsaxes import WCSAxes
-from astropy.visualization.wcsaxes.frame import EllipticalFrame
-from astropy import units as u
 
-import mhealpy
-from mhealpy import HealpixMap
-from mhealpy.plot.axes import HealpyAxes
+try:
+    from astropy.visualization.wcsaxes import WCSAxes
+    from astropy.visualization.wcsaxes.frame import EllipticalFrame
+    from astropy import units as u
+except 
+    print("package *astropy* not found -> if you want to use plotting functionality for adaptive grids, install *astropy*!")
+
+try:
+    import mhealpy
+    from mhealpy import HealpixMap
+    from mhealpy.plot.axes import HealpyAxes
+except:
+    print("package *mhealpy* not found -> if you want to use plotting functionality for adaptive grids, install *mhealpy*!")
 
 from matplotlib.projections import register_projection
 from matplotlib.transforms import Bbox
