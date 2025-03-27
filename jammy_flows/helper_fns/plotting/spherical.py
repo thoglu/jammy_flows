@@ -11,10 +11,12 @@ try:
 except:
     print("package *astropy* not found -> if you want to use plotting functionality for adaptive grids, install *astropy*!")
 
+mhealpy_installed=False
 try:
     import mhealpy
     from mhealpy import HealpixMap
     from mhealpy.plot.axes import HealpyAxes
+    mhealpy_installed=True
 except:
     print("package *mhealpy* not found -> if you want to use plotting functionality for adaptive grids, install *mhealpy*!")
 
@@ -109,342 +111,343 @@ def add(self,
 
         self._stale = True
 
-class HealpyAxesAzimuthOrdering(HealpyAxes):
+if(mhealpy_installed):
+    class HealpyAxesAzimuthOrdering(HealpyAxes):
 
-    def __init__(self, *args, rot = 0, **kwargs):
-        """
-        We creae a "custom" cylindrial axes here that is always fixed in terms of rotation
-        """
-        
-        ## *args must contain fig and rect
-        fig=args[0]
-        rect=args[1:]
+        def __init__(self, *args, rot = 0, **kwargs):
+            """
+            We creae a "custom" cylindrial axes here that is always fixed in terms of rotation
+            """
+            
+            ## *args must contain fig and rect
+            fig=args[0]
+            rect=args[1:]
 
-        if not isinstance(rect, Bbox):
-            if(type(rect)==int or type(rect)==tuple):
-                ## whole figure.. assert that indices match with that
-                if(type(rect)==int):
-                    assert(rect==1), rect
-                    rect = Bbox.from_bounds(0,0,1,1)
-                elif(type(rect)==tuple):
-                    if(len(rect)==1):
-                        assert(isinstance(rect[0], Bbox))
-                        rect = rect[0]
-                    else:
-                        assert(rect[0]==1 and rect[1]==1 and rect[2]==1), rect
+            if not isinstance(rect, Bbox):
+                if(type(rect)==int or type(rect)==tuple):
+                    ## whole figure.. assert that indices match with that
+                    if(type(rect)==int):
+                        assert(rect==1), rect
                         rect = Bbox.from_bounds(0,0,1,1)
-                
-            elif(type(rect)==list):
-                rect = Bbox.from_bounds(*rect)
-            elif(type(rect)==matplotlib.gridspec.SubplotSpec):
-                rect=rect.get_position(fig).extents
-                rect=Bbox.from_bounds(*rect)
+                    elif(type(rect)==tuple):
+                        if(len(rect)==1):
+                            assert(isinstance(rect[0], Bbox))
+                            rect = rect[0]
+                        else:
+                            assert(rect[0]==1 and rect[1]==1 and rect[2]==1), rect
+                            rect = Bbox.from_bounds(0,0,1,1)
+                    
+                elif(type(rect)==list):
+                    rect = Bbox.from_bounds(*rect)
+                elif(type(rect)==matplotlib.gridspec.SubplotSpec):
+                    rect=rect.get_position(fig).extents
+                    rect=Bbox.from_bounds(*rect)
 
+                else:
+                    raise Exception("Unknown ax rect ", type(rect))
+
+            ## default setting for 
+            fixed_rot=numpy.array([0.0,90.0,0.0]) # rotation z set to 0 ensures azimuth starts at 0 
+            
+            super().__init__(fig, rect,
+                             rot = fixed_rot,
+                             flip="geo", # this ordering assures that azimuth spans from left to right
+                             **kwargs)
+
+        def graticule(self, 
+                      dpar = 45, 
+                      dmer = 60, 
+                      grid = True,
+                      ticks = True, 
+                      show_zenith_label=True,
+                      show_zenith_axis=True,
+                      zenith_axislabel_minpad=2.0,
+                      show_azimuth_label=True,
+                      show_azimuth_axis=True,
+                      tick_format = 'd', 
+                      frame = True, 
+                      zen_azi_mode="zen_azi",
+                      text_size=12,
+                      **kwargs):
+            """
+            Graticule overwrite.
+
+            Args:
+                dpar (float): Interval for the latitude axis (parallels)
+                dmer (float): Interval for the longitude axis (meridians)
+                grid (bool): Whether to show the grid
+                ticks (bool): Whether to shoe the tick labels
+                tick_format ('str'): Tick label formater. e.g. 'dd:mm:ss.s', 
+                    'hh:mm:ss.s', 'd.d'
+                frame (bool): Draw plot frame  
+            """
+
+            assert(zen_azi_mode=="zen_azi"), "Only supporting zen_azi mode right now"
+
+            self.grid(grid, **kwargs)
+
+            if(ticks):
+                self.coords[0].set_ticks(spacing=dmer * u.deg)
+                self.coords[1].set_ticks(spacing=dpar * u.deg)
+
+            if(show_azimuth_axis):
+                self.coords[0].set_major_formatter(tick_format)
+                self.coords[0].set_ticklabel_visible(ticks)
+                self.coords[0].set_ticklabel(color='white', size=text_size)
+
+            if(show_zenith_axis):
+                self.coords[1].set_major_formatter(tick_format)
+                self.coords[1].set_ticklabel_visible(ticks)
+                self.coords[1].set_ticklabel(color='black', size=text_size)
+
+            if frame:
+                self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
+                self.coords.frame.set_color(kwargs.get('color', 'black'))
             else:
-                raise Exception("Unknown ax rect ", type(rect))
+                self.coords.frame.set_linewidth(0)            
+                
+            if(zen_azi_mode=="zen_azi"):
+                if(show_azimuth_axis):
+                    if(show_azimuth_label):
+                        self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
 
-        ## default setting for 
-        fixed_rot=numpy.array([0.0,90.0,0.0]) # rotation z set to 0 ensures azimuth starts at 0 
+                if(show_zenith_axis):
+
+                    ## monkeypatching ticklabels for zenith
+                    self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
+
+                    if(show_zenith_label):
+                        self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
+                    
+                    
+            
+    class MollviewAzimuth(HealpyAxesAzimuthOrdering):
+
+        name = "mollview_azimuth"
+        _wcsproj = "MOL"
+        _aspect = 2
+
+        ## multiply by 0.995 for correct labeling (due to rounding errors of WCSaxis)
+        _cdelt = 2*numpy.sqrt(2)/numpy.pi*0.995 # Sqrt of pixel size
+        _autoscale = True
+        _center = [0,0]
         
-        super().__init__(fig, rect,
-                         rot = fixed_rot,
-                         flip="geo", # this ordering assures that azimuth spans from left to right
-                         **kwargs)
+        def __init__(self, *args, **kwargs):
+            super().__init__(*args,
+                             frame_class = kwargs.pop('frame_class', EllipticalFrame),
+                             **kwargs)
 
-    def graticule(self, 
-                  dpar = 45, 
-                  dmer = 60, 
-                  grid = True,
-                  ticks = True, 
-                  show_zenith_label=True,
-                  show_zenith_axis=True,
-                  zenith_axislabel_minpad=2.0,
-                  show_azimuth_label=True,
-                  show_azimuth_axis=True,
-                  tick_format = 'd', 
-                  frame = True, 
-                  zen_azi_mode="zen_azi",
-                  text_size=12,
-                  **kwargs):
-        """
-        Graticule overwrite.
+        def proj_plot(self, *args, **kwargs):
+            """
+            Calls matplotlib.plot in world coordinates, and does an internal transformation first.
+            Internally the healpy ax uses dec/ra, so have to take of that here.
+            """
+            assert(len(args)>=2)
 
-        Args:
-            dpar (float): Interval for the latitude axis (parallels)
-            dmer (float): Interval for the longitude axis (meridians)
-            grid (bool): Whether to show the grid
-            ticks (bool): Whether to shoe the tick labels
-            tick_format ('str'): Tick label formater. e.g. 'dd:mm:ss.s', 
-                'hh:mm:ss.s', 'd.d'
-            frame (bool): Draw plot frame  
-        """
+            projection_type="zen_azi"
 
-        assert(zen_azi_mode=="zen_azi"), "Only supporting zen_azi mode right now"
+            if("projection_type" in kwargs):
+                projection_type=kwargs["projection_type"]
 
-        self.grid(grid, **kwargs)
+            assert(projection_type=="zen_azi"), "For now only zen_azi is supported"
 
-        if(ticks):
-            self.coords[0].set_ticks(spacing=dmer * u.deg)
-            self.coords[1].set_ticks(spacing=dpar * u.deg)
+            x=args[0]
+            y=args[1]
 
-        if(show_azimuth_axis):
+            new_x=x
+            new_y=y
+            if(type(x)==list):
+                new_x=numpy.array(x)
+            if(type(y)==list):
+                new_y=numpy.array(y)
+
+            assert(new_x.ndim==1)
+            assert(new_y.ndim==1)
+
+            combined_coords=numpy.concatenate([new_x[:,None], new_y[:,None]], axis=1)
+
+            world_coords=_transform_to_world(self, combined_coords, projection_type=projection_type)
+
+            further_args=args[2:]
+            
+            new_kwargs=kwargs.copy()
+            if("projection_type" in new_kwargs):
+                del new_kwargs["projection_type"]
+
+            self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
+
+            
+    register_projection(MollviewAzimuth)
+
+    class OrthviewAzimuth(HealpyAxes):
+
+        name = "orthview_azimuth"
+        _wcsproj = "SIN"
+        _aspect  = 1
+        _center = [0,0]
+        # Sqrt of pixel area at point of tangency. Sign matches healpy
+        _cdelt = -1/numpy.pi
+        
+        
+        _autoscale = True
+
+        def __init__(self, *args, zoom_center=None, zoom_diameter=None,**kwargs):
+
+            ## *args must contain fig and rect
+            fig=args[0]
+            rect=args[1:]
+
+            if not isinstance(rect, Bbox):
+                if(type(rect)==int or type(rect)==tuple):
+                    ## whole figure.. assert that indices match with that
+                    if(type(rect)==int):
+                        assert(rect==1), rect
+                        rect = Bbox.from_bounds(0,0,1,1)
+                    elif(type(rect)==tuple):
+                        if(len(rect)==1):
+                            assert(isinstance(rect[0], Bbox))
+                            rect = rect[0]
+                        else:
+                            assert(rect[0]==1 and rect[1]==1 and rect[2]==1), rect
+                            rect = Bbox.from_bounds(0,0,1,1)
+                    
+                elif(type(rect)==list):
+                    rect = Bbox.from_bounds(*rect)
+                elif(type(rect)==matplotlib.gridspec.SubplotSpec):
+                    rect=rect.get_position(fig).extents
+                    rect=Bbox.from_bounds(*rect)
+
+                else:
+                    raise Exception("Unknown ax rect ", type(rect))
+            
+            self._cdelt = 1/numpy.pi
+            
+            if(zoom_diameter is not None):
+                # zoom_diameter is in radian .. only use if smaller than pi
+                if(zoom_diameter<numpy.pi):
+                    self._cdelt=(zoom_diameter/numpy.pi)*1/numpy.pi
+
+                ## multiply by 0.995 for correct labeling (due to rounding errors of WCSaxis)
+                self._cdelt=self._cdelt*0.995
+                
+            rot=(0.0,0.0,180.0)
+            if(zoom_center is not None):
+              
+                assert(len(zoom_center)==2)
+                # zoom_center is in zen/azimuth, but rotation entries are opposite order
+                # last entry has to be 180.0 to yield correct view
+                rot=(zoom_center[1]*180.0/numpy.pi, 90.0-(zoom_center[0]*180.0/numpy.pi), 180.0)
+
+            super().__init__(fig, rect,
+                             flip="geo",
+                             rot=rot,
+                             frame_class = kwargs.pop('frame_class', EllipticalFrame),
+                             **kwargs)
+
+        def graticule(self, 
+                      dpar = 45, 
+                      dmer = 60, 
+                      grid = True,
+                      ticks = True, 
+                      show_zenith_label=True,
+                      show_zenith_axis=True,
+                      zenith_axislabel_minpad=4.0,
+                      show_azimuth_label=True,
+                      show_azimuth_axis=False,
+                      tick_format = 'd', 
+                      frame = True, 
+                      zen_azi_mode="zen_azi",
+                      text_size=12,
+                      **kwargs):
+            """
+            Graticule overwrite.
+
+            Args:
+                dpar (float): Interval for the latitude axis (parallels)
+                dmer (float): Interval for the longitude axis (meridians)
+                grid (bool): Whether to show the grid
+                ticks (bool): Whether to shoe the tick labels
+                tick_format ('str'): Tick label formater. e.g. 'dd:mm:ss.s', 
+                    'hh:mm:ss.s', 'd.d'
+                frame (bool): Draw plot frame  
+            """
+
+            assert(zen_azi_mode=="zen_azi"), "Only supporting zen_azi mode right now"
+
+            self.grid(grid, **kwargs)
+
+            if(ticks):
+                self.coords[0].set_ticks(spacing=dmer * u.deg)
+                self.coords[1].set_ticks(spacing=dpar * u.deg)
+
+        
             self.coords[0].set_major_formatter(tick_format)
             self.coords[0].set_ticklabel_visible(ticks)
             self.coords[0].set_ticklabel(color='white', size=text_size)
 
-        if(show_zenith_axis):
+            if frame:
+                self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
+                self.coords.frame.set_color(kwargs.get('color', 'black'))
+            else:
+                self.coords.frame.set_linewidth(0)    
+
+           
             self.coords[1].set_major_formatter(tick_format)
             self.coords[1].set_ticklabel_visible(ticks)
             self.coords[1].set_ticklabel(color='black', size=text_size)
 
-        if frame:
-            self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
-            self.coords.frame.set_color(kwargs.get('color', 'black'))
-        else:
-            self.coords.frame.set_linewidth(0)            
-            
-        if(zen_azi_mode=="zen_azi"):
+            ## monkeypatching ticklabels for zenith
+            self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
+
             if(show_azimuth_axis):
                 if(show_azimuth_label):
                     self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
 
             if(show_zenith_axis):
-
-                ## monkeypatching ticklabels for zenith
-                self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
-
-                if(show_zenith_label):
+                if(show_azimuth_label):
                     self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
-                
-                
-        
-class MollviewAzimuth(HealpyAxesAzimuthOrdering):
 
-    name = "mollview_azimuth"
-    _wcsproj = "MOL"
-    _aspect = 2
 
-    ## multiply by 0.995 for correct labeling (due to rounding errors of WCSaxis)
-    _cdelt = 2*numpy.sqrt(2)/numpy.pi*0.995 # Sqrt of pixel size
-    _autoscale = True
-    _center = [0,0]
-    
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args,
-                         frame_class = kwargs.pop('frame_class', EllipticalFrame),
-                         **kwargs)
+        def proj_plot(self, *args, **kwargs):
+            """
+            Calls matplotlib.plot in world coordinates, and does an internal transformation first.
+            Internally the healpy ax uses dec/ra, so have to take of that here.
+            """
+            assert(len(args)>=2)
 
-    def proj_plot(self, *args, **kwargs):
-        """
-        Calls matplotlib.plot in world coordinates, and does an internal transformation first.
-        Internally the healpy ax uses dec/ra, so have to take of that here.
-        """
-        assert(len(args)>=2)
+            projection_type="zen_azi"
 
-        projection_type="zen_azi"
+            if("projection_type" in kwargs):
+                projection_type=kwargs["projection_type"]
 
-        if("projection_type" in kwargs):
-            projection_type=kwargs["projection_type"]
+            assert(projection_type=="zen_azi"), "For now only zen_azi is supported"
 
-        assert(projection_type=="zen_azi"), "For now only zen_azi is supported"
+            x=args[0]
+            y=args[1]
 
-        x=args[0]
-        y=args[1]
+            new_x=x
+            new_y=y
+            if(type(x)==list):
+                new_x=numpy.array(x)
+            if(type(y)==list):
+                new_y=numpy.array(y)
 
-        new_x=x
-        new_y=y
-        if(type(x)==list):
-            new_x=numpy.array(x)
-        if(type(y)==list):
-            new_y=numpy.array(y)
+            assert(new_x.ndim==1)
+            assert(new_y.ndim==1)
 
-        assert(new_x.ndim==1)
-        assert(new_y.ndim==1)
+            combined_coords=numpy.concatenate([new_x[:,None], new_y[:,None]], axis=1)
 
-        combined_coords=numpy.concatenate([new_x[:,None], new_y[:,None]], axis=1)
+            world_coords=_transform_to_world(self, combined_coords, projection_type=projection_type)
 
-        world_coords=_transform_to_world(self, combined_coords, projection_type=projection_type)
-
-        further_args=args[2:]
-        
-        new_kwargs=kwargs.copy()
-        if("projection_type" in new_kwargs):
-            del new_kwargs["projection_type"]
-
-        self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
-
-        
-register_projection(MollviewAzimuth)
-
-class OrthviewAzimuth(HealpyAxes):
-
-    name = "orthview_azimuth"
-    _wcsproj = "SIN"
-    _aspect  = 1
-    _center = [0,0]
-    # Sqrt of pixel area at point of tangency. Sign matches healpy
-    _cdelt = -1/numpy.pi
-    
-    
-    _autoscale = True
-
-    def __init__(self, *args, zoom_center=None, zoom_diameter=None,**kwargs):
-
-        ## *args must contain fig and rect
-        fig=args[0]
-        rect=args[1:]
-
-        if not isinstance(rect, Bbox):
-            if(type(rect)==int or type(rect)==tuple):
-                ## whole figure.. assert that indices match with that
-                if(type(rect)==int):
-                    assert(rect==1), rect
-                    rect = Bbox.from_bounds(0,0,1,1)
-                elif(type(rect)==tuple):
-                    if(len(rect)==1):
-                        assert(isinstance(rect[0], Bbox))
-                        rect = rect[0]
-                    else:
-                        assert(rect[0]==1 and rect[1]==1 and rect[2]==1), rect
-                        rect = Bbox.from_bounds(0,0,1,1)
-                
-            elif(type(rect)==list):
-                rect = Bbox.from_bounds(*rect)
-            elif(type(rect)==matplotlib.gridspec.SubplotSpec):
-                rect=rect.get_position(fig).extents
-                rect=Bbox.from_bounds(*rect)
-
-            else:
-                raise Exception("Unknown ax rect ", type(rect))
-        
-        self._cdelt = 1/numpy.pi
-        
-        if(zoom_diameter is not None):
-            # zoom_diameter is in radian .. only use if smaller than pi
-            if(zoom_diameter<numpy.pi):
-                self._cdelt=(zoom_diameter/numpy.pi)*1/numpy.pi
-
-            ## multiply by 0.995 for correct labeling (due to rounding errors of WCSaxis)
-            self._cdelt=self._cdelt*0.995
+            further_args=args[2:]
             
-        rot=(0.0,0.0,180.0)
-        if(zoom_center is not None):
-          
-            assert(len(zoom_center)==2)
-            # zoom_center is in zen/azimuth, but rotation entries are opposite order
-            # last entry has to be 180.0 to yield correct view
-            rot=(zoom_center[1]*180.0/numpy.pi, 90.0-(zoom_center[0]*180.0/numpy.pi), 180.0)
+            new_kwargs=kwargs.copy()
+            if("projection_type" in new_kwargs):
+                del new_kwargs["projection_type"]
 
-        super().__init__(fig, rect,
-                         flip="geo",
-                         rot=rot,
-                         frame_class = kwargs.pop('frame_class', EllipticalFrame),
-                         **kwargs)
+            self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
 
-    def graticule(self, 
-                  dpar = 45, 
-                  dmer = 60, 
-                  grid = True,
-                  ticks = True, 
-                  show_zenith_label=True,
-                  show_zenith_axis=True,
-                  zenith_axislabel_minpad=4.0,
-                  show_azimuth_label=True,
-                  show_azimuth_axis=False,
-                  tick_format = 'd', 
-                  frame = True, 
-                  zen_azi_mode="zen_azi",
-                  text_size=12,
-                  **kwargs):
-        """
-        Graticule overwrite.
-
-        Args:
-            dpar (float): Interval for the latitude axis (parallels)
-            dmer (float): Interval for the longitude axis (meridians)
-            grid (bool): Whether to show the grid
-            ticks (bool): Whether to shoe the tick labels
-            tick_format ('str'): Tick label formater. e.g. 'dd:mm:ss.s', 
-                'hh:mm:ss.s', 'd.d'
-            frame (bool): Draw plot frame  
-        """
-
-        assert(zen_azi_mode=="zen_azi"), "Only supporting zen_azi mode right now"
-
-        self.grid(grid, **kwargs)
-
-        if(ticks):
-            self.coords[0].set_ticks(spacing=dmer * u.deg)
-            self.coords[1].set_ticks(spacing=dpar * u.deg)
-
-    
-        self.coords[0].set_major_formatter(tick_format)
-        self.coords[0].set_ticklabel_visible(ticks)
-        self.coords[0].set_ticklabel(color='white', size=text_size)
-
-        if frame:
-            self.coords.frame.set_linewidth(kwargs.get('linewidth', 3))
-            self.coords.frame.set_color(kwargs.get('color', 'black'))
-        else:
-            self.coords.frame.set_linewidth(0)    
-
-       
-        self.coords[1].set_major_formatter(tick_format)
-        self.coords[1].set_ticklabel_visible(ticks)
-        self.coords[1].set_ticklabel(color='black', size=text_size)
-
-        ## monkeypatching ticklabels for zenith
-        self.coords[1].ticklabels.add = add.__get__(self.coords[1].ticklabels)
-
-        if(show_azimuth_axis):
-            if(show_azimuth_label):
-                self.coords[0].set_axislabel("azimuth [deg]", color="white") # shift the label a little to the left
-
-        if(show_zenith_axis):
-            if(show_azimuth_label):
-                self.coords[1].set_axislabel("zenith [deg]", minpad=zenith_axislabel_minpad) # shift the label a little to the left
-
-
-    def proj_plot(self, *args, **kwargs):
-        """
-        Calls matplotlib.plot in world coordinates, and does an internal transformation first.
-        Internally the healpy ax uses dec/ra, so have to take of that here.
-        """
-        assert(len(args)>=2)
-
-        projection_type="zen_azi"
-
-        if("projection_type" in kwargs):
-            projection_type=kwargs["projection_type"]
-
-        assert(projection_type=="zen_azi"), "For now only zen_azi is supported"
-
-        x=args[0]
-        y=args[1]
-
-        new_x=x
-        new_y=y
-        if(type(x)==list):
-            new_x=numpy.array(x)
-        if(type(y)==list):
-            new_y=numpy.array(y)
-
-        assert(new_x.ndim==1)
-        assert(new_y.ndim==1)
-
-        combined_coords=numpy.concatenate([new_x[:,None], new_y[:,None]], axis=1)
-
-        world_coords=_transform_to_world(self, combined_coords, projection_type=projection_type)
-
-        further_args=args[2:]
-        
-        new_kwargs=kwargs.copy()
-        if("projection_type" in new_kwargs):
-            del new_kwargs["projection_type"]
-
-        self.plot(world_coords[:,0], world_coords[:,1], *further_args, **new_kwargs)
-
-register_projection(OrthviewAzimuth)
+    register_projection(OrthviewAzimuth)
 
 def get_meshed_positions_and_areas(samples, 
                                    max_entries_per_pixel=10):
