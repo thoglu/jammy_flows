@@ -8,7 +8,7 @@ try:
     from astropy.visualization.wcsaxes import WCSAxes
     from astropy.visualization.wcsaxes.frame import EllipticalFrame
     from astropy import units as u
-except 
+except:
     print("package *astropy* not found -> if you want to use plotting functionality for adaptive grids, install *astropy*!")
 
 try:
