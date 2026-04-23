@@ -73,6 +73,23 @@ The package has been built and tested with these versions, but might work just f
 
 ## Installation
 
+### uv
+
+Install the project together with the test tooling:
+
+```bash
+uv sync --group test
+```
+
+The repository includes a `.python-version` file targeting Python 3.12, which is the interpreter used for the `uv` workflow here.
+
+Run the test suite with either `pytest` or the existing `unittest` discovery:
+
+```bash
+uv run pytest
+uv run python -m unittest discover -s tests -p 'test_*.py'
+```
+
 ### specific version:
 
 ```

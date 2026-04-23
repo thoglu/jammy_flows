@@ -1,0 +1,57 @@
+[build-system]
+requires = ["setuptools>=61", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "jammy_flows"
+version = "1.0.0"
+description = "A package to describe joint autoregressive (conditional) normalizing-flow PDFs on manifolds with coverage control."
+readme = { file = "README.md", content-type = "text/markdown" }
+requires-python = ">=3.6.1"
+license = { text = "MIT" }
+authors = [
+    { name = "Thorsten Glüsenkamp", email = "thorsten.glu@gmail.com" },
+]
+dependencies = [
+    "matplotlib>=3.3.3",
+    "numpy>=1.18.5",
+    "scipy>=1.5.4",
+    "torch>=1.7",
+    "torchdiffeq>=0.2.1",
+]
+classifiers = [
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Python :: Implementation :: PyPy",
+]
+
+[project.urls]
+Homepage = "https://github.com/thoglu/jammy_flows"
+Documentation = "https://thoglu.github.io/jammy_flows/index.html"
+Repository = "https://github.com/thoglu/jammy_flows"
+Issues = "https://github.com/thoglu/jammy_flows/issues"
+
+[dependency-groups]
+test = [
+    "pytest>=6.2",
+]
+docs = [
+    "sphinx>=4",
+    "sphinx-rtd-theme>=1",
+]
+
+[tool.setuptools]
+include-package-data = true
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = ["jammy_flows*"]
+exclude = ["tests", "tests.*"]
+
+[tool.pytest.ini_options]
+addopts = "-ra"
+python_files = ["test_*.py"]
+testpaths = ["tests"]

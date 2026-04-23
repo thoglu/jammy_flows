@@ -49,6 +49,7 @@ coverage.xml
 *.cover
 *.py,cover
 .hypothesis/
+skewness_test
 .pytest_cache/
 
 # Translations
