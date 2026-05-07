@@ -6,7 +6,6 @@ from .layers.euclidean.euclidean_do_nothing import euclidean_do_nothing
 
 from .layers.spheres.moebius_1d import moebius
 from .layers.spheres.splines_1d import spline_1d as sphere_spline_1d
-from .layers.spheres.segmented_sphere_nd import segmented_sphere_nd
 from .layers.spheres.exponential_map_s2 import exponential_map_s2
 from .layers.spheres.spherical_do_nothing import spherical_do_nothing
 from .layers.spheres.cnf_sphere_charts import cnf_sphere_charts

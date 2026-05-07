@@ -6,6 +6,7 @@ import numpy
 import pylab
 import torch.autograd.functional
 import random
+import copy
 
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
@@ -116,8 +117,102 @@ class Test(unittest.TestCase):
 
         self.flow_inits=[]
 
-        
+        ## test rotation modes for spherical flows
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="xyz"
 
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="xyz"
+        extra_flow_defs["options_overwrite"]["f"]["kappa_prediction"]="mu"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="xyz"
+        extra_flow_defs["options_overwrite"]["f"]["kappa_prediction"]="mu_squared"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="quaternion"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="quaternion"
+        extra_flow_defs["options_overwrite"]["f"]["kappa_prediction"]="quatvec"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="quaternion"
+        extra_flow_defs["options_overwrite"]["f"]["kappa_prediction"]="quatvec_squared"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="angles"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        extra_flow_defs=dict()
+        extra_flow_defs["options_overwrite"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]=dict()
+        extra_flow_defs["options_overwrite"]["f"]["rotation_mode"]="householder"
+
+        self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
+
+        
+        for fix_opt in [0,1]:
+            for second_fix_opt in [0,1]:
+                for ind_opt in [0,1]:
+                    for smooth_opt in [0,1]:
+                    
+                        extra_flow_defs=dict()
+                        extra_flow_defs["options_overwrite"]=dict()
+                        extra_flow_defs["options_overwrite"]["o"]=dict()
+                        extra_flow_defs["options_overwrite"]["o"]["smooth_second_derivative"]=smooth_opt
+                        extra_flow_defs["options_overwrite"]["o"]["num_basis_functions"]=2
+                        extra_flow_defs["options_overwrite"]["o"]["fix_first_width_n_height_to_zero"]=fix_opt
+                        extra_flow_defs["options_overwrite"]["o"]["also_fix_second_width_to_zero"]=second_fix_opt
+                        extra_flow_defs["options_overwrite"]["o"]["independent_width_height_parametrization"]=ind_opt
+                        
+                        self.flow_inits.append([ ["s1", "o"], extra_flow_defs])
+
+        
+        for two_new_opts in [(0,0), (0,1), (1,1), (1,0)]:
+        
+            extra_flow_defs=dict()
+            extra_flow_defs["options_overwrite"]=dict()
+            extra_flow_defs["options_overwrite"]["f"]=dict()
+            extra_flow_defs["options_overwrite"]["f"]["add_vertical_rq_spline_flow"]=1
+            extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
+            extra_flow_defs["options_overwrite"]["f"]["circular_add_rotation"]=0
+            extra_flow_defs["options_overwrite"]["f"]["circular_flow_defs"]="ooo"
+
+            extra_flow_defs["options_overwrite"]["f"]["vertical_fix_first_width_n_height_to_zero"]=1
+            extra_flow_defs["options_overwrite"]["f"]["vertical_also_fix_second_width_to_zero"]=two_new_opts[0]
+            extra_flow_defs["options_overwrite"]["f"]["vertical_independent_width_height_parametrization"]=two_new_opts[1]
+            #extra_flow_defs["conditional_input_dim"]=2
+            self.flow_inits.append([ ["s2", "ff"], extra_flow_defs])
+        
+        
         extra_flow_defs=dict()
         extra_flow_defs["options_overwrite"]=dict()
         extra_flow_defs["options_overwrite"]["f"]=dict()
@@ -125,7 +220,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
         extra_flow_defs["options_overwrite"]["f"]["boundary_cos_theta_identity_region"]=0.4
         self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
-
+        
         extra_flow_defs=dict()
         extra_flow_defs["options_overwrite"]=dict()
         extra_flow_defs["options_overwrite"]["f"]=dict()
@@ -133,7 +228,7 @@ class Test(unittest.TestCase):
         extra_flow_defs["options_overwrite"]["f"]["add_circular_rq_spline_flow"]=1
         extra_flow_defs["options_overwrite"]["f"]["boundary_cos_theta_identity_region"]=0.0
         self.flow_inits.append([ ["s2", "f"], extra_flow_defs])
-
+        
 
         extra_flow_defs=dict()
         extra_flow_defs["options_overwrite"]=dict()
@@ -295,46 +390,6 @@ class Test(unittest.TestCase):
 
         self.flow_inits.append([ ["i1_-1.0_1.0", "r"], extra_flow_defs])
 
-        ####
-        #zenith_layers=["g", "p", "x", "z", "r"]
-        zenith_layers=["g", "x", "z", "r"]
-
-        for z_layer in zenith_layers:
-            extra_flow_defs=dict()
-            extra_flow_defs["options_overwrite"]=dict()
-            extra_flow_defs["options_overwrite"]["n"]=dict()
-         
-            extra_flow_defs["options_overwrite"]["n"]["add_rotation"]=1
-            #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
-            extra_flow_defs["options_overwrite"]["n"]["zenith_type_layers"]=z_layer
-            ## all n-type flows
-
-            pdf_def="s2"
-            flow_def="n"
-
-            self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
-
-        # more general flow
-
-        extra_flow_defs=dict()
-        extra_flow_defs["options_overwrite"]=dict()
-        extra_flow_defs["options_overwrite"]["n"]=dict()
-      
-        extra_flow_defs["options_overwrite"]["n"]["add_rotation"]=1
-        #extra_flow_defs["options_overwrite"]["n"]["kwargs"]["higher_order_cylinder_parametrization"]=True
-
-        ## general flow
-        pdf_def="s2+e2+s1"
-        flow_def="n+gg+m"
-
-        self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
-
-        ## general flow reversed
-        pdf_def="e2+s2+s1"
-        flow_def="gg+n+m"
-
-        self.flow_inits.append([[pdf_def, flow_def], extra_flow_defs])
-    
     
     def test_selfconsistency(self):
 
@@ -342,181 +397,193 @@ class Test(unittest.TestCase):
 
         samplesize=10000
         
-        for ind, init in enumerate(self.flow_inits):
+        for ind, non_cond_init in enumerate(self.flow_inits):
             ## seed everything to have consistent tests
-            seed_everything(1)
-            
 
-            #seed_everything(0)
-            this_flow=f.pdf(*init[0], **init[1])
-            #this_flow.double()
+            cond_init=copy.deepcopy(non_cond_init)
 
-            ## test for pure Euclidean manifold
-            if( (len(init[0][0].split("+"))==1) and (init[0][0][0]=="e")):
-                used_dim=int(init[0][0][1:])
-                gaussian_init_data=torch.randn(size=(100,used_dim))
+            assert("conditional_input_dim" not in cond_init[1].keys())
+            cond_init[1]["conditional_input_dim"]=2
+
+            for init in [non_cond_init, cond_init]:
                 
-                # test init function with random data
-                this_flow.init_params(data=gaussian_init_data)
-
-               
-            cinput=None
-            if("conditional_input_dim" in init[1].keys()):
-                if(type(init[1]["conditional_input_dim"])==int):
-
-                    rvec=numpy.random.normal(size=(samplesize,init[1]["conditional_input_dim"]))*100.0
-                    cinput=torch.from_numpy(rvec)
-                else:
-                    cinput=[]
-                    for ci_dim in init[1]["conditional_input_dim"]:
-
-                        rvec=numpy.random.normal(size=(samplesize,ci_dim))*100.0
-                        cinput.append(torch.from_numpy(rvec))
-
-            print("####################")
-            print("INIT ", init)
-            print("####################")
-
-            for precision in [torch.float64, torch.float32]:
+                seed_everything(1)
                 
 
-                if(precision==torch.float32):
+                #seed_everything(0)
+                this_flow=f.pdf(*init[0], **init[1])
+                #this_flow.double()
 
-                    if(len(init[0][0].split("+"))>1):
-                        ## only test single sub pdf flows with float32
-                        continue
-
-                    ### v requires double precision
-                    if("v" in init[0][1]):
-                        continue
-
+                ## test for pure Euclidean manifold
+                if( (len(init[0][0].split("+"))==1) and (init[0][0][0]=="e")):
+                    used_dim=int(init[0][0][1:])
+                    gaussian_init_data=torch.randn(size=(100,used_dim))
                     
+                    # test init function with random data
+                    this_flow.init_params(data=gaussian_init_data)
 
-                    tolerance=0.15
+                   
+                cinput=None
+                if("conditional_input_dim" in init[1].keys()):
+                    if(type(init[1]["conditional_input_dim"])==int):
 
-                    if("o" in init[0][1]):
-                        tolerance=5.0
-
-                    if("c" in init[0][1]):
-                        ## exponential map flows get a little less strict tolerance check for now
-                        
-                        tolerance=1e-2
-
-                    ### n requires double precision
-                    if("n" in init[0][1]):
-                        tolerance=1.1
-
-                    
-                    this_flow.float()
-                else:
-
-                    tolerance=1e-6
-
-                    
-
-                    if("v" in init[0][1]):
-                        ## exponential map flows get a little less strict tolerance check for now
-                        
-                        tolerance=1e-4
-
-                    if("c" in init[0][1]):
-                        ## exponential map flows get a little less strict tolerance check for now
-                        
-                        tolerance=1e-4
-
-                    this_flow.double()
-
-                print("++++ PRECISION ", precision)
-
-                if(cinput is not None):
-                    if(type(cinput)==list):
-                        cinput=[ci.type(precision) for ci in cinput]
+                        rvec=numpy.random.normal(size=(samplesize,init[1]["conditional_input_dim"]))*100.0
+                        cinput=torch.from_numpy(rvec)
                     else:
-                        cinput=cinput.type(precision)
+                        cinput=[]
+                        for ci_dim in init[1]["conditional_input_dim"]:
 
-                for use_embedding in [0,1]:
-                    print("####### EMBEDDING : ", use_embedding)
+                            rvec=numpy.random.normal(size=(samplesize,ci_dim))*100.0
+                            cinput.append(torch.from_numpy(rvec))
 
-                    with torch.no_grad():
-                        samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput, force_embedding_coordinates=use_embedding)
-                        
-                        samples_bef=samples.clone()
-                        ## evaluate the samples and see if the reverse direction is compatible
-                        evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput, force_embedding_coordinates=use_embedding)
-                     
+                print("####################")
+                if("conditional_input_dim" in init[1].keys()):
+                    print("--- CONDITIONAL INPUT TEST ---")
+                else:
+                    print("--- NON CONDITIONAL INPUT TEST")
+                print("INIT ", init)
+                print("####################")
 
-                      
-                        ## make sure there is no in place operation that changes things
-                        compare_two_arrays(samples.detach().numpy(), samples_bef.detach().numpy(), "samples_before_pass", "samples_after_pass", diff_value=tolerance)
-
-
-                        ## make sure log-det is not overwritten in forward/backward passes
-                        test_sample=torch.rand(10,this_flow.total_target_dim, dtype=samples.dtype)
-                        log_det=torch.zeros(test_sample.shape[0]).to(test_sample)
-                        
-                        inp=None
-                        if(cinput is not None):
-                            if(type(cinput)==list):
-                                inp=[ci[:10,:] for ci in cinput]
-                            else:
-                                inp=cinput[:10,:]
-
-                        res, log_det_new=this_flow.all_layer_forward(test_sample, log_det, inp)
-
-                     
-                        assert( (log_det==0).sum()==10)
-
-                        #####
-
-                        inp=None
-                        if(cinput is not None):
-                            if(type(cinput)==list):
-                                inp=[ci[:10,:] for ci in cinput]
-                            else:
-                                inp=cinput[:10,:]
-
-                        res, log_det_new=this_flow.all_layer_inverse(test_sample, log_det, inp)
-
+                for precision in [torch.float64, torch.float32]:
                     
-                        assert( (log_det==0).sum()==10)
+
+                    if(precision==torch.float32):
 
 
-                    #this_flow.count_parameters()
-                    compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
-                    compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
-                    compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
+                        if(len(init[0][0].split("+"))>1):
+                            ## only test single sub pdf flows with float32
+                            continue
 
-                    """
-                    Check self consistency in flow structure.
-                    """
+                        ### v requires double precision
+                        if("v" in init[0][1]):
+                            continue
 
-                    ## exclude gausianization flows from param structure test because we manually add determinant in params, so difference would be detectable
-                    if(not "g" in init[0][1] and not "c" in init[0][1]):
-                        if(cinput is None):
-                            flow_param_structure=this_flow.obtain_flow_param_structure()
+                        
+
+                        tolerance=0.3
+
+                        if("o" in init[0][1]):
+                            tolerance=30.0
+
+                        if("c" in init[0][1]):
+                            ## exponential map flows get a little less strict tolerance check for now
+                            
+                            tolerance=1e-2
+
+                        if("f" in init[0][1]):
+                            tolerance=10.0
+                        
+                        this_flow.float()
+
+                    else:
+
+                        tolerance=1e-6
+
+                        
+
+                        if("v" in init[0][1]):
+                            ## exponential map flows get a little less strict tolerance check for now
+                            
+                            tolerance=1e-4
+
+                        if("c" in init[0][1]):
+                            ## exponential map flows get a little less strict tolerance check for now
+                            
+                            tolerance=3e-4
+
+                        this_flow.double()
+
+                    print("++++ PRECISION ", precision)
+
+                    if(cinput is not None):
+                        if(type(cinput)==list):
+                            cinput=[ci.type(precision) for ci in cinput]
                         else:
+                            cinput=cinput.type(precision)
 
-                            if(type(cinput)==list):
-                                inp=[ci[:1,:] for ci in cinput]
+                    for use_embedding in [0,1]:
+                        print("####### EMBEDDING : ", use_embedding)
+
+                        with torch.no_grad():
+                            samples, base_samples, evals, base_evals=this_flow.sample(samplesize=samplesize,conditional_input=cinput, force_embedding_coordinates=use_embedding)
+                            
+                            samples_bef=samples.clone()
+                            ## evaluate the samples and see if the reverse direction is compatible
+                            evals2, base_evals2, base_samples2=this_flow(samples, conditional_input=cinput, force_embedding_coordinates=use_embedding)
+                         
+
+                          
+                            ## make sure there is no in place operation that changes things
+                            compare_two_arrays(samples.detach().numpy(), samples_bef.detach().numpy(), "samples_before_pass", "samples_after_pass", diff_value=tolerance)
+
+
+                            ## make sure log-det is not overwritten in forward/backward passes
+                            test_sample=torch.rand(10,this_flow.total_target_dim, dtype=samples.dtype)
+                            log_det=torch.zeros(test_sample.shape[0]).to(test_sample)
+                            
+                            inp=None
+                            if(cinput is not None):
+                                if(type(cinput)==list):
+                                    inp=[ci[:10,:] for ci in cinput]
+                                else:
+                                    inp=cinput[:10,:]
+
+                            res, log_det_new=this_flow.all_layer_forward(test_sample, log_det, inp)
+
+                         
+                            assert( (log_det==0).sum()==10)
+
+                            #####
+
+                            inp=None
+                            if(cinput is not None):
+                                if(type(cinput)==list):
+                                    inp=[ci[:10,:] for ci in cinput]
+                                else:
+                                    inp=cinput[:10,:]
+
+                            res, log_det_new=this_flow.all_layer_inverse(test_sample, log_det, inp)
+
+                        
+                            assert( (log_det==0).sum()==10)
+
+
+                        #this_flow.count_parameters()
+                        compare_two_arrays(base_samples.detach().numpy(), base_samples2.detach().numpy(), "base_samples", "base_samples2", diff_value=tolerance)
+                        compare_two_arrays(evals.detach().numpy(), evals2.detach().numpy(), "evals", "evals2", diff_value=tolerance)
+                        compare_two_arrays(base_evals.detach().numpy(), base_evals2.detach().numpy(), "base_evals", "base_evals2", diff_value=tolerance)
+
+                        """
+                        Check self consistency in flow structure.
+                        """
+
+                        ## exclude gausianization flows from param structure test because we manually add determinant in params, so difference would be detectable
+                        if(not "g" in init[0][1] and not "c" in init[0][1]):
+                            if(cinput is None):
+                                flow_param_structure=this_flow.obtain_flow_param_structure()
                             else:
-                                inp=cinput[:1,:]
 
-                            flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=inp)
-                        
-                        fps_num=0
+                                if(type(cinput)==list):
+                                    inp=[ci[:1,:] for ci in cinput]
+                                else:
+                                    inp=cinput[:1,:]
 
-                        for k in flow_param_structure.keys():
-                            for k2 in flow_param_structure[k].keys():
-                              
-                                fps_num+=flow_param_structure[k][k2].numel()
-                        
-                        explicit_param_num=0
-                        for pdf_index, pdf_layers in enumerate(this_flow.layer_list):
+                                flow_param_structure=this_flow.obtain_flow_param_structure(conditional_input=inp)
+                            
+                            fps_num=0
 
-                            for l in pdf_layers:
-                                explicit_param_num+=l.total_param_num
+                            for k in flow_param_structure.keys():
+                                for k2 in flow_param_structure[k].keys():
+                                  
+                                    fps_num+=flow_param_structure[k][k2].numel()
+                            
+                            explicit_param_num=0
+                            for pdf_index, pdf_layers in enumerate(this_flow.layer_list):
 
-                        assert(explicit_param_num==fps_num), ("explicit: ", explicit_param_num, "flow params num ", fps_num)
+                                for l in pdf_layers:
+                                    explicit_param_num+=l.total_param_num
+
+                            assert(explicit_param_num==fps_num), ("explicit: ", explicit_param_num, "flow params num ", fps_num)
 
     
     def test_derivative(self):

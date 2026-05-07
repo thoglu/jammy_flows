@@ -43,12 +43,11 @@ class Test(unittest.TestCase):
         self.assertTrue( (numpy.isfinite((ev).detach().numpy())==0).sum()==0)
 
         extra_flow_defs=dict()
-        extra_flow_defs["n"]=dict()
+        extra_flow_defs["f"]=dict()
        
-        extra_flow_defs["n"]["add_rotation"]=0
-        extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=0
-
-        this_flow=f.pdf("s2", "n", options_overwrite=extra_flow_defs)
+        extra_flow_defs["f"]["add_rotation"]=0
+     
+        this_flow=f.pdf("s2", "f", options_overwrite=extra_flow_defs)
         test_input=torch.from_numpy(numpy.array([[0.0,0.0],[numpy.pi,0.0]]))
         
         ev,_,_=this_flow(test_input)
@@ -128,24 +127,6 @@ class Test(unittest.TestCase):
 
                 ## smaller than 1 % off from 1.00 for the last one with the highest number of bins
                 assert( numpy.fabs(pdf_sums[-1]-1.0) < 1e-2)
-
-
-        ## Autoregressive flow With various options
-
-        for zenith_layer_type in ["g", "p", "x", "z", "r"]:
-            for cyl_para in [0]:
-
-                extra_flow_defs=dict()
-                extra_flow_defs["n"]=dict()
-                
-                extra_flow_defs["n"]["add_rotation"]=1
-                extra_flow_defs["n"]["higher_order_cylinder_parametrization"]=cyl_para
-                extra_flow_defs["n"]["zenith_type_layers"]=zenith_layer_type
-             
-                this_flow=f.pdf("s2", "n", options_overwrite=extra_flow_defs)
-
-                check_flow(this_flow)
-
         
         ## f flow
 
