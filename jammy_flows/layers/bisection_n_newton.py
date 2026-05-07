@@ -37,6 +37,8 @@ def inverse_bisection_n_newton_joint_func_and_grad(func,
         Tensor
             The inverse of the function *func* in each sub-dimension in each batch item.
 
+    TODO: Make implicit at some point.
+
     """
     new_upper = torch.tensor(max_boundary).type(target_arg.dtype).repeat(*target_arg.shape).to(target_arg.device)
     new_lower = torch.tensor(min_boundary).type(target_arg.dtype).repeat(*target_arg.shape).to(target_arg.device)
@@ -70,7 +72,7 @@ def inverse_bisection_n_newton_joint_func_and_grad(func,
     broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
 
     for i in range(num_newton_iter):
-       
+        
         fn_result, f_prime_eval = joint_func(prev[above_tolerance_mask,:], *[a[above_tolerance_mask] if(broadcasting_bool_args[arg_index] == True) else a for arg_index, a in enumerate(args)])
         
         f_eval=fn_result-target_arg[above_tolerance_mask,:]
@@ -78,6 +80,15 @@ def inverse_bisection_n_newton_joint_func_and_grad(func,
         update=(f_eval/f_prime_eval)
 
         newsource=prev[above_tolerance_mask,:]-update
+       
+        ##### correction if we get nans/infs
+        non_fin_mask_new=~torch.isfinite(newsource)
+        non_finite_sum=(non_fin_mask_new==True).sum()
+        if(non_finite_sum>0):
+            print("---- non finite in jammy flows sampling.. try to FIX IT .....................")
+            # stop iterations and replace with previous
+            newsource=torch.where(non_fin_mask_new, prev[above_tolerance_mask,:], newsource)
+        ##################
 
         prev=torch.masked_scatter(input=prev, mask=above_tolerance_mask[:,None], source=newsource)
 
