@@ -134,21 +134,6 @@ opts_dict["o"]["kwargs"]["min_derivative"] = (1e-4, lambda x: x > 0)
 S2 flows
 """
 
-## 2-d spherical flow based on conditional implementation
-opts_dict["n"] = dict()
-opts_dict["n"]["module"] = segmented_sphere_nd
-opts_dict["n"]["type"] = "s"
-opts_dict["n"]["kwargs"] = dict()
-opts_dict["n"]["kwargs"]["add_rotation"] = (1, [0,1])
-opts_dict["n"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "angles"])
-opts_dict["n"]["kwargs"]["hidden_dims"] = ("64", lambda x: type(x)==str)
-opts_dict["n"]["kwargs"]["num_basis_functions"] = (10, lambda x: x>0)
-opts_dict["n"]["kwargs"]["higher_order_cylinder_parametrization"] = (False, [True, False])
-opts_dict["n"]["kwargs"]["zenith_type_layers"] = ("r", lambda x: sum([i in ["r", "g", "p", "x", "z", "t"] for i in x])==len(x) )
-opts_dict["n"]["kwargs"]["max_rank"] = (-1, lambda x: (x==-1) or (x>0))
-opts_dict["n"]["kwargs"]["subspace_mapping"] = ("logistic", ["logistic"])
-opts_dict["n"]["kwargs"]["highway_mode"] = (0, [0,1,2,3,4])
-
 # exponential map s2 flow
 opts_dict["v"] = dict()
 opts_dict["v"]["module"] = exponential_map_s2
