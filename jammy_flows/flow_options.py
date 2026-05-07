@@ -118,8 +118,16 @@ opts_dict["o"]["module"] = sphere_spline_1d
 opts_dict["o"]["type"] = "s"
 opts_dict["o"]["kwargs"] = dict()
 opts_dict["o"]["kwargs"]["add_rotation"] = (1, [0,1])
-opts_dict["o"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
+opts_dict["o"]["kwargs"]["num_basis_functions"] = (2, lambda x: x>0)
 opts_dict["o"]["kwargs"]["natural_direction"] = (1, [0,1])
+opts_dict["o"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
+opts_dict["o"]["kwargs"]["smooth_second_derivative"] = (1, [0,1])
+opts_dict["o"]["kwargs"]["fix_first_width_n_height_to_zero"] = (0, [0,1])
+opts_dict["o"]["kwargs"]["also_fix_second_width_to_zero"] = (0, [0,1])
+opts_dict["o"]["kwargs"]["independent_width_height_parametrization"] = (0, [0,1])
+opts_dict["o"]["kwargs"]["min_width"] = (1e-4, lambda x: x > 0)
+opts_dict["o"]["kwargs"]["min_height"] = (1e-4, lambda x: x > 0)
+opts_dict["o"]["kwargs"]["min_derivative"] = (1e-4, lambda x: x > 0)
 
 
 """
@@ -182,13 +190,22 @@ opts_dict["f"]["kwargs"]["vertical_flow_defs"] = ("rr", lambda x: type(x)==str)
 opts_dict["f"]["kwargs"]["correlated_max_rank"] = (3, lambda x: (x>=0))
 opts_dict["f"]["kwargs"]["inverse_z_scaling"] = (1, [0,1])
 opts_dict["f"]["kwargs"]["boundary_cos_theta_identity_region"] = (0.0, lambda x: ( (x>=0) & (x<1) ))
-opts_dict["f"]["kwargs"]["spline_num_basis_functions"] = (5, lambda x: ( x>0))
+opts_dict["f"]["kwargs"]["spline_num_basis_functions"] = (5, lambda x: ( (x>0) | (x==-1)))
 opts_dict["f"]["kwargs"]["vertical_smooth"] = (0, [0,1])
 opts_dict["f"]["kwargs"]["vertical_restrict_max_min_width_height_ratio"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
 opts_dict["f"]["kwargs"]["vertical_fix_boundary_derivative"] = (1, lambda x: [0,1])
+opts_dict["f"]["kwargs"]["vertical_fix_first_width_n_height_to_zero"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["vertical_also_fix_second_width_to_zero"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["vertical_independent_width_height_parametrization"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["circular_add_rotation"] = (0, [0,1])
 opts_dict["f"]["kwargs"]["min_kappa"] = (1e-10, lambda x: x>0)
-opts_dict["f"]["kwargs"]["kappa_prediction"] = ("direct_log_real_bounded", ["direct_log_real_bounded", "softplus_real_bounded", "log_bounded"])
+opts_dict["f"]["kwargs"]["kappa_prediction"] = ("direct_log_real_bounded", ["direct_log_real_bounded", "softplus_real_bounded", "log_bounded", "mu", "mu_squared", "quatvec", "quatvec_squared"])
 opts_dict["f"]["kwargs"]["add_extra_rotation_inbetween"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["add_rotation"] = (1, [0,1])
+opts_dict["f"]["kwargs"]["rotation_mode"] = ("householder", ["householder", "angles", "xyz", "quaternion"])
+opts_dict["f"]["kwargs"]["kappa_clamping"] = (0, [0,1])
+opts_dict["f"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
+
 
 """
 Interval flows
@@ -203,6 +220,13 @@ opts_dict["r"]["kwargs"]["num_basis_functions"] = (5, lambda x: x>0)
 opts_dict["r"]["kwargs"]["fix_boundary_derivatives"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
 opts_dict["r"]["kwargs"]["smooth_second_derivative"] = (0, lambda x: (type(x)==int) & (x >=0) )
 opts_dict["r"]["kwargs"]["restrict_max_min_width_height_ratio"] = (-1.0, lambda x: (x==-1.0) or (x>0.0))
+opts_dict["r"]["kwargs"]["fix_first_width_n_height_to_zero"] = (0, [0,1])
+opts_dict["r"]["kwargs"]["also_fix_second_width_to_zero"] = (0, [0,1])
+opts_dict["r"]["kwargs"]["independent_width_height_parametrization"] = (0, [0,1])
+opts_dict["r"]["kwargs"]["min_width"] = (1e-4, lambda x: x > 0)
+opts_dict["r"]["kwargs"]["min_height"] = (1e-4, lambda x: x > 0)
+opts_dict["r"]["kwargs"]["min_derivative"] = (1e-4, lambda x: x > 0)
+
 
 """
 Simplex flows
