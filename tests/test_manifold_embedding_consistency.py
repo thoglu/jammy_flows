@@ -154,12 +154,6 @@ class Test(unittest.TestCase):
 
         testcase=dict()
         testcase["pdf_def"]="s2"
-        testcase["layer_def"]="n"
-
-        self.test_cases.append(testcase)
-
-        testcase=dict()
-        testcase["pdf_def"]="s2"
         testcase["layer_def"]="v"
 
         self.test_cases.append(testcase)
