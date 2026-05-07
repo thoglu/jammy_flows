@@ -2169,7 +2169,7 @@ class pdf(nn.Module):
                             large_to_small_probs_mask=numpy.argsort(exp_log_evals_list)[::-1]
                             sorted_pos=evalpositions[large_to_small_probs_mask]
 
-                            diffs_sorted=embedded_labels[cur_sample:cur_sample+1,:].cpu().detach().numpy()-sorted_pos
+                            diffs_sorted=embedded_labels[cur_batch_ind:cur_batch_ind+1,:].cpu().detach().numpy()-sorted_pos
         
                             min_index=numpy.argmin( numpy.linalg.norm(diffs_sorted,axis=1))
 
