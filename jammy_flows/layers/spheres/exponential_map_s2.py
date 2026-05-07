@@ -444,7 +444,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
    
 
-    def _inv_flow_mapping(self, inputs, extra_inputs=None):
+    def _inv_flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None):
 
         [x,log_det]=inputs
         
@@ -453,7 +453,7 @@ class exponential_map_s2(sphere_base.sphere_base):
       
         if(extra_inputs is not None):
            
-            potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)
+            potential_pars=extra_inputs.reshape(-1, self.num_potential_pars, self.num_components)
         else:
             potential_pars=self.potential_pars.to(x)
 
@@ -487,7 +487,7 @@ class exponential_map_s2(sphere_base.sphere_base):
 
         return result, log_det, None
 
-    def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
+    def _flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None, sf_extra=None):
         #print("calculating forward flow ?!")
         [x,log_det]=inputs
 
@@ -500,7 +500,7 @@ class exponential_map_s2(sphere_base.sphere_base):
             x, log_det=self.spherical_to_eucl_embedding(x, log_det)
 
         if(extra_inputs is not None):
-            potential_pars=extra_inputs.reshape(x.shape[0], self.num_potential_pars, self.num_components)
+            potential_pars=extra_inputs.reshape(-1, self.num_potential_pars, self.num_components)
         else:
             potential_pars=self.potential_pars.to(x)
         
