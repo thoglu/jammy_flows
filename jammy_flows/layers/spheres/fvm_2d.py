@@ -59,7 +59,8 @@ class fisher_von_mises_2d(sphere_base.sphere_base):
         """
         Symbol: "f"
 
-        Based off of https://arxiv.org/abs/2002.02428.
+        Based off of https://arxiv.org/abs/2002.02428 (conditional rational splines) and 
+        https://arxiv.org/abs/2604.19846, (smooth rational splines and von-mises Fisher scaling functions).
 
         Parameters:
         
