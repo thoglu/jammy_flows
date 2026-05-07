@@ -68,7 +68,7 @@ class Test(unittest.TestCase):
 
             #self.flow_inits.append([ ["s2", "y"], extra_def])
             
-            self.flow_inits.append([ ["s2", "n"], extra_def])
+            self.flow_inits.append([ ["s2", "f"], extra_def])
             
             self.flow_inits.append([ ["e1", "gg"], extra_def])
 
