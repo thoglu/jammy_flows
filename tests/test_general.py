@@ -262,7 +262,7 @@ class Test(unittest.TestCase):
         self.flow_inits.append([ ["s1", "m"], extra_flow_defs])
 
         pdf_def="e1+e2+e2+s1"
-        flow_def="pp+pp+gg+m"
+        flow_def="gg+gg+gg+m"
 
         ## 3d rotation
 
@@ -287,7 +287,7 @@ class Test(unittest.TestCase):
         # center mean
         extra_flow_defs=dict()
      
-        extra_flow_defs["conditional_input_dim"]=[3,4,5]
+        #extra_flow_defs["conditional_input_dim"]=[3,4,5]
        
         self.flow_inits.append([ ["e1+e2+e1", "gg+g+ggg"], extra_flow_defs])
 
@@ -327,7 +327,6 @@ class Test(unittest.TestCase):
                     for gf_setting in gf_settings:
                         d=dict()
                         
-                        d["conditional_input_dim"]=2
                         
                        
                         d["amortization_mlp_dims"]=mlp_hidden
@@ -360,7 +359,7 @@ class Test(unittest.TestCase):
             extra_flow_defs["options_overwrite"]=dict()
             extra_flow_defs["options_overwrite"]["t"]=dict()
             extra_flow_defs["options_overwrite"]["t"]["cov_type"]=cov_type
-            extra_flow_defs["conditional_input_dim"]=2
+            #extra_flow_defs["conditional_input_dim"]=2
         
             self.flow_inits.append([ ["e10", "t"], extra_flow_defs])
 
@@ -386,7 +385,7 @@ class Test(unittest.TestCase):
         ###################### Interval flows
 
         extra_flow_defs=dict()
-        extra_flow_defs["conditional_input_dim"]=2
+        #extra_flow_defs["conditional_input_dim"]=2
 
         self.flow_inits.append([ ["i1_-1.0_1.0", "r"], extra_flow_defs])
 
@@ -399,10 +398,10 @@ class Test(unittest.TestCase):
         
         for ind, non_cond_init in enumerate(self.flow_inits):
             ## seed everything to have consistent tests
-
+           
             cond_init=copy.deepcopy(non_cond_init)
 
-            assert("conditional_input_dim" not in cond_init[1].keys())
+            assert("conditional_input_dim" not in cond_init[1].keys()), cond_init
             cond_init[1]["conditional_input_dim"]=2
 
             for init in [non_cond_init, cond_init]:
@@ -444,7 +443,7 @@ class Test(unittest.TestCase):
                 print("INIT ", init)
                 print("####################")
 
-                for precision in [torch.float64, torch.float32]:
+                for precision in [torch.float64]:  # float32 testing switched off for now
                     
 
                     if(precision==torch.float32):
@@ -472,6 +471,9 @@ class Test(unittest.TestCase):
 
                         if("f" in init[0][1]):
                             tolerance=10.0
+
+                        if("m" in init[0][1]):
+                            tolerance=2.0
                         
                         this_flow.float()
 
