@@ -73,16 +73,6 @@ opts_dict["h"]["kwargs"]["width_smooth_saturation"]=(1, [0,1]) #
 opts_dict["h"]["kwargs"]["regulate_normalization"]=(1, [0,1])
 opts_dict["h"]["kwargs"]["add_skewness"]=(0, [0,1])
 
-# polynomial stretch flow
-opts_dict["p"] = dict()
-opts_dict["p"]["module"] = psf_block
-opts_dict["p"]["type"] = "e"
-opts_dict["p"]["kwargs"] = dict()
-opts_dict["p"]["kwargs"]["num_householder_iter"] = (-1, lambda x: (x==-1) or (x>0))
-opts_dict["p"]["kwargs"]["num_transforms"] = (1, lambda x: x>0)
-opts_dict["p"]["kwargs"]["exact_mode"] = (True, [True, False])
-opts_dict["p"]["kwargs"]["skip_model_offset"]=(0, [0,1])
-
 # Multivariate Normal
 opts_dict["t"] = dict()
 opts_dict["t"]["module"] = mvn_block

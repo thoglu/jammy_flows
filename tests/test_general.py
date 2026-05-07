@@ -248,7 +248,7 @@ class Test(unittest.TestCase):
         
         self.flow_inits.append([ ["s2", "c"], dict()])
 
-        self.flow_inits.append([ ["e1", "p"], dict()])
+    
         self.flow_inits.append([ ["e1", "g"], dict()])
         self.flow_inits.append([ ["s1", "m"], dict()])
         self.flow_inits.append([ ["s1", "o"], dict()])
