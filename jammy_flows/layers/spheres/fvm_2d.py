@@ -9,7 +9,6 @@ from ..bisection_n_newton import inverse_bisection_n_newton_sphere, inverse_bise
 from ...amortizable_mlp import AmortizableMLP
 from ...extra_functions import list_from_str
 
-from ..euclidean.polynomial_stretch_flow import psf_block
 from ..euclidean.euclidean_do_nothing import euclidean_do_nothing
 
 from ...extra_functions import NONLINEARITIES

@@ -1,6 +1,5 @@
 from .layers.euclidean.gaussianization_flow import gf_block
 from .layers.euclidean.gaussianization_flow_old import gf_block_old
-from .layers.euclidean.polynomial_stretch_flow import psf_block
 from .layers.euclidean.multivariate_normal import mvn_block
 from .layers.euclidean.euclidean_do_nothing import euclidean_do_nothing
 
