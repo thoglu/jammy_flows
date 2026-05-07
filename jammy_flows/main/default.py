@@ -1,12 +1,6 @@
 import torch
 from torch import nn
 
-from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
-from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks
-from ..amortizable_mlp import AmortizableMLP
-from ..helper_fns import contours, grid_functions
-from ..helper_fns.coverage import calculate_approximate_coverage
-from ..helper_fns.plotting.spherical import get_multiresolution_evals
 import collections
 import numpy
 import copy
@@ -14,6 +8,18 @@ import sys
 import scipy
 import math
 import time
+
+import glob
+import os
+
+from .zlp_kent_ml_fit import fit_zlpkent_batch_quat
+
+from ..flow_options import check_flow_option, obtain_default_options, obtain_overall_flow_info
+from ..extra_functions import list_from_str, NONLINEARITIES, recheck_sampling, find_init_pars_of_chained_blocks
+from ..amortizable_mlp import AmortizableMLP
+from ..helper_fns import contours, grid_functions
+from ..helper_fns.coverage import calculate_approximate_coverage
+from ..helper_fns.plotting.spherical import get_multiresolution_evals,plot_multiresolution_healpy
 
 try:
     import healpy
@@ -51,7 +57,8 @@ class pdf(nn.Module):
         amortization_mlp_highway_mode=0,
         amortize_everything=False,
         use_as_passthrough_instead_of_pdf=False,
-        skip_mlp_initialization=False
+        skip_mlp_initialization=False,
+        verbose=False
     ):  
         """
         The main class of the project that defines a pytorch normalizing-flow PDF.
@@ -117,7 +124,8 @@ class pdf(nn.Module):
                                    options_overwrite, 
                                    conditional_input_dim, 
                                    amortization_mlp_dims, 
-                                   amortization_mlp_ranks)
+                                   amortization_mlp_ranks,
+                                   verbose=verbose)
        
         self.init_flow_structure()
         
@@ -148,7 +156,8 @@ class pdf(nn.Module):
                               options_overwrite,
                               conditional_input_dim,
                               amortization_mlp_dims,
-                              amortization_mlp_ranks):
+                              amortization_mlp_ranks,
+                              verbose=False):
         
         # list of the pdf defs (e.g. e2 for 2-d Euclidean) for each subpdf
         # i.e. e2+s2 will yield 2 entries, one for each manifold
@@ -208,7 +217,9 @@ class pdf(nn.Module):
 
                             for detail_opt in options_overwrite[k][detail_abbrv].keys():
 
-                                print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                if(verbose):
+                                    print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                
                                 overwrote_default=True
 
                                 check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
@@ -233,7 +244,9 @@ class pdf(nn.Module):
                                     
                                     for detail_opt in options_overwrite[k][detail_abbrv].keys():
 
-                                        print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind],cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                        if(verbose):
+                                            print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind],cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_abbrv][detail_opt])
+                                        
                                         overwrote_default=True
 
                                         check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_abbrv][detail_opt])
@@ -248,7 +261,10 @@ class pdf(nn.Module):
                         if(k==flow_abbrv):
 
                             for detail_opt in options_overwrite[k].keys():
-                                print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_opt])
+
+                                if(verbose):
+                                    print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) options overwrite " % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ), detail_opt, " with ", options_overwrite[k][detail_opt])
+                                
                                 overwrote_default=True
 
                                 check_flow_option(flow_abbrv, detail_opt, options_overwrite[k][detail_opt])
@@ -257,7 +273,9 @@ class pdf(nn.Module):
 
 
                 if(overwrote_default==False):
-                    print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) - using *default* options" % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ))
+
+                    if(verbose):
+                        print("sub-manifold (%d - %s - %s) and intra-manifold flow (%d - %s) - using *default* options" % (ind, self.pdf_defs_list[ind], cur_flow_defs, cur_flow_index,flow_abbrv ))
 
                 cur_flow_index+=1
 
@@ -864,7 +882,8 @@ class pdf(nn.Module):
                           data_summary, 
                           amortization_parameters=None, 
                           force_embedding_coordinates=False, 
-                          force_intrinsic_coordinates=False):
+                          force_intrinsic_coordinates=False,
+                          only_last=False):
         """
         Performs the autoregressive (IAF) backward normalizing-flow mapping of all sub-manifold flows.
 
@@ -995,7 +1014,16 @@ class pdf(nn.Module):
                 
                 if(l==(len(pdf_layers)-1)):
                     # force embedding or intrinsic coordinates in the layer that defines the target dimension
-                    this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+                    
+                    if(only_last):
+                        if(self.pdf_defs_list[pdf_index][0]=="s"):
+                            this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params, fix_euclidean_to_sphere_first=True)
+                        else:
+                            this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+                        break
+                    else:
+                        this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+
                 else:
 
                     this_target, log_det = layer.inv_flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
@@ -1033,7 +1061,8 @@ class pdf(nn.Module):
                 conditional_input=None,
                 amortization_parameters=None, 
                 force_embedding_coordinates=False, 
-                force_intrinsic_coordinates=False):
+                force_intrinsic_coordinates=False,
+                only_last=False):
         """
         Calculates log-probability at the target *x*. Also returns some other quantities that are calculated as a consequence.
 
@@ -1075,7 +1104,7 @@ class pdf(nn.Module):
 
         tot_log_det = torch.zeros(x.shape[0]).type_as(x)
 
-        base_pos, tot_log_det=self.all_layer_inverse(x, tot_log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+        base_pos, tot_log_det=self.all_layer_inverse(x, tot_log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates, only_last=only_last)
 
         ## must faster calculation based on std normal
         other=torch.distributions.Normal(
@@ -1278,7 +1307,8 @@ class pdf(nn.Module):
                force_intrinsic_coordinates=False,
                failsafe_crosscheck_tolerance=None,
                dtype=None,
-               device=None):
+               device=None,
+               only_last=False):
         """ 
         Samples from the (conditional) PDF. 
 
@@ -1319,7 +1349,8 @@ class pdf(nn.Module):
                                                                                          force_intrinsic_coordinates=force_intrinsic_coordinates,
                                                                                          failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
                                                                                          device=device,
-                                                                                         dtype=dtype)
+                                                                                         dtype=dtype,
+                                                                                         only_last=only_last)
 
 
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
@@ -1334,7 +1365,8 @@ class pdf(nn.Module):
                                                                                              force_intrinsic_coordinates=force_intrinsic_coordinates,
                                                                                              failsafe_crosscheck_tolerance=failsafe_crosscheck_tolerance,
                                                                                              device=device,
-                                                                                             dtype=dtype)
+                                                                                             dtype=dtype,
+                                                                                             only_last=only_last)
            
             return sample, normal_base_sample, log_pdf_target, log_pdf_base
 
@@ -1344,7 +1376,8 @@ class pdf(nn.Module):
                           data_summary, 
                           amortization_parameters=None,
                           force_embedding_coordinates=False, 
-                          force_intrinsic_coordinates=False):
+                          force_intrinsic_coordinates=False,
+                          only_last=False):
 
         """
         Performs the autoregressive (IAF) forward normalizing-flow mapping of all sub-manifold flows.
@@ -1453,12 +1486,23 @@ class pdf(nn.Module):
                 if extra_params is not None:
                     
                     this_extra_params = extra_params[:, extra_param_counter : extra_param_counter + layer.total_param_num]
-              
-                if(l==(len(pdf_layers)-1)):
-                    this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+
+                if(only_last):
+                    if(l<(len(pdf_layers)-1) ):
+                        extra_param_counter += layer.total_param_num
+                        continue
+
+                if(only_last):
+                 
+                    if(self.pdf_defs_list[pdf_index][0]=="s"):
+                        this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params, fix_euclidean_to_sphere_first=True)
+                    elif(self.pdf_defs_list[pdf_index][0]=="e"):
+                        this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
+                    else:
+                        raise Exception("Flow type ", self.pdf_defs_list[pdf_index][0], " does not supported *only_last*!")
                 else:
                     this_target, log_det = layer.flow_mapping([this_target, log_det], extra_inputs=this_extra_params)
-                
+              
                 extra_param_counter += layer.total_param_num
 
             new_targets.append(this_target)
@@ -1496,7 +1540,8 @@ class pdf(nn.Module):
                        force_intrinsic_coordinates=False,
                        failsafe_crosscheck_tolerance=None,
                        dtype=None,
-                       device=None):
+                       device=None,
+                       only_last=False):
         """
         Obtains a sample from the Multivariate Standard Normal, evaluates it and passes it through forward machinery. 
         When *predefined_target_input* is given, takes this as a sample.
@@ -1621,7 +1666,7 @@ class pdf(nn.Module):
 
         log_det = torch.zeros(used_sample_size).type(data_type).to(used_device)
         
-        new_targets, log_det=self.all_layer_forward(x, log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates)
+        new_targets, log_det=self.all_layer_forward(x, log_det, conditional_input, amortization_parameters=amortization_parameters, force_embedding_coordinates=force_embedding_coordinates, force_intrinsic_coordinates=force_intrinsic_coordinates, only_last=only_last)
 
         ## failsafe crosscheck?
 
@@ -1980,7 +2025,7 @@ class pdf(nn.Module):
                                  calculate_MAP=False):
 
         """
-        Calculates coverage (approximate) and possibly exact. Performs pdf scan for exact coverage and save scan if desired.
+        Calculates coverage (base-ordered, HPD, -> here called *approximate*) and possibly exact ("Target-orered", HPD). Performs pdf scan for exact coverage and save scan if desired.
         The pdf scan and the exact coverage must be calculated in intrinsic coordinates (e.g. theta/phi for direction instead of dx/dy/dz).
 
         Parameters:
@@ -2009,8 +2054,8 @@ class pdf(nn.Module):
         return_dict=dict()
 
         embedded_labels=None
-        if(exact_coverage_calculation):
-            assert(labels is not None)
+        #if(exact_coverage_calculation):
+        #    assert(labels is not None)
 
         batch_size=1
         if(conditional_input is not None):
@@ -2058,7 +2103,7 @@ class pdf(nn.Module):
                 samples_per_event=10000
 
                 data_summary_repeated=None
-                print("self pdf defs list", self.pdf_defs_list)
+                
                 if(self.pdf_defs_list[0][0]=="e"):
                     ## make sure only Euclidean sub dimensions
 
@@ -2107,24 +2152,29 @@ class pdf(nn.Module):
                             pdf_scan_volume_sizes.append(bin_volumes)                                                                  
                                                                                                            
                                                                                                   
-                        if(exact_coverage_calculation):
+                        if(exact_coverage_calculation and (labels is not None)):
 
+                            ## log_evals is a batched tensor of shape (1,N), since get_pdf_on_grid can return batched output
+                            ## we take the first item only
                             exp_log_evals_list=numpy.exp(log_evals)[0].flatten()
-                            ## expected coverage
-                            actual_expected_coverage=numpy.linspace(0, 1.0, coverage_num_percentile_points)#=[0.39,0.5,0.68,0.95]
 
-                            if(conditional_input is not None):
-                                if(type(conditional_input)==list):  
-                                    data_summary_single=[ci[cur_batch_ind:cur_batch_ind+1] for ci in conditional_input]
-                                else:
-                                    data_summary_single=conditional_input[cur_batch_ind:cur_batch_ind+1]
+                            ###
+                            large_to_small_probs_mask=numpy.argsort(exp_log_evals_list)[::-1]
+                            sorted_pos=evalpositions[large_to_small_probs_mask]
 
-                
-                            all_joined_contours=contours.compute_contours(actual_expected_coverage, exp_log_evals_list, bin_volumes, sample_points=evalpositions[0])
+                            diffs_sorted=embedded_labels[cur_sample:cur_sample+1,:].cpu().detach().numpy()-sorted_pos
+        
+                            min_index=numpy.argmin( numpy.linalg.norm(diffs_sorted,axis=1))
 
-                            ## find closest contour to truth
-                            cb=contours.find_closest_contour(self, embedded_labels[cur_batch_ind], all_joined_contours, actual_expected_coverage)
-                            real_cov_values.append(cb)
+                            # find index of label
+
+                            if( type(bin_volumes)==float or type(bin_volumes)==numpy.float64):
+                                sorted_evals=bin_volumes*exp_log_evals_list[large_to_small_probs_mask]
+                            else:
+                                sorted_evals=bin_volumes[large_to_small_probs_mask]*exp_log_evals_list[large_to_small_probs_mask]
+                            real_cov_value=numpy.cumsum(sorted_evals)[min_index]
+
+                            real_cov_values.append(real_cov_value)
 
                 elif(self.pdf_defs_list[0][0]=="s"):
 
@@ -2142,6 +2192,7 @@ class pdf(nn.Module):
                             else:
                                 single_conditional_input=conditional_input[cur_sample:cur_sample+1]
                         
+                      
                         eval_positions, log_pdf_evals, pdf_evals, eval_areas, _ = get_multiresolution_evals(self, samplesize=10000, conditional_input=single_conditional_input, max_entries_per_pixel=5)
                         if((~numpy.isfinite(log_pdf_evals)).sum()>0):
                             print("nonfint")
@@ -2159,22 +2210,22 @@ class pdf(nn.Module):
                         embedding_max_position,_=self.transform_target_space(torch.from_numpy(max_positions_angles[-1]), transform_from="intrinsic", transform_to="embedding")
                         max_positions.append(embedding_max_position.numpy())
                         
-                        if(exact_coverage_calculation):
-                            ## interested proportions for target space coverage
-                            ## TODO: fix start/ending to 0/1
-                            actual_expected_coverage=numpy.linspace(0.02, 0.98, coverage_num_percentile_points)
+                        if(exact_coverage_calculation and (labels is not None)):
 
-                            ## resulting contours
-                            xy_contours_for_coverage_temp=contours.compute_contours(actual_expected_coverage, pdf_evals, eval_areas, manifold="sphere")
-                            xy_contours_for_coverage=[]
-                            for tc in xy_contours_for_coverage_temp:
-                       
-                                xy_contours_for_coverage.append([self.transform_target_space(torch.from_numpy(ii), transform_from="intrinsic", transform_to="embedding")[0].detach().numpy() for ii in tc])
-                            
-                            ## obtain coverage value of truth
+                            xyz_positions,_=self.transform_target_space(torch.from_numpy(eval_positions), transform_from="intrinsic", transform_to="embedding")
+                            xyz_positions=xyz_positions.numpy()
 
-                            real_cov_value=contours.find_closest_contour(self, embedded_labels[cur_sample], xy_contours_for_coverage, actual_expected_coverage)
-                            #real_cov_value=sl_env_helper_fns.get_real_coverage_value(embedded_labels[cur_sample:cur_sample+1], xy_contours_for_coverage, interested_proportions)
+                            large_to_small_probs_mask=numpy.argsort(log_pdf_evals)[::-1]
+                            sorted_pos=xyz_positions[large_to_small_probs_mask]
+
+                            diffs_sorted=embedded_labels[cur_sample:cur_sample+1,:].cpu().detach().numpy()-sorted_pos
+        
+                            min_index=numpy.argmin( numpy.linalg.norm(diffs_sorted,axis=1))
+
+                            # find index of label
+
+                            sorted_evals=eval_areas[large_to_small_probs_mask]*numpy.exp(log_pdf_evals[large_to_small_probs_mask])
+                            real_cov_value=numpy.cumsum(sorted_evals)[min_index]
 
                             real_cov_values.append(real_cov_value)
 
@@ -2186,7 +2237,8 @@ class pdf(nn.Module):
 
                 if(calculate_MAP):  
                     return_dict["map_positions"]=numpy.concatenate(max_positions)
-                if(exact_coverage_calculation):
+                if(exact_coverage_calculation and (labels is not None)):
+
                     return_dict["real_cov_values"]=numpy.array(real_cov_values)
 
                 if(save_pdf_scan):
@@ -3240,7 +3292,8 @@ class pdf(nn.Module):
                          device=None,
                          verbose=False,
                          s2_entropy_scanning=False,
-                         s2_entropy_scan_nside=32):
+                         s2_entropy_scan_nside=32,
+                         return_samples=False):
         """
         Calculate the first and second central moments of the marginal distributions. For Euclidean manifolds it calculates a Gaussian approximation, for spherical distributions calculates
         a von-Mises approximation. Because these are the respective maximum entropy distributions, their entropy should always be larger than the original distribution.
@@ -3258,6 +3311,7 @@ class pdf(nn.Module):
             device (torch.device): If given, uses this device. Otherwise uses device from parameters.
             verbose (bool): Some extra print statements on runtime.
             s2_entropy_scanning (bool): Use a healpix scan to determine entropy .. can be faster for certain s2 distributions.
+            return_samples (bool): Return samples used to calculate the moments.
 
         Returns:
 
@@ -3458,6 +3512,8 @@ class pdf(nn.Module):
                 # also calculate total entropy [-1], because it is no extra cost 
 
                 if(s2_entropy_scanning):
+                    # s2_entropy_scanning is an outdated way to calculate he  entropy purely from log_pdf evaluations
+                    # for flows that are very slow in the forward pass
                     assert(self.pdf_defs_list[0]=="s2")
 
                     ent_vec=[]
@@ -3642,7 +3698,7 @@ class pdf(nn.Module):
 
                 else:
                     ## we have sample_logprobs
-                    print("sample logprobs shape", sample_logprobs.shape)
+                    
                     reshaped_log_pdfs=sample_logprobs.reshape(initial_batch_size, samplesize)
 
                 index_mask=torch.argmax(reshaped_log_pdfs, dim=1)
@@ -3657,6 +3713,9 @@ class pdf(nn.Module):
 
 
                 these_subsamples=samples[:, :, self.target_dim_indices_embedded[sub_pdf_dim][0]:self.target_dim_indices_embedded[sub_pdf_dim][1]]
+
+                if(return_samples):
+                    return_dict["samples_%d" % sub_pdf_dim]=these_subsamples.cpu().numpy()
 
                 if("e" in sub_pdf_def):
 
@@ -3723,6 +3782,12 @@ class pdf(nn.Module):
 
                     angle_mean,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(this_mean, 0.0)
 
+                    ## add angle samples if wanted
+                    angle_subsamples,_=self.layer_list[sub_pdf_dim][0].eucl_to_spherical_embedding(these_subsamples, 0.0)
+                    if(return_samples):
+                        return_dict["samples_%d_angles" % sub_pdf_dim]=angle_subsamples.cpu().numpy()
+
+
                     # max PDF value
                     if(index_mask is not None):
                         this_arg_max=these_subsamples[torch.arange(initial_batch_size), index_mask]
@@ -3731,6 +3796,7 @@ class pdf(nn.Module):
 
                     return_dict["mean_%d_angles"%sub_pdf_dim]=angle_mean.cpu().numpy()
                     
+                    ## calculate 
 
                     normalized_length_R=sample_sum_length/samplesize
 
@@ -3739,6 +3805,26 @@ class pdf(nn.Module):
                     elif("2" in sub_pdf_def):
                         p=3
 
+                    ### calculate quasi-euclidean variance in zen/azi in 3-d
+                    if(p==3):
+                       
+                        # diff to mean
+                        shifted_azimuth=(angle_subsamples[...,1:2]-angle_mean.unsqueeze(1)[...,1:2]).squeeze(-1)
+
+                        # re-align to 0-2pi where mean is at 0
+                        shifted_azimuth=torch.where(shifted_azimuth<0, shifted_azimuth+2*numpy.pi, shifted_azimuth)
+
+                        #re-align to -pi-pi where mean is still at 0
+                        shifted_azimuth=torch.where(shifted_azimuth>=numpy.pi, shifted_azimuth-2*numpy.pi, shifted_azimuth)
+                        
+                        return_dict["azivar_%d" % sub_pdf_dim]=numpy.var(shifted_azimuth.cpu().numpy(), axis=-1)
+
+                        #zen_diffs=(angle_subsamples[...,0:1]-angle_mean.unsqueeze(1)[...,0:1]).squeeze(-1)
+                        return_dict["zenvar_%d" % sub_pdf_dim]=numpy.var(angle_subsamples[...,0:1].cpu().numpy(), axis=1)[:,-1]
+                       
+
+
+                    ## perform vmf fixed-point iterations (fixed-point ml fit)
                     last_vec=(normalized_length_R*(p-normalized_length_R**2)/(1-normalized_length_R**2))
                     
                     max_iter=20
@@ -3748,6 +3834,7 @@ class pdf(nn.Module):
                     last_vec_cpu=last_vec.cpu()
                     cpu_length=normalized_length_R.cpu()
 
+                    # vmf ml iterations in kappa (last_vec/this_var)
                     for i in range(max_iter):
 
                         new_vec=newton_iter(last_vec_cpu, p,cpu_length)
@@ -3759,9 +3846,18 @@ class pdf(nn.Module):
                             break
 
                         last_vec_cpu=new_vec
-                        
-                    ## set back to device before newton iters
+
                     this_var=last_vec_cpu
+                    
+                    ## zlp-Kent fit
+                    res=fit_zlpkent_batch_quat(these_subsamples, mu_vmf=this_mean, kappa_vmf=this_var, fast_path=True)
+                   
+                    return_dict["zlp_kent_gamma1_%d"%sub_pdf_dim]=res["gamma1"]
+                    return_dict["zlp_kent_gamma2_%d"%sub_pdf_dim]=res["gamma2"]
+                    return_dict["zlp_kent_gamma3_%d"%sub_pdf_dim]=res["gamma3"]
+                    return_dict["zlp_kent_kappa_%d"%sub_pdf_dim]=res["kappa"]
+                    return_dict["zlp_kent_u_%d"%sub_pdf_dim]=res["u"]
+
 
                     if(p==2):
 
@@ -3784,8 +3880,6 @@ class pdf(nn.Module):
                         #c_p_k*=1e-5
                         #a_p_k=(iv(1.5, this_var)/iv(0.5, this_var)).to(angle_mean)
                         
-
-
                     this_var=this_var.to(angle_mean)
                         
                     approx_entropy=(-log_c_p_k-this_var*a_p_k).squeeze(1)
