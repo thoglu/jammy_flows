@@ -54,7 +54,7 @@ class moebius(sphere_base.sphere_base):
         ## natural direction means no bisection in the forward pass, but in the backward pass
         self.natural_direction=natural_direction
 
-    def _inv_flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
+    def _inv_flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None, sf_extra=None):
 
         [x,log_det]=inputs
 
@@ -98,7 +98,7 @@ class moebius(sphere_base.sphere_base):
        
         return x, log_det
 
-    def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
+    def _flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None, sf_extra=None):
         
        
         [x,log_det]=inputs

@@ -360,7 +360,7 @@ class cnf_sphere_charts(sphere_base.sphere_base):
     def num_evals(self):
         return self.odefunc._num_evals.item()
     """
-    def _inv_flow_mapping(self, inputs, extra_inputs=None):
+    def _inv_flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None):
 
         #if(self.higher_order_cylinder_parametrization):
         #    print("extra params MLP", extra_inputs[0,self.num_mlp_params-self.total_euclidean_pars:self.num_mlp_params])
@@ -385,7 +385,7 @@ class cnf_sphere_charts(sphere_base.sphere_base):
 
         return res, log_det, None
 
-    def _flow_mapping(self, inputs, extra_inputs=None, sf_extra=None):
+    def _flow_mapping(self, inputs, extra_inputs=None, extra_inputs_base=None, sf_extra=None):
         
         [x,log_det]=inputs
 
