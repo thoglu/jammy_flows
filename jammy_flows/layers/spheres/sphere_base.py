@@ -72,6 +72,7 @@ class sphere_base(layer_base.layer_base):
         self.rotation_mode=rotation_mode
         self.add_rotation=add_rotation
 
+        ## houeholder params stands for any rotation params here
         self.num_householder_params=0
 
         if(self.add_rotation):
@@ -103,7 +104,8 @@ class sphere_base(layer_base.layer_base):
                 self.num_householder_params=self.num_householder_iter*(dimension+1)
                 
         if(use_permanent_parameters):
-            self.householder_params=nn.Parameter(torch.randn((1, self.num_householder_params  )))
+            if(self.num_householder_params>0):
+                self.householder_params=nn.Parameter(torch.randn((1, self.num_householder_params  )))
 
         self.total_param_num+=self.num_householder_params
 

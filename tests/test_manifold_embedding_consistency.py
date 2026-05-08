@@ -104,7 +104,7 @@ def setup_and_test_multiple_pdfs(pdf_def, layer_def):
         intrinsic_forced_embedded_eval,_,_=intrinsic_pdf(embedded_sample, force_embedding_coordinates=True)
       
         for ind in range(1):
-            
+
             res1=torch.autograd.grad(normal_eval[ind], normal_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
             res2=torch.autograd.grad(embedded_eval[ind], embedded_pdf.parameters(), allow_unused=False, retain_graph=True)[0]
 
