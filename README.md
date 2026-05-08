@@ -41,11 +41,11 @@ Also check out the [example notebook](examples/examples.ipynb).
 
 ### Spherical flows:
 
-### S1:
+#### S1:
 - [x] Moebius transformations  (described in [arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"m"**)
 - [x] Circular rational-quadratic splines  (described in [arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"o"**)
 
-### S2:
+#### S2:
 - [x] Autorregressive flow for the 2-sphere based on rational-quadratic splines (neural spline flows) ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"f"** with specific options)
 - [x] smooth rational-quadratic splines with von-Mises-Fisher scaling functions ([arXiv:2604.19846](https://arxiv.org/abs/2604.19846)) (**"f"** with specific options)
 - [x] Exponential map flow ([arXiv:0906.0874](https://arxiv.org/abs/0906.0874)/[arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"v"**)
