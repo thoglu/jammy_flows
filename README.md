@@ -2,7 +2,7 @@
 
 <img src="https://github.com/thoglu/jammy_flows/workflows/build/badge.svg"> <img src="https://github.com/thoglu/jammy_flows/workflows/tests/badge.svg">
 
-This package implements (conditional) PDFs with **J**oint **A**utoregressive **M**anifold (**MY**) normalizing-flows. It grew out of work for the paper [Unifying supervised learning and VAEs - coverage, systematics and goodness-of-fit in normalizing-flow based neural network models for astro-particle reconstructions [arXiv:2008.05825]](https://arxiv.org/abs/2008.05825) and includes the paper's described methodology for coverage calculation of PDFs on tensor products of manifolds. For Euclidean manifolds, it includes an updated implementation of the [offical implementation](https://github.com/chenlin9/Gaussianization_Flows) of [Gaussianization flows [arXiv:2003.01941]](https://arxiv.org/abs/2003.01941), where now the inverse is differentiable (adding Newton iterations to the bisection) and made more stable using better approximations of the inverse Gaussian CDF. Several other state-of-the art flows are implemented sometimes using slight modifications or extensions.
+This package implements (conditional) PDFs with **J**oint **A**utoregressive **M**anifold (**MY**) normalizing-flows. It grew out of work for the paper [Unifying supervised learning and VAEs - coverage, systematics and goodness-of-fit in normalizing-flow based neural network models for astro-particle reconstructions [arXiv:2008.05825]](https://arxiv.org/abs/2008.05825). For Euclidean manifolds, it includes an updated implementation of the [offical implementation](https://github.com/chenlin9/Gaussianization_Flows) of [Gaussianization flows [arXiv:2003.01941]](https://arxiv.org/abs/2003.01941), where now the inverse is differentiable (adding Newton iterations to the bisection) and made more stable using better approximations of the inverse Gaussian CDF. Several other state-of-the art flows are implemented sometimes using slight modifications or extensions. For example neural spline flows can be modified to have smoothness constraints (as decribed in [arXiv:2604.19846](https://arxiv.org/abs/2604.19846)), which allows them to behave numerically more stable in conditional settings.
 
 The package has a simple syntax that lets the user define a PDF and get going with a single line of code that **should just work**. To define a 10-d PDF, with 4 Euclidean dimensions, followed by a 2-sphere, followed again by 4 Euclidean dimensions, one could for example write
 ```
@@ -38,7 +38,6 @@ Also check out the [example notebook](examples/examples.ipynb).
 
 - [x] Generic affine flow (Multivariate normal distribution) (**"t"**)
 - [x] Gaussianization flow [arXiv:2003.01941](https://arxiv.org/abs/2003.01941) (**"g"**)
-- [x] Hybrid of nonlinear scalings and rotations ("Polynomial Stretch flow") (**"p"**)
 
 ### Spherical flows:
 
@@ -47,17 +46,18 @@ Also check out the [example notebook](examples/examples.ipynb).
 - [x] Circular rational-quadratic splines  (described in [arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"o"**)
 
 ### S2:
-- [x] Autorregressive flow for N-Spheres ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"n"**)
+- [x] Autorregressive flow for the 2-sphere based on rational-quadratic splines (neural spline flows) ([arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"f"** with specific options)
+- [x] smooth rational-quadratic splines with von-Mises-Fisher scaling functions ([arXiv:2604.19846](https://arxiv.org/abs/2604.19846)) (**"f"** with specific options)
 - [x] Exponential map flow ([arXiv:0906.0874](https://arxiv.org/abs/0906.0874)/[arXiv:2002.02428](https://arxiv.org/abs/2002.02428)) (**"v"**)
 - [x] Neural Manifold Ordinary Differential Equations [arXiv:2006.10254](https://arxiv.org/abs/2006.10254) (**"c"**)
  
 ### Interval Flows:
 
-- [x] "Neural Spline Flows" (Rational-quadratic splines) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032) (**"r"**)
+- [x] "Neural Spline Flows" (Rational-quadratic splines) (new in v 1.1 - smooth neural spline flows) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032) (**"r"**)
 
 ### Simplex Flows:
 
-- [x] Autoregressive simplex flow [arXiv:2008.05456](https://arxiv.org/abs/2008.05456) (**"w"**)
+- [x] Autoregressive simplex flow (experimental) [arXiv:2008.05456](https://arxiv.org/abs/2008.05456) (**"w"**)
 
 For a description of all flows and abbreviations, have a look in the docs [here](https://thoglu.github.io/jammy_flows/usage/api.html#module-jammy_flows.layers.layer_base).
 
