@@ -197,7 +197,7 @@ class sphere_base(layer_base.layer_base):
                     sq = torch.sum(x[:, ind:] ** 2, dim=1, keepdims=True)
                     denom = torch.sqrt(torch.clamp(sq, min=1e-8))
                     arg = x[:, ind:ind+1] / denom
-                    arg = torch.clamp(arg, -1.0, 1.0)
+                    arg = torch.clamp(arg, -1.0 + 1e-4, 1.0 - 1e-4)
                     new_angle = torch.acos(arg)
 
                     #mask_smaller=(x[:,ind+1:ind+2]<0).double()
