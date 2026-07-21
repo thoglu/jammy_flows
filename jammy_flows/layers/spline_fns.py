@@ -288,7 +288,7 @@ def rational_quadratic_spline_with_linear_extension(inputs,
                                                   - 2 * input_delta))
             c = - input_delta * (inputs - input_cumheights)
 
-            discriminant = b.pow(2) - 4 * a * c
+            discriminant = (b.pow(2) - 4 * a * c).clamp(min=0)
             #assert (discriminant >= 0).all(), (inputs[discriminant<0], input_cumwidths[discriminant<0], input_cumheights[discriminant<0], input_bin_widths[discriminant<0], input_heights[discriminant<0],bin_idx[discriminant<0],discriminant[discriminant<0], a[discriminant<0], b[discriminant<0], c[discriminant<0], a,b,c )
 
             root = (2 * c) / (-b - torch.sqrt(discriminant))
@@ -322,11 +322,18 @@ def rational_quadratic_spline_with_linear_extension(inputs,
                                          + input_derivatives * theta_one_minus_theta)
             denominator = input_delta + ((input_derivatives + input_derivatives_plus_one - 2 * input_delta)
                                          * theta_one_minus_theta)
+            # Safe denominator: for inputs in the linear tail (inputs<=left / >=right) the
+            # torch.where below overwrites outputs/logabsdet, but autograd still backprops
+            # through this RQ branch evaluated at extrapolated theta, where denominator and
+            # derivative_numerator can be <=0 -> inf/NaN in the dead branch -> NaN gradient.
+            # clamp_min keeps the dead branch finite; in-range rows are >> 1e-8 so unaffected.
+            denominator = denominator.clamp_min(1e-8)
             outputs = input_cumheights + numerator / denominator
 
             derivative_numerator = input_delta.pow(2) * (input_derivatives_plus_one * theta.pow(2)
                                                          + 2 * input_delta * theta_one_minus_theta
                                                          + input_derivatives * (1 - theta).pow(2))
+            derivative_numerator = derivative_numerator.clamp_min(1e-8)
             logabsdet = torch.log(derivative_numerator) - 2 * torch.log(denominator)
 
             ## fill in linear bits
