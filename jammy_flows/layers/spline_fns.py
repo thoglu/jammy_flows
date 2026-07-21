@@ -288,7 +288,7 @@ def rational_quadratic_spline_with_linear_extension(inputs,
                                                   - 2 * input_delta))
             c = - input_delta * (inputs - input_cumheights)
 
-            discriminant = b.pow(2) - 4 * a * c
+            discriminant = (b.pow(2) - 4 * a * c).clamp(min=0)
             #assert (discriminant >= 0).all(), (inputs[discriminant<0], input_cumwidths[discriminant<0], input_cumheights[discriminant<0], input_bin_widths[discriminant<0], input_heights[discriminant<0],bin_idx[discriminant<0],discriminant[discriminant<0], a[discriminant<0], b[discriminant<0], c[discriminant<0], a,b,c )
 
             root = (2 * c) / (-b - torch.sqrt(discriminant))
