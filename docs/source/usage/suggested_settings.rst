@@ -24,6 +24,7 @@ Example for 1-d:
     opt_dict["g"]["lower_bound_for_widths"]=0.01 # bound found empirically to work well
 
     pdf=jammy_flows.pdf("e1", "gggt", options_overwrite=opt_dict) # also in 1-d multiple g flows can help, especially with tail behavior
+    pdf.double() # double precision usually necessary to avoid numerical issues
 
 Example for 3-d:
 
@@ -38,7 +39,8 @@ Example for 3-d:
     opt_dict["g"]["lower_bound_for_widths"]=0.01 # bound found empirically to work well
 
     pdf=jammy_flows.pdf("e3", "gggggt", options_overwrite=opt_dict)
-
+    pdf.double() # double precision usually necessary to avoid numerical issues
+    
 --------------------------------
 Spherical PDF (2-sphere)
 --------------------------------
@@ -68,6 +70,7 @@ https://arxiv.org/abs/2604.19846 is recommended as a starting point.
     opt_dict["f"]["rotation_mode"]="householder" 
 
     pdf=jammy_flows.pdf("s2", "fffffffffffffff", options_overwrite=opt_dict)
+    pdf.double() # double precision usually necessary to avoid numerical issues
 
 Take more or less "f" flows as needed, depending on the complexity.
 
@@ -82,4 +85,4 @@ Both the Moebius flow ("m") and periodic circular spline flow ("o") should work,
     opt_dict=dict()
 
     pdf=jammy_flows.pdf("s1", "m", options_overwrite=opt_dict)
-
+    pdf.double() # double precision usually necessary to avoid numerical issues
