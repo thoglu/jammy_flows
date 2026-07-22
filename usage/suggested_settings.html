@@ -94,6 +94,7 @@ For an expressive result, one typically wants to use at least as many “g” la
 <span class="n">opt_dict</span><span class="p">[</span><span class="s2">&quot;g&quot;</span><span class="p">][</span><span class="s2">&quot;lower_bound_for_widths&quot;</span><span class="p">]</span><span class="o">=</span><span class="mf">0.01</span> <span class="c1"># bound found empirically to work well</span>
 
 <span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e1&quot;</span><span class="p">,</span> <span class="s2">&quot;gggt&quot;</span><span class="p">,</span> <span class="n">options_overwrite</span><span class="o">=</span><span class="n">opt_dict</span><span class="p">)</span> <span class="c1"># also in 1-d multiple g flows can help, especially with tail behavior</span>
+<span class="n">pdf</span><span class="o">.</span><span class="n">double</span><span class="p">()</span> <span class="c1"># double precision usually necessary to avoid numerical issues</span>
 </pre></div>
 </div>
 <p>Example for 3-d:</p>
@@ -106,6 +107,7 @@ For an expressive result, one typically wants to use at least as many “g” la
 <span class="n">opt_dict</span><span class="p">[</span><span class="s2">&quot;g&quot;</span><span class="p">][</span><span class="s2">&quot;lower_bound_for_widths&quot;</span><span class="p">]</span><span class="o">=</span><span class="mf">0.01</span> <span class="c1"># bound found empirically to work well</span>
 
 <span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;e3&quot;</span><span class="p">,</span> <span class="s2">&quot;gggggt&quot;</span><span class="p">,</span> <span class="n">options_overwrite</span><span class="o">=</span><span class="n">opt_dict</span><span class="p">)</span>
+<span class="n">pdf</span><span class="o">.</span><span class="n">double</span><span class="p">()</span> <span class="c1"># double precision usually necessary to avoid numerical issues</span>
 </pre></div>
 </div>
 </div>
@@ -133,6 +135,7 @@ For an expressive result, one typically wants to use at least as many “g” la
 <span class="n">opt_dict</span><span class="p">[</span><span class="s2">&quot;f&quot;</span><span class="p">][</span><span class="s2">&quot;rotation_mode&quot;</span><span class="p">]</span><span class="o">=</span><span class="s2">&quot;householder&quot;</span>
 
 <span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;s2&quot;</span><span class="p">,</span> <span class="s2">&quot;fffffffffffffff&quot;</span><span class="p">,</span> <span class="n">options_overwrite</span><span class="o">=</span><span class="n">opt_dict</span><span class="p">)</span>
+<span class="n">pdf</span><span class="o">.</span><span class="n">double</span><span class="p">()</span> <span class="c1"># double precision usually necessary to avoid numerical issues</span>
 </pre></div>
 </div>
 <p>Take more or less “f” flows as needed, depending on the complexity.</p>
@@ -143,6 +146,7 @@ For an expressive result, one typically wants to use at least as many “g” la
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">opt_dict</span><span class="o">=</span><span class="nb">dict</span><span class="p">()</span>
 
 <span class="n">pdf</span><span class="o">=</span><span class="n">jammy_flows</span><span class="o">.</span><span class="n">pdf</span><span class="p">(</span><span class="s2">&quot;s1&quot;</span><span class="p">,</span> <span class="s2">&quot;m&quot;</span><span class="p">,</span> <span class="n">options_overwrite</span><span class="o">=</span><span class="n">opt_dict</span><span class="p">)</span>
+<span class="n">pdf</span><span class="o">.</span><span class="n">double</span><span class="p">()</span> <span class="c1"># double precision usually necessary to avoid numerical issues</span>
 </pre></div>
 </div>
 </div>
