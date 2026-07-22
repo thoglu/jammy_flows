@@ -25,6 +25,13 @@ The docs can be found [here](https://thoglu.github.io/jammy_flows/index.html).
 
 Also check out the [example notebook](examples/examples.ipynb).
 
+### Quick Start / Recommended settings:
+
+Recommended settings:
+ - [Euclidean PDFs](https://thoglu.github.io/jammy_flows/usage/suggested_settings.html#euclidean-pdfs)
+ - [circle (1-sphere) PDFs](https://thoglu.github.io/jammy_flows/usage/suggested_settings.html#spherical-pdf-1-sphere-pdf-on-the-circle)
+ - [2-sphere PDFs](https://thoglu.github.io/jammy_flows/usage/suggested_settings.html#spherical-pdf-2-sphere)
+
 ## Features
 
 ### General
@@ -57,7 +64,7 @@ Also check out the [example notebook](examples/examples.ipynb).
  
 ### Interval Flows:
 
-- [x] "Neural Spline Flows" (Rational-quadratic splines) (new in v 1.1 - smooth neural spline flows) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032) (**"r"**)
+- [x] "Neural Spline Flows" (Rational-quadratic splines) (new in v 1.1 - smooth neural spline flows) [arXiv:1906.04032](https://arxiv.org/abs/1906.04032)/[arXiv:2604.19846](https://arxiv.org/abs/2604.19846) (**"r"**)
 
 ### Simplex Flows:
 
@@ -84,9 +91,9 @@ pip install git+https://github.com/thoglu/jammy_flows.git@*tag*
 ```
 e.g.
 ```
-pip install git+https://github.com/thoglu/jammy_flows.git@1.0.0
+pip install git+https://github.com/thoglu/jammy_flows.git@1.1.0
 ```
-to install release 1.0.0.
+to install release 1.1.0.
 
 ### master:
 
