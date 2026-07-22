@@ -122,12 +122,10 @@ Circular 1-d spline flow ("o")
 
 Neural spline and von-Mises Fisher 2-d sphere flow ("f")
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: jammy_flows.layers.spheres.vmf_2d
+.. automodule:: jammy_flows.layers.spheres.fvm_2d
     :members:
     :special-members: __init__
-    :exclude-members: to_subspace, from_subspace
-
+    
 Exponential map 2-d sphere flow ("v")
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
