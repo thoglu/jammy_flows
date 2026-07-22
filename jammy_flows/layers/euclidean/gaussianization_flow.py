@@ -154,6 +154,7 @@ class gf_block(euclidean_base.euclidean_base):
 
         ## Householder rotations
         self.rotation_mode=rotation_mode
+
         if(self.rotation_mode=="triangular_combination"):
 
             ## diagonal + lower/upper (uni) triangular matrices
@@ -1170,9 +1171,10 @@ class gf_block(euclidean_base.euclidean_base):
         counter=0
 
         if(self.rotation_mode=="triangular_combination"):
-            self.triangle_trafo_pars.data=torch.reshape(params[:self.num_triangle_params], [1, self.num_triangle_params])
+            if(self.num_triangle_params>0):
+                self.triangle_trafo_pars.data=torch.reshape(params[:self.num_triangle_params], [1, self.num_triangle_params])
 
-            counter+=self.num_triangle_params
+                counter+=self.num_triangle_params
         elif(self.rotation_mode=="householder"):
             if self.use_householder:
                

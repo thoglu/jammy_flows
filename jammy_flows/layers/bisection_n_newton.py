@@ -37,42 +37,101 @@ def inverse_bisection_n_newton_joint_func_and_grad(func,
         Tensor
             The inverse of the function *func* in each sub-dimension in each batch item.
 
-    """
-    new_upper = torch.full_like(target_arg, max_boundary)
-    new_lower = torch.full_like(target_arg, min_boundary)
+    TODO: Make implicit at some point.
 
-    mid = (new_upper + new_lower) / 2.
+    """
+    new_upper = torch.tensor(max_boundary).type(target_arg.dtype).repeat(*target_arg.shape).to(target_arg.device)
+    new_lower = torch.tensor(min_boundary).type(target_arg.dtype).repeat(*target_arg.shape).to(target_arg.device)
+ 
+    mid=0
     for i in range(num_bisection_iter):
         mid = (new_upper + new_lower) / 2.
+        #print("mid: ", mid)
         inverse_mid = func(mid, *args)
 
-        right_part = (inverse_mid < target_arg).to(target_arg.dtype)
+        #print("MID", mid)
+        
+        right_part = (inverse_mid < target_arg).type(target_arg.dtype)
         left_part = 1. - right_part
 
-        correct_part = close(inverse_mid, target_arg, rtol=1e-6, atol=0).to(target_arg.dtype)
+        correct_part = (close(inverse_mid, target_arg, rtol=1e-6, atol=0)).type(target_arg.dtype)
 
         new_lower = (1. - correct_part) * (right_part * mid + left_part * new_lower) + correct_part * mid
         new_upper = (1. - correct_part) * (right_part * new_upper + left_part * mid) + correct_part * mid
+      
+        
+    prev=mid
 
-    prev = mid
+    #print("target arg", target_arg.shape)
 
-    # Changes to the Newton iterations for compile:
-    # 1. Keep the full batch each iteration, using torch.where to only update where
-    #    non-converged (used to slice the batch in 'prev[above_tolerance_mask, :]')
-    # 2. Removed the early exiting when converging so full number of iterations are completed
-    active_row = torch.ones(target_arg.shape[0], dtype=torch.bool, device=target_arg.device)
+
+    above_tolerance_mask=torch.ones( target_arg.shape[0], dtype=torch.bool, device=target_arg.device)
+
+    ## check where we want to broadcast the masking, and wnhere not
+
+    broadcasting_bool_args=[True if (prev.shape[0]>1 and arg.shape[0]>1) else False for arg in args ]
+
     for i in range(num_newton_iter):
-        fn_result, f_prime_eval = joint_func(prev, *args)
+        
+        fn_result, f_prime_eval = joint_func(prev[above_tolerance_mask,:], *[a[above_tolerance_mask] if(broadcasting_bool_args[arg_index] == True) else a for arg_index, a in enumerate(args)])
+        
+        f_eval=fn_result-target_arg[above_tolerance_mask,:]
 
-        f_eval = fn_result - target_arg
-        update = f_eval / f_prime_eval
+        update=(f_eval/f_prime_eval)
 
-        newsource = prev - update
-        prev = torch.where(active_row.unsqueeze(-1), newsource, prev)
+        newsource=prev[above_tolerance_mask,:]-update
+       
+        ##### correction if we get nans/infs
+        non_fin_mask_new=~torch.isfinite(newsource)
+        non_finite_sum=(non_fin_mask_new==True).sum()
+        if(non_finite_sum>0):
+            print("---- non finite in jammy flows sampling.. try to FIX IT .....................")
+            # stop iterations and replace with previous
+            newsource=torch.where(non_fin_mask_new, prev[above_tolerance_mask,:], newsource)
+        ##################
 
-        still_active = torch.abs(update).sum(dim=1) >= newton_tolerance
-        active_row = active_row & still_active
+        prev=torch.masked_scatter(input=prev, mask=above_tolerance_mask[:,None], source=newsource)
 
+        non_finite_sum=(torch.isfinite(prev)==False).sum()
+        if(non_finite_sum>0):
+
+
+            print("NONZERO")
+            print((torch.isfinite(prev)==False).nonzero())
+
+
+            print("prev", prev[torch.isfinite(prev)==False])
+            print("feval ", f_eval[torch.isfinite(prev)==False])
+            print("f grad eval ", f_prime_eval[torch.isfinite(prev)==False])
+
+            raise Exception()
+
+        new_tolerance_mask=(torch.abs(update).sum(axis=1))>=newton_tolerance
+    
+        above_tolerance_mask=torch.masked_scatter(input=above_tolerance_mask, mask=above_tolerance_mask, source=new_tolerance_mask)
+
+        above_tol=above_tolerance_mask.sum()
+
+        if(verbose):
+            print("-- newton iter %d .. %d / %d dims completed" % (i, target_arg.shape[0]-above_tol, target_arg.shape[0]))
+        if(above_tol==0):
+            if(verbose):
+                print("------ done")
+            break
+
+    if(target_arg.dtype==torch.float64):
+
+        target_prec=1e-7
+    else:
+
+        target_prec=1e-4
+
+    num_non_converged=(torch.abs(f_eval)>target_prec).sum()
+    
+    if( num_non_converged>0):
+        print(num_non_converged, " items did not converge in Newton iterations")
+        print("feval (diff) ",f_eval[torch.abs(f_eval)>target_prec])
+    
     return prev
 
 def inverse_bisection_n_newton(func, 
