@@ -13,6 +13,7 @@ Documentation test
 
    usage/introduction
    usage/training
+   usage/suggested_settings
    usage/api
 
 Indices and tables

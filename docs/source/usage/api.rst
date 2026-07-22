@@ -93,13 +93,6 @@ Gaussianization flow ("g")
     :special-members: __init__
     :exclude-members: sigmoid_inv_error_pass_combined_val_n_log_derivative, sigmoid_inv_error_pass_combined_val_n_normal_derivative
 
-Polynomial stretch flow ("p")
-^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
-
-.. automodule:: jammy_flows.layers.euclidean.polynomial_stretch_flow
-    :members:
-    :special-members: __init__
-
 Spherical flow layers
 ----------------------------
 
@@ -127,10 +120,10 @@ Circular 1-d spline flow ("o")
     :members:
     :special-members: __init__
 
-Segmented 2-d sphere flow ("n")
+Neural spline and von-Mises Fisher 2-d sphere flow ("f")
 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-.. automodule:: jammy_flows.layers.spheres.segmented_sphere_nd
+.. automodule:: jammy_flows.layers.spheres.vmf_2d
     :members:
     :special-members: __init__
     :exclude-members: to_subspace, from_subspace
