@@ -1192,6 +1192,39 @@ rotation_mode (str): One of [“angles”, “householder”]. <em>Angles</em> i
 </div>
 <div class="section" id="neural-spline-and-von-mises-fisher-2-d-sphere-flow-f">
 <h4>Neural spline and von-Mises Fisher 2-d sphere flow (“f”)<a class="headerlink" href="#neural-spline-and-von-mises-fisher-2-d-sphere-flow-f" title="Permalink to this headline">¶</a></h4>
+<span class="target" id="module-jammy_flows.layers.spheres.fvm_2d"></span><dl class="class">
+<dt id="jammy_flows.layers.spheres.fvm_2d.fisher_von_mises_2d">
+<em class="property">class </em><code class="sig-prename descclassname">jammy_flows.layers.spheres.fvm_2d.</code><code class="sig-name descname">fisher_von_mises_2d</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">fisher_parametrization='split'</em>, <em class="sig-param">add_vertical_rq_spline_flow=0</em>, <em class="sig-param">add_circular_rq_spline_flow=0</em>, <em class="sig-param">vertical_flow_defs='r'</em>, <em class="sig-param">circular_flow_defs='o'</em>, <em class="sig-param">add_correlated_rq_spline_flow=0</em>, <em class="sig-param">correlated_max_rank=3</em>, <em class="sig-param">inverse_z_scaling=1</em>, <em class="sig-param">spline_num_basis_functions=5</em>, <em class="sig-param">boundary_cos_theta_identity_region=0.0</em>, <em class="sig-param">vertical_smooth=0</em>, <em class="sig-param">vertical_restrict_max_min_width_height_ratio=-1.0</em>, <em class="sig-param">vertical_fix_boundary_derivative=1</em>, <em class="sig-param">vertical_fix_first_width_n_height_to_zero=0</em>, <em class="sig-param">vertical_also_fix_second_width_to_zero=0</em>, <em class="sig-param">vertical_independent_width_height_parametrization=0</em>, <em class="sig-param">circular_add_rotation=1</em>, <em class="sig-param">min_kappa=1e-10</em>, <em class="sig-param">kappa_prediction='direct_log_real_bounded'</em>, <em class="sig-param">add_extra_rotation_inbetween=0</em>, <em class="sig-param">kappa_clamping=0</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">num_householder_iter=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.fvm_2d.fisher_von_mises_2d" title="Permalink to this definition">¶</a></dt>
+<dd><dl class="method">
+<dt id="jammy_flows.layers.spheres.fvm_2d.fisher_von_mises_2d.__init__">
+<code class="sig-name descname">__init__</code><span class="sig-paren">(</span><em class="sig-param">dimension</em>, <em class="sig-param">euclidean_to_sphere_as_first=False</em>, <em class="sig-param">use_permanent_parameters=False</em>, <em class="sig-param">fisher_parametrization='split'</em>, <em class="sig-param">add_vertical_rq_spline_flow=0</em>, <em class="sig-param">add_circular_rq_spline_flow=0</em>, <em class="sig-param">vertical_flow_defs='r'</em>, <em class="sig-param">circular_flow_defs='o'</em>, <em class="sig-param">add_correlated_rq_spline_flow=0</em>, <em class="sig-param">correlated_max_rank=3</em>, <em class="sig-param">inverse_z_scaling=1</em>, <em class="sig-param">spline_num_basis_functions=5</em>, <em class="sig-param">boundary_cos_theta_identity_region=0.0</em>, <em class="sig-param">vertical_smooth=0</em>, <em class="sig-param">vertical_restrict_max_min_width_height_ratio=-1.0</em>, <em class="sig-param">vertical_fix_boundary_derivative=1</em>, <em class="sig-param">vertical_fix_first_width_n_height_to_zero=0</em>, <em class="sig-param">vertical_also_fix_second_width_to_zero=0</em>, <em class="sig-param">vertical_independent_width_height_parametrization=0</em>, <em class="sig-param">circular_add_rotation=1</em>, <em class="sig-param">min_kappa=1e-10</em>, <em class="sig-param">kappa_prediction='direct_log_real_bounded'</em>, <em class="sig-param">add_extra_rotation_inbetween=0</em>, <em class="sig-param">kappa_clamping=0</em>, <em class="sig-param">add_rotation=1</em>, <em class="sig-param">rotation_mode='householder'</em>, <em class="sig-param">num_householder_iter=-1</em><span class="sig-paren">)</span><a class="headerlink" href="#jammy_flows.layers.spheres.fvm_2d.fisher_von_mises_2d.__init__" title="Permalink to this definition">¶</a></dt>
+<dd><p>Symbol: “f”</p>
+<p>Based off of <a class="reference external" href="https://arxiv.org/abs/2002.02428">https://arxiv.org/abs/2002.02428</a> (conditional rational splines) and
+<a class="reference external" href="https://arxiv.org/abs/2604.19846">https://arxiv.org/abs/2604.19846</a>, (smooth rational splines and von-mises Fisher scaling functions).</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters</dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>add_vertical_rq_spline_flow</strong> (<em>int</em>) – Add vertical rq flow?</p></li>
+<li><p><strong>add_circular_rq_spline_flow</strong> (<em>int</em>) – Add 1-d rq flow for phi?</p></li>
+<li><p><strong>vertical_flow_defs</strong> (<em>str</em>) – Which vertical flow layers to use.</p></li>
+<li><p><strong>circular_flow_defs</strong> (<em>str</em>) – Which circular flow layers to use.</p></li>
+<li><p><strong>add_correlated_rq_spline_flow</strong> (<em>int</em>) – Add a correlation between vertical and circular flow via a NN ?</p></li>
+<li><p><strong>correlated_max_rank</strong> (<em>int</em>) – Max rank of matrices in NN to connect vertical and circular flow.</p></li>
+<li><p><strong>inverse_z_scaling</strong> (<em>int</em>) – Define flow -z instead of z. Should be set to 1 to work well with standard stereographic projection.</p></li>
+<li><p><strong>spline_num_basis_functions</strong> (<em>int</em>) – Number of basis functions for the vertical/circular spline flows.</p></li>
+<li><p><strong>boundary_cos_theta_identity_region</strong> (<em>float</em>) – Defines the distance in cos(theta) from -1/1 respectively in which only an identity mapping is used.</p></li>
+<li><p><strong>vertical_smooth</strong> (<em>int</em>) – Smooth 2nd derivatives for vertical rq flow.</p></li>
+<li><p><strong>vertical_restrict_max_min_width_height_ratio</strong> (<em>float</em>) – Restrict the ratio between widths/heights to a maximum value.</p></li>
+<li><p><strong>vertical_fix_boundary_derivative</strong> (<em>int</em>) – Fix boundary derivative to 1.0 or not?</p></li>
+<li><p><strong>min_kappa</strong> (<em>float</em>) – Minimum allowed kappa value.</p></li>
+<li><p><strong>kappa_prediction</strong> (<em>str</em>) – Either “direct_log_real_bounded”, or “log_bounded”, which uses softplus in log space to lower-bound kappa.</p></li>
+</ul>
+</dd>
+</dl>
+</dd></dl>
+
+</dd></dl>
+
 </div>
 <div class="section" id="module-jammy_flows.layers.spheres.exponential_map_s2">
 <span id="exponential-map-2-d-sphere-flow-v"></span><h4>Exponential map 2-d sphere flow (“v”)<a class="headerlink" href="#module-jammy_flows.layers.spheres.exponential_map_s2" title="Permalink to this headline">¶</a></h4>
