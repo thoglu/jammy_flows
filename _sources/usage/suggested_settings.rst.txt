@@ -3,11 +3,7 @@ Suggested Settings
 **************************
 
 The settings of a normalizing flow can drastically change its behavior. In the following, we summarize recommended standard settings to start with. Settings for a normalizing flow are custumized 
-via the 
-..  code-block:: python
-    options_overwrite
-
-keyword passed at construction.
+via the **options_overwrite** keyword passed at construction.
 
 --------------------------------
 Euclidean PDFs
