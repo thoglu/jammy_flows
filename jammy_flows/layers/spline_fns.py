@@ -31,9 +31,15 @@ def return_safe_angle_within_2pi(x, safety_margin=1e-7):
             used_safety_margin=1e-7
         elif(x.dtype==torch.float64):
             used_safety_margin=1e-10
-    
-    upper_bound=2*numpy.pi-safety_margin
-    lower_bound=0.0+safety_margin
+
+    # In float32 the spacing between representable values at 2*pi is ~4.8e-7,
+    # so a smaller margin makes the upper clamp a no-op (2*pi - margin rounds
+    # back to 2*pi). Widen it so the clamp stays effective in fp32.
+    if(x.dtype==torch.float32 and used_safety_margin<1e-6):
+        used_safety_margin=1e-6
+
+    upper_bound=2*numpy.pi-used_safety_margin
+    lower_bound=0.0+used_safety_margin
 
     small_mask=x<lower_bound
     large_mask=x>upper_bound

@@ -258,10 +258,17 @@ class sphere_base(layer_base.layer_base):
 
                     # last one is 0 to 2pi
                     # new_angle=torch.acos(x[:,ind:ind+1]/torch.sum(x[:,ind:]**2, dim=1, keepdims=True).sqrt())
+                    # Keep acos away from +-1 so neither the value nor the
+                    # backward pass (d/dx acos = -1/sqrt(1-x^2)) produces
+                    # NaN/inf. Margin is dtype-aware: wide enough to survive
+                    # fp32 rounding, tight enough not to distort the inverse
+                    # mapping in fp64 (a fixed 1e-4 margin breaks
+                    # sample<->eval roundtrip consistency).
+                    acos_margin = 1e-6 if x.dtype == torch.float32 else 1e-12
                     sq = torch.sum(x[:, ind:] ** 2, dim=1, keepdims=True)
                     denom = torch.sqrt(torch.clamp(sq, min=1e-8))
                     arg = x[:, ind:ind+1] / denom
-                    arg = torch.clamp(arg, -1.0 + 1e-4, 1.0 - 1e-4)
+                    arg = torch.clamp(arg, -1.0 + acos_margin, 1.0 - acos_margin)
                     new_angle = torch.acos(arg)
 
                     #mask_smaller=(x[:,ind+1:ind+2]<0).double()
