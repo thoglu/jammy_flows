@@ -46,7 +46,7 @@ Spherical PDF (2-sphere)
 --------------------------------
 
 A combination of smooth neural spline flows interwoven with von-Mises-Fisher scalings as used in 
-https://arxiv.org/abs/2604.19846 is recommended as a starting point. 
+https://arxiv.org/abs/2604.19846 is recommended as a starting point. The final vMF flow can probably be dropped.
 
 ..  code-block:: python
 
@@ -69,7 +69,17 @@ https://arxiv.org/abs/2604.19846 is recommended as a starting point.
     opt_dict["f"]["vertical_also_fix_second_width_to_zero"]=1
     opt_dict["f"]["rotation_mode"]="householder" 
 
-    pdf=jammy_flows.pdf("s2", "fffffffffffffff", options_overwrite=opt_dict)
+    # overwrite last layer to be pure vMF - a precaution in principle, probably not needed
+    opt_dict[(0,15)]=dict()
+    opt_dict[(0,15)]["f"]=dict()
+    opt_dict[(0,15)]["f"]["add_vertical_rq_spline_flow"]=0
+    opt_dict[(0,15)]["f"]["add_circular_rq_spline_flow"]=0
+    opt_dict[(0,15)]["f"]["add_rotation"]=1
+    opt_dict[(0,15)]["f"]["min_kappa"]=1e-10
+    opt_dict[(0,15)]["f"]["kappa_prediction"]="direct_log_real_bounded"
+    opt_dict[(0,15)]["f"]["rotation_mode"]="householder"
+
+    pdf=jammy_flows.pdf("s2", "f"*16, options_overwrite=opt_dict, conditional_input_dim=*N*) # 15 + 1 "f" layers (last one is pure vMF)
     pdf.double() # double precision usually necessary to avoid numerical issues
 
 Take more or less "f" flows as needed, depending on the complexity.
