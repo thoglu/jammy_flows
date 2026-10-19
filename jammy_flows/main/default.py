@@ -116,7 +116,8 @@ class pdf(nn.Module):
         self.total_number_amortizable_params=None
 
         if(self.amortize_everything):
-            assert(self.amortization_mlp_use_custom_mode), "Amortizing all MLPs requires custom MLPs."
+            if(conditional_input_dim is not None):
+                assert(self.amortization_mlp_use_custom_mode), "Amortizing all MLPs requires custom MLPs."
             self.total_number_amortizable_params=0
     
         self.read_model_definition(pdf_defs, 

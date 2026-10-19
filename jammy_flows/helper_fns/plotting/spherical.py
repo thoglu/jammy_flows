@@ -479,6 +479,7 @@ def get_meshed_positions_and_areas(samples,
 
 def get_multiresolution_evals(pdf, 
                               conditional_input=None,
+                              amortization_parameters=None,
                               sub_pdf_index=0,
                               samplesize=10000, 
                               max_entries_per_pixel=5,
@@ -505,8 +506,17 @@ def get_multiresolution_evals(pdf,
             if(conditional_input.ndim==2):
                 assert(conditional_input.shape[0]==1), "Only a single conditional input item must be given!"
             data_summary_repeated=conditional_input.repeat_interleave(samplesize, dim=0) if conditional_input.ndim==2 else conditional_input[None,:].repeat_interleave(samplesize, dim=0)
-        
-    samples,_,_,_=pdf.sample(samplesize=samplesize, conditional_input=data_summary_repeated)
+    
+    amortization_params_repeated=None
+    if(amortization_parameters is not None):
+        # must have similar shape than conditional pars (single item)
+        assert(amortization_parameters.ndim==2)
+        assert(amortization_parameters.shape[0]==1)
+
+        amortization_params_repeated=amortization_parameters.repeat_interleave(samplesize, dim=0)
+
+
+    samples,_,_,_=pdf.sample(samplesize=samplesize, conditional_input=data_summary_repeated, amortization_parameters=amortization_params_repeated)
 
     eval_positions, eval_areas, moc_map=get_meshed_positions_and_areas(samples,max_entries_per_pixel=max_entries_per_pixel)
 
@@ -514,10 +524,11 @@ def get_multiresolution_evals(pdf,
 
     if(use_density_if_possible and (sub_pdf_index==0)):
         xyz_positions=pdf.transform_target_into_returnable_params(torch.from_numpy(eval_positions).to(samples))
-
+        moc_size=xyz_positions.shape[0]
+        
         if(data_summary_repeated is not None):
             
-            moc_size=xyz_positions.shape[0]
+            
             if(type(data_summary_repeated)==list):  
                 assert(moc_size<=data_summary_repeated[0].shape[0])
                 data_summary_repeated=[ci[:moc_size] for ci in data_summary_repeated]
@@ -525,7 +536,11 @@ def get_multiresolution_evals(pdf,
                 assert(moc_size<=data_summary_repeated.shape[0])
                 data_summary_repeated=data_summary_repeated[:moc_size]
 
-        log_pdf,_,_=pdf(xyz_positions, force_embedding_coordinates=True, conditional_input=data_summary_repeated)
+        if(amortization_params_repeated is not None):
+            assert(moc_size<=amortization_params_repeated.shape[0])
+            amortization_params_repeated=amortization_params_repeated[:moc_size]
+
+        log_pdf,_,_=pdf(xyz_positions, force_embedding_coordinates=True, conditional_input=data_summary_repeated,amortization_parameters=amortization_params_repeated)
         
         log_pdf=log_pdf.cpu().detach().numpy()
         pdf_evals=numpy.exp(log_pdf)
@@ -554,6 +569,7 @@ def plot_multiresolution_healpy(pdf,
                                 ax_to_plot=None,
                                 samplesize=10000,
                                 conditional_input=None, 
+                                amortization_parameters=None,
                                 sub_pdf_index=0,
                                 max_entries_per_pixel=5,
                                 draw_pixels=True,
@@ -584,6 +600,7 @@ def plot_multiresolution_healpy(pdf,
                                                                              sub_pdf_index=sub_pdf_index,
                                                                     samplesize=samplesize,
                                                                     conditional_input=conditional_input,
+                                                                    amortization_parameters=amortization_parameters,
                                                                     max_entries_per_pixel=max_entries_per_pixel,
                                                                     use_density_if_possible=use_density_if_possible)
     
